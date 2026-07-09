@@ -1,0 +1,496 @@
+{
+  "schema_version": "2.0",
+  "prototype_id": "scenario-n-icc-005-v2",
+  "scenario": {
+    "scenario_id": "N-ICC-005",
+    "title": "Talking About Culture on Campus",
+    "scenario_type": "Global Intercultural Campus Conversation",
+    "level": "B1-B2",
+    "ar_scene": "Campus courtyard near the International Office",
+    "student_role": "Rina, a local Indonesian student",
+    "ai_role": "David, an international student from Melbourne, Australia",
+    "icc_dimension": [
+      "Knowledge",
+      "Attitudes",
+      "Skills of interpreting and relating",
+      "Critical cultural awareness"
+    ],
+    "cultural_focus": [
+      "Stereotypes",
+      "Smiling and friendliness",
+      "Personal questions",
+      "Language learning",
+      "Gotong royong",
+      "Respectful cultural comparison"
+    ],
+    "learning_goal": "Exchange cultural perspectives respectfully, explain intentions, and compare cultural practices without stereotyping.",
+    "task_instruction": "Talk with David about Australian and Indonesian culture, clarify misunderstandings, and compare values respectfully.",
+    "ai_character_prompt": "You are David, an exchange student from Melbourne, Australia. You are friendly, curious, reflective, and willing to discuss your own experience without claiming to represent every Australian. You ask Rina respectful questions about Indonesian campus life and culture.",
+    "good_response_examples": [
+      "What is something people often misunderstand about Australians?",
+      "In Indonesia, personal questions are sometimes intended as friendly conversation, although people can have different boundaries.",
+      "Gotong royong is a value of helping the community together."
+    ],
+    "poor_response_examples": [
+      "All Australians spend their time surfing.",
+      "You should not feel uncomfortable because our culture is friendly.",
+      "Indonesian culture is better than Australian culture."
+    ],
+    "cultural_note": "Intercultural understanding requires separating stereotypes from individual experience, explaining intentions without dismissing personal boundaries, and comparing values without ranking cultures."
+  },
+  "context": {
+    "scene_title": "Culture Conversation on Campus",
+    "setting": "Campus courtyard near the International Office",
+    "situation": "Rina and David talk on campus about Australian stereotypes, Indonesian friendliness, personal questions, language learning, and gotong royong.",
+    "boundaries": [
+      "Remain in a friendly conversation on campus.",
+      "David speaks only as David and never speaks for Rina.",
+      "Treat cultural statements as personal experiences rather than universal facts.",
+      "Do not return to the old cultural festival booth scenario."
+    ],
+    "forbidden_terms": [
+      "cultural festival booth",
+      "visitor from another Indonesian region",
+      "our tradition is better"
+    ]
+  },
+  "characters": [
+    {
+      "name": "Rina",
+      "role": "Student learner",
+      "profile": "A local Indonesian university student who wants to discuss culture respectfully."
+    },
+    {
+      "name": "David",
+      "role": "AI conversation partner",
+      "profile": "An international student from Melbourne, Australia who is adjusting to Indonesian campus life."
+    }
+  ],
+  "prototype_scope": {
+    "input_mode": "voice_with_text_fallback",
+    "voice_enabled": true,
+    "ar_enabled": true,
+    "avatar_enabled": true,
+    "scoring_enabled": true,
+    "feedback_enabled": true,
+    "max_turns": 10,
+    "prototype_focus": "Scenario-based AR speaking practice with adaptive AI role-play, objective tracking, scoring, and post-session feedback."
+  },
+  "session_rules": {
+    "minimum_student_responses": 5,
+    "target_student_responses_min": 6,
+    "target_student_responses_max": 8,
+    "maximum_student_responses": 10,
+    "required_objective_ids": [
+      "ask_without_stereotyping",
+      "explain_local_friendliness",
+      "clarify_personal_questions",
+      "encourage_language_learning",
+      "compare_community_values"
+    ],
+    "natural_closing_message": "I have learned a lot from talking with you today. I hope we can have more conversations like this on campus."
+  },
+  "conversation_objectives": [
+    {
+      "objective_id": "ask_without_stereotyping",
+      "description": "Ask about Australian culture without assuming a stereotype is true.",
+      "detection_cues": [
+        "misunderstand",
+        "australian culture",
+        "your experience",
+        "is it true",
+        "what is something"
+      ],
+      "ai_follow_up": "I would be happy to share. What would you like to ask about my own experience in Australia?"
+    },
+    {
+      "objective_id": "explain_local_friendliness",
+      "description": "Explain smiling and friendliness in Indonesian campus life.",
+      "detection_cues": [
+        "smile",
+        "smiling",
+        "friendly",
+        "respect",
+        "comfortable",
+        "welcoming"
+      ],
+      "ai_follow_up": "I often notice students smiling at each other. What does that usually communicate here?"
+    },
+    {
+      "objective_id": "clarify_personal_questions",
+      "description": "Explain the friendly intention behind personal questions while respecting boundaries.",
+      "detection_cues": [
+        "personal question",
+        "married",
+        "how old",
+        "friendly intention",
+        "privacy",
+        "boundary"
+      ],
+      "ai_follow_up": "Some personal questions surprised me at first. How would you explain their intention without ignoring someone's privacy?"
+    },
+    {
+      "objective_id": "encourage_language_learning",
+      "description": "Encourage David's effort to learn Indonesian.",
+      "detection_cues": [
+        "terima kasih",
+        "tolong",
+        "apa kabar",
+        "pronunciation",
+        "appreciate your effort",
+        "indonesian words"
+      ],
+      "ai_follow_up": "I know a few Indonesian expressions, but I am still practicing. What would you say to encourage me?"
+    },
+    {
+      "objective_id": "compare_community_values",
+      "description": "Explain gotong royong and compare community values without ranking cultures.",
+      "detection_cues": [
+        "gotong royong",
+        "community",
+        "working together",
+        "volunteer",
+        "both cultures",
+        "similar"
+      ],
+      "ai_follow_up": "Could you explain gotong royong and how it might compare with community volunteering in Australia?"
+    }
+  ],
+  "conversation_stages": [
+    {
+      "stage_order": 1,
+      "stage": "Opening",
+      "speaker": "AI",
+      "message_or_student_goal": "Hi, Rina. It is good to see you. I am settling into campus life well, and everyone has been very friendly.",
+      "expected_function": "Begin a friendly campus conversation.",
+      "success_indicator": "Begin a friendly campus conversation."
+    },
+    {
+      "stage_order": 2,
+      "stage": "Australian Culture",
+      "speaker": "Student Goal",
+      "message_or_student_goal": "Ask about Australian culture without presenting a stereotype as fact.",
+      "expected_function": "Use respectful curiosity.",
+      "success_indicator": "Use respectful curiosity."
+    },
+    {
+      "stage_order": 3,
+      "stage": "Indonesian Friendliness",
+      "speaker": "AI",
+      "message_or_student_goal": "I often see students smiling at each other on campus. Is smiling important here?",
+      "expected_function": "Invite a contextual explanation.",
+      "success_indicator": "Invite a contextual explanation."
+    },
+    {
+      "stage_order": 4,
+      "stage": "Culture Shock",
+      "speaker": "AI",
+      "message_or_student_goal": "Some personal questions surprised me at first. How should I understand them?",
+      "expected_function": "Discuss intention and boundaries.",
+      "success_indicator": "Discuss intention and boundaries."
+    },
+    {
+      "stage_order": 5,
+      "stage": "Language Learning",
+      "speaker": "AI",
+      "message_or_student_goal": "I know Terima kasih, Tolong, and Apa kabar, but I am still practicing.",
+      "expected_function": "Encourage language learning.",
+      "success_indicator": "Encourage language learning."
+    },
+    {
+      "stage_order": 6,
+      "stage": "Community Values",
+      "speaker": "AI",
+      "message_or_student_goal": "What is your favorite Indonesian tradition or value?",
+      "expected_function": "Discuss gotong royong and comparison.",
+      "success_indicator": "Discuss gotong royong and comparison."
+    },
+    {
+      "stage_order": 7,
+      "stage": "Closing",
+      "speaker": "AI",
+      "message_or_student_goal": "I have learned a lot from talking with you today.",
+      "expected_function": "Close with mutual appreciation.",
+      "success_indicator": "Close with mutual appreciation."
+    }
+  ],
+  "conversation_flow": [
+    {
+      "turn": 1,
+      "stage": "Opening",
+      "speaker": "AI",
+      "message": "Hi, Rina. It is good to see you. I am settling into campus life well, and everyone has been very friendly.",
+      "expected_function": "Begin a friendly campus conversation.",
+      "success_indicator": "Begin a friendly campus conversation."
+    },
+    {
+      "turn": 2,
+      "stage": "Australian Culture",
+      "speaker": "Student Goal",
+      "student_goal": "Ask about Australian culture without presenting a stereotype as fact.",
+      "expected_function": "Use respectful curiosity.",
+      "success_indicator": "Use respectful curiosity."
+    },
+    {
+      "turn": 3,
+      "stage": "Indonesian Friendliness",
+      "speaker": "AI",
+      "message": "I often see students smiling at each other on campus. Is smiling important here?",
+      "expected_function": "Invite a contextual explanation.",
+      "success_indicator": "Invite a contextual explanation."
+    },
+    {
+      "turn": 4,
+      "stage": "Culture Shock",
+      "speaker": "AI",
+      "message": "Some personal questions surprised me at first. How should I understand them?",
+      "expected_function": "Discuss intention and boundaries.",
+      "success_indicator": "Discuss intention and boundaries."
+    },
+    {
+      "turn": 5,
+      "stage": "Language Learning",
+      "speaker": "AI",
+      "message": "I know Terima kasih, Tolong, and Apa kabar, but I am still practicing.",
+      "expected_function": "Encourage language learning.",
+      "success_indicator": "Encourage language learning."
+    },
+    {
+      "turn": 6,
+      "stage": "Community Values",
+      "speaker": "AI",
+      "message": "What is your favorite Indonesian tradition or value?",
+      "expected_function": "Discuss gotong royong and comparison.",
+      "success_indicator": "Discuss gotong royong and comparison."
+    },
+    {
+      "turn": 7,
+      "stage": "Closing",
+      "speaker": "AI",
+      "message": "I have learned a lot from talking with you today.",
+      "expected_function": "Close with mutual appreciation.",
+      "success_indicator": "Close with mutual appreciation."
+    }
+  ],
+  "branching_rules": [
+    {
+      "rule_id": "BR-026",
+      "student_response_category": "GOOD",
+      "detection_cues": [
+        "polite",
+        "clear",
+        "relevant",
+        "culturally sensitive"
+      ],
+      "ai_response_strategy": "Continue conversation and reinforce good strategy",
+      "example_ai_response": "That is a respectful way to say it. Let's continue.",
+      "feedback_focus": "Positive reinforcement",
+      "score_impact": "+1 politeness/ICC"
+    },
+    {
+      "rule_id": "BR-027",
+      "student_response_category": "ACCEPTABLE",
+      "detection_cues": [
+        "understandable but slightly direct or limited"
+      ],
+      "ai_response_strategy": "Continue but model improved expression",
+      "example_ai_response": "Your meaning is clear. You can make it more polite by saying...",
+      "feedback_focus": "Improvement",
+      "score_impact": "neutral"
+    },
+    {
+      "rule_id": "BR-028",
+      "student_response_category": "TOO_DIRECT",
+      "detection_cues": [
+        "commands",
+        "blunt disagreement",
+        "no softeners"
+      ],
+      "ai_response_strategy": "Ask student to soften language and explain pragmatics",
+      "example_ai_response": "Your message is understandable, but it sounds too direct in this context.",
+      "feedback_focus": "Politeness strategy",
+      "score_impact": "-1 politeness/pragmatics"
+    },
+    {
+      "rule_id": "BR-029",
+      "student_response_category": "STEREOTYPING",
+      "detection_cues": [
+        "always",
+        "everyone from",
+        "people from your region",
+        "accent jokes"
+      ],
+      "ai_response_strategy": "Challenge generalization and redirect respectfully",
+      "example_ai_response": "Be careful not to generalize a whole group. Try asking about individual experience.",
+      "feedback_focus": "Critical cultural awareness",
+      "score_impact": "-1 or -2 ICC"
+    },
+    {
+      "rule_id": "BR-030",
+      "student_response_category": "DISMISSIVE",
+      "detection_cues": [
+        "just eat anything",
+        "too sensitive",
+        "not important"
+      ],
+      "ai_response_strategy": "Explain cultural or personal importance and request repair",
+      "example_ai_response": "This response may dismiss the other person's concern. Try acknowledging their preference first.",
+      "feedback_focus": "Empathy and repair",
+      "score_impact": "-1 ICC"
+    },
+    {
+      "rule_id": "BR-031",
+      "student_response_category": "SILENCE_OR_UNCLEAR",
+      "detection_cues": [
+        "empty",
+        "very short",
+        "unclear pronunciation/transcription"
+      ],
+      "ai_response_strategy": "Prompt clarification and give support",
+      "example_ai_response": "Could you say that again in a complete sentence? You can start with...",
+      "feedback_focus": "Fluency support",
+      "score_impact": "no score until retry"
+    }
+  ],
+  "fallback_responses": {
+    "GOOD": "That helps me understand the intention and the cultural context much better.",
+    "ACCEPTABLE": "That helps me understand the intention and the cultural context much better.",
+    "TOO_DIRECT": "I understand what you mean. Could we continue this conversation in a more respectful way?",
+    "STEREOTYPING": "I would rather talk about individual experiences than generalize a whole group.",
+    "TOO_PERSONAL": "I would prefer not to discuss that yet. Could we stay with the topic we are discussing?",
+    "DISMISSIVE": "I understand, but I would appreciate it if we could acknowledge the concern and discuss it together.",
+    "SILENCE_OR_UNCLEAR": "Sorry, I did not quite understand. Could you say that again in a complete sentence?"
+  },
+  "rubric": {
+    "grammar": {
+      "score_1": "Many errors obscure meaning",
+      "score_2": "Frequent errors but some meaning clear",
+      "score_3": "Some errors but understandable",
+      "score_4": "Minor errors only",
+      "score_5": "Accurate and natural for level",
+      "notes_for_ai": "Do not over-penalize accent or minor EFL errors."
+    },
+    "vocabulary": {
+      "score_1": "Very limited or inappropriate",
+      "score_2": "Limited vocabulary",
+      "score_3": "Adequate vocabulary",
+      "score_4": "Appropriate vocabulary",
+      "score_5": "Varied and context-appropriate vocabulary",
+      "notes_for_ai": "Focus on communicative appropriateness."
+    },
+    "fluency": {
+      "score_1": "Very hesitant or fragmented",
+      "score_2": "Frequent pauses",
+      "score_3": "Generally understandable",
+      "score_4": "Mostly smooth",
+      "score_5": "Smooth and natural",
+      "notes_for_ai": "Use speech transcript; consider hesitation reasonably."
+    },
+    "politeness": {
+      "score_1": "Rude or commanding",
+      "score_2": "Too direct",
+      "score_3": "Some polite forms",
+      "score_4": "Polite and respectful",
+      "score_5": "Highly appropriate politeness strategy",
+      "notes_for_ai": "Assess softeners, greetings, thanks, apology."
+    },
+    "pragmatic_appropriateness": {
+      "score_1": "Response does not fit context",
+      "score_2": "Partly inappropriate",
+      "score_3": "Generally appropriate",
+      "score_4": "Appropriate to role/context",
+      "score_5": "Highly appropriate and context-sensitive",
+      "notes_for_ai": "Assess function: request, refusal, apology, disagreement."
+    },
+    "intercultural_awareness": {
+      "score_1": "Stereotyping or culturally insensitive",
+      "score_2": "Limited awareness",
+      "score_3": "Some awareness",
+      "score_4": "Clear awareness",
+      "score_5": "Strong empathy, reflection, and respectful comparison",
+      "notes_for_ai": "Assess avoiding assumptions, respect, curiosity, repair."
+    }
+  },
+  "reference_dialogue": [
+    {
+      "speaker": "Rina",
+      "message": "Hi, David. How are you settling into campus life?"
+    },
+    {
+      "speaker": "David",
+      "message": "Hi, Rina. I am doing well, thank you. Everyone has been very friendly."
+    },
+    {
+      "speaker": "Rina",
+      "message": "What is something that people usually misunderstand about Australians?"
+    },
+    {
+      "speaker": "David",
+      "message": "Many people think we spend all our time surfing or all live near the beach. Australia is diverse, and people have many different lifestyles."
+    },
+    {
+      "speaker": "David",
+      "message": "I often see students smiling at each other on campus. Is smiling an important part of Indonesian culture?"
+    },
+    {
+      "speaker": "Rina",
+      "message": "Smiling is a way to show friendliness and respect and to make others feel comfortable."
+    },
+    {
+      "speaker": "David",
+      "message": "I noticed that people sometimes ask personal questions like whether I am married or how old I am. At first, I was surprised."
+    },
+    {
+      "speaker": "Rina",
+      "message": "Those questions are often intended to be friendly, although people can still have different personal boundaries."
+    },
+    {
+      "speaker": "David",
+      "message": "I know Terima kasih, Tolong, and Apa kabar. I am still practicing my pronunciation."
+    },
+    {
+      "speaker": "Rina",
+      "message": "People will appreciate your effort to speak Indonesian."
+    },
+    {
+      "speaker": "Rina",
+      "message": "I like gotong royong. It means working together to help the community without expecting anything in return."
+    },
+    {
+      "speaker": "David",
+      "message": "We also have community volunteering in Australia. Understanding both values is interesting."
+    },
+    {
+      "speaker": "David",
+      "message": "I have learned a lot from talking with you today."
+    },
+    {
+      "speaker": "Rina",
+      "message": "Learning about different cultures is one of the best parts of university life."
+    }
+  ],
+  "ai_output_format": {
+    "schema_version": "2.0",
+    "required_fields": [
+      "scenario_id",
+      "turn_number",
+      "ai_message",
+      "detected_category",
+      "scores",
+      "feedback",
+      "cultural_note",
+      "improved_response",
+      "continue_conversation",
+      "completed_objective_ids",
+      "end_reason"
+    ]
+  },
+  "initial_conversation_state": {
+    "scenario_id": "N-ICC-005",
+    "student_response_count": 0,
+    "conversation_status": "started",
+    "ai_opening_message": "Hi, Rina. It is good to see you. I am settling into campus life well, and everyone has been very friendly.",
+    "student_expected_action": "Ask about Australian culture without assuming a stereotype is true.",
+    "session_result": null
+  }
+}

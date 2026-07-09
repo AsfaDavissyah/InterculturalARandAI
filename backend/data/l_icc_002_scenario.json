@@ -1,0 +1,400 @@
+{
+  "schema_version": "2.0",
+  "prototype_id": "scenario-l-icc-002-v2",
+  "scenario": {
+    "scenario_id": "L-ICC-002",
+    "title": "Different Regional Greeting Norms",
+    "scenario_type": "Local Indonesian Intercultural",
+    "level": "B1",
+    "ar_scene": "Student dormitory lobby",
+    "student_role": "New student meeting a roommate",
+    "ai_role": "Roommate from another Indonesian region",
+    "icc_dimension": [
+      "Attitudes",
+      "Knowledge",
+      "Skills of discovery and interaction"
+    ],
+    "cultural_focus": [
+      "Greeting",
+      "regional identity",
+      "safe small talk",
+      "respectful curiosity"
+    ],
+    "learning_goal": "Introduce oneself and ask culturally sensitive questions when meeting someone from another Indonesian region.",
+    "task_instruction": "Meet your new roommate from another region. Introduce yourself and start a friendly conversation without asking overly personal questions.",
+    "ai_character_prompt": "You are a friendly Indonesian student from another region. You are open to conversation, but you prefer not to answer questions that feel too personal at the first meeting.",
+    "good_response_examples": [
+      "Nice to meet you. How was your trip here?",
+      "What do you like most about your hometown?"
+    ],
+    "poor_response_examples": [
+      "Why is your accent like that?",
+      "Are people from your region always loud?",
+      "Are you rich or poor?"
+    ],
+    "cultural_note": "Respectful curiosity is acceptable, but questions should avoid stereotypes and private matters."
+  },
+  "context": {
+    "scene_title": "Meeting a New Roommate",
+    "setting": "Student dormitory lobby",
+    "situation": "A student meets a roommate from another Indonesian region for the first time in the dormitory lobby.",
+    "boundaries": [
+      "Remain in the student dormitory lobby.",
+      "Focus on introductions, safe small talk, and respectful curiosity.",
+      "Avoid private questions and regional stereotypes."
+    ],
+    "forbidden_terms": [
+      "airport pickup",
+      "lecturer's office",
+      "campus canteen"
+    ]
+  },
+  "characters": [
+    {
+      "name": "Student",
+      "role": "Student learner",
+      "profile": "New student meeting a roommate"
+    },
+    {
+      "name": "AI Partner",
+      "role": "AI conversation partner",
+      "profile": "Roommate from another Indonesian region"
+    }
+  ],
+  "prototype_scope": {
+    "input_mode": "voice_with_text_fallback",
+    "voice_enabled": true,
+    "ar_enabled": true,
+    "avatar_enabled": true,
+    "scoring_enabled": true,
+    "feedback_enabled": true,
+    "max_turns": 10,
+    "prototype_focus": "Scenario-based AR speaking practice with adaptive AI role-play, objective tracking, scoring, and post-session feedback."
+  },
+  "session_rules": {
+    "minimum_student_responses": 5,
+    "target_student_responses_min": 6,
+    "target_student_responses_max": 8,
+    "maximum_student_responses": 10,
+    "required_objective_ids": [
+      "greet_and_introduce",
+      "safe_small_talk",
+      "respectful_curiosity",
+      "build_connection"
+    ],
+    "natural_closing_message": "It was nice getting to know you. Thank you for making me feel welcome as your new roommate."
+  },
+  "conversation_objectives": [
+    {
+      "objective_id": "greet_and_introduce",
+      "description": "Greet the roommate and introduce oneself.",
+      "detection_cues": [
+        "hello",
+        "hi",
+        "nice to meet",
+        "my name is",
+        "i am"
+      ],
+      "ai_follow_up": "It is nice to meet you. Could you tell me your name?"
+    },
+    {
+      "objective_id": "safe_small_talk",
+      "description": "Ask a safe first-meeting question.",
+      "detection_cues": [
+        "how was your trip",
+        "journey",
+        "hometown",
+        "campus",
+        "dormitory"
+      ],
+      "ai_follow_up": "The trip was quite long. What would you like to know about my journey?"
+    },
+    {
+      "objective_id": "respectful_curiosity",
+      "description": "Ask about regional background without generalizing.",
+      "detection_cues": [
+        "what do you like",
+        "could you tell me",
+        "your hometown",
+        "your region",
+        "your experience"
+      ],
+      "ai_follow_up": "What would you like to know about my hometown or my own experience?"
+    },
+    {
+      "objective_id": "build_connection",
+      "description": "Suggest a friendly next step as roommates.",
+      "detection_cues": [
+        "show you",
+        "help you",
+        "together",
+        "later",
+        "let us",
+        "can help"
+      ],
+      "ai_follow_up": "What should we do after we settle into the dormitory?"
+    }
+  ],
+  "conversation_stages": [
+    {
+      "stage_order": 1,
+      "stage": "Opening",
+      "speaker": "AI",
+      "message_or_student_goal": "Hi, I think we are roommates. My name is Raka. I just arrived this morning.",
+      "expected_function": "Greeting",
+      "success_indicator": "Student greets and introduces self."
+    },
+    {
+      "stage_order": 2,
+      "stage": "Small Talk",
+      "speaker": "Student Goal",
+      "message_or_student_goal": "Introduce self and ask a safe opening question.",
+      "expected_function": "Safe small talk",
+      "success_indicator": "Student avoids overly personal questions."
+    },
+    {
+      "stage_order": 3,
+      "stage": "Branching",
+      "speaker": "AI",
+      "message_or_student_goal": "If safe: The trip was long. If too personal: That's a bit personal. If stereotyping: Not everyone from my region is like that.",
+      "expected_function": "Adaptive response",
+      "success_indicator": "AI addresses safe/unsafe question type."
+    },
+    {
+      "stage_order": 4,
+      "stage": "Discovery",
+      "speaker": "Student Goal",
+      "message_or_student_goal": "Ask respectfully about hometown or cultural background.",
+      "expected_function": "Respectful curiosity",
+      "success_indicator": "Student uses non-stereotyping language."
+    },
+    {
+      "stage_order": 5,
+      "stage": "Closing",
+      "speaker": "AI",
+      "message_or_student_goal": "Thank you for asking respectfully. I can share some things about my hometown.",
+      "expected_function": "Positive reinforcement",
+      "success_indicator": "Student receives cultural information."
+    }
+  ],
+  "conversation_flow": [
+    {
+      "turn": 1,
+      "stage": "Opening",
+      "speaker": "AI",
+      "message": "Hi, I think we are roommates. My name is Raka. I just arrived this morning.",
+      "expected_function": "Greeting",
+      "success_indicator": "Student greets and introduces self."
+    },
+    {
+      "turn": 2,
+      "stage": "Small Talk",
+      "speaker": "Student Goal",
+      "student_goal": "Introduce self and ask a safe opening question.",
+      "expected_function": "Safe small talk",
+      "success_indicator": "Student avoids overly personal questions."
+    },
+    {
+      "turn": 3,
+      "stage": "Branching",
+      "speaker": "AI",
+      "message": "If safe: The trip was long. If too personal: That's a bit personal. If stereotyping: Not everyone from my region is like that.",
+      "expected_function": "Adaptive response",
+      "success_indicator": "AI addresses safe/unsafe question type."
+    },
+    {
+      "turn": 4,
+      "stage": "Discovery",
+      "speaker": "Student Goal",
+      "student_goal": "Ask respectfully about hometown or cultural background.",
+      "expected_function": "Respectful curiosity",
+      "success_indicator": "Student uses non-stereotyping language."
+    },
+    {
+      "turn": 5,
+      "stage": "Closing",
+      "speaker": "AI",
+      "message": "Thank you for asking respectfully. I can share some things about my hometown.",
+      "expected_function": "Positive reinforcement",
+      "success_indicator": "Student receives cultural information."
+    }
+  ],
+  "branching_rules": [
+    {
+      "rule_id": "BR-007",
+      "student_response_category": "GOOD",
+      "detection_cues": [
+        "polite",
+        "clear",
+        "relevant",
+        "culturally sensitive"
+      ],
+      "ai_response_strategy": "Continue conversation and reinforce good strategy",
+      "example_ai_response": "That is a respectful way to say it. Let's continue.",
+      "feedback_focus": "Positive reinforcement",
+      "score_impact": "+1 politeness/ICC"
+    },
+    {
+      "rule_id": "BR-008",
+      "student_response_category": "ACCEPTABLE",
+      "detection_cues": [
+        "understandable but slightly direct or limited"
+      ],
+      "ai_response_strategy": "Continue but model improved expression",
+      "example_ai_response": "Your meaning is clear. You can make it more polite by saying...",
+      "feedback_focus": "Improvement",
+      "score_impact": "neutral"
+    },
+    {
+      "rule_id": "BR-009",
+      "student_response_category": "TOO_DIRECT",
+      "detection_cues": [
+        "commands",
+        "blunt disagreement",
+        "no softeners"
+      ],
+      "ai_response_strategy": "Ask student to soften language and explain pragmatics",
+      "example_ai_response": "Your message is understandable, but it sounds too direct in this context.",
+      "feedback_focus": "Politeness strategy",
+      "score_impact": "-1 politeness/pragmatics"
+    },
+    {
+      "rule_id": "BR-010",
+      "student_response_category": "STEREOTYPING",
+      "detection_cues": [
+        "always",
+        "everyone from",
+        "people from your region",
+        "accent jokes"
+      ],
+      "ai_response_strategy": "Challenge generalization and redirect respectfully",
+      "example_ai_response": "Be careful not to generalize a whole group. Try asking about individual experience.",
+      "feedback_focus": "Critical cultural awareness",
+      "score_impact": "-1 or -2 ICC"
+    },
+    {
+      "rule_id": "BR-011",
+      "student_response_category": "TOO_PERSONAL",
+      "detection_cues": [
+        "marriage",
+        "income",
+        "religion asked abruptly",
+        "private family question"
+      ],
+      "ai_response_strategy": "Set boundary and teach safe topics",
+      "example_ai_response": "That question may feel too personal at a first meeting. Try asking about travel, campus, or hometown generally.",
+      "feedback_focus": "Safe small talk",
+      "score_impact": "-1 pragmatics/ICC"
+    },
+    {
+      "rule_id": "BR-012",
+      "student_response_category": "DISMISSIVE",
+      "detection_cues": [
+        "just eat anything",
+        "too sensitive",
+        "not important"
+      ],
+      "ai_response_strategy": "Explain cultural or personal importance and request repair",
+      "example_ai_response": "This response may dismiss the other person's concern. Try acknowledging their preference first.",
+      "feedback_focus": "Empathy and repair",
+      "score_impact": "-1 ICC"
+    },
+    {
+      "rule_id": "BR-013",
+      "student_response_category": "SILENCE_OR_UNCLEAR",
+      "detection_cues": [
+        "empty",
+        "very short",
+        "unclear pronunciation/transcription"
+      ],
+      "ai_response_strategy": "Prompt clarification and give support",
+      "example_ai_response": "Could you say that again in a complete sentence? You can start with...",
+      "feedback_focus": "Fluency support",
+      "score_impact": "no score until retry"
+    }
+  ],
+  "fallback_responses": {
+    "GOOD": "Thank you for asking respectfully. I am happy to tell you about my own experience.",
+    "ACCEPTABLE": "Thank you for asking respectfully. I am happy to tell you about my own experience.",
+    "TOO_DIRECT": "I understand what you mean. Could we continue this conversation in a more respectful way?",
+    "STEREOTYPING": "I would rather talk about individual experiences than generalize a whole group.",
+    "TOO_PERSONAL": "I would prefer not to discuss that yet. Could we stay with the topic we are discussing?",
+    "DISMISSIVE": "I understand, but I would appreciate it if we could acknowledge the concern and discuss it together.",
+    "SILENCE_OR_UNCLEAR": "Sorry, I did not quite understand. Could you say that again in a complete sentence?"
+  },
+  "rubric": {
+    "grammar": {
+      "score_1": "Many errors obscure meaning",
+      "score_2": "Frequent errors but some meaning clear",
+      "score_3": "Some errors but understandable",
+      "score_4": "Minor errors only",
+      "score_5": "Accurate and natural for level",
+      "notes_for_ai": "Do not over-penalize accent or minor EFL errors."
+    },
+    "vocabulary": {
+      "score_1": "Very limited or inappropriate",
+      "score_2": "Limited vocabulary",
+      "score_3": "Adequate vocabulary",
+      "score_4": "Appropriate vocabulary",
+      "score_5": "Varied and context-appropriate vocabulary",
+      "notes_for_ai": "Focus on communicative appropriateness."
+    },
+    "fluency": {
+      "score_1": "Very hesitant or fragmented",
+      "score_2": "Frequent pauses",
+      "score_3": "Generally understandable",
+      "score_4": "Mostly smooth",
+      "score_5": "Smooth and natural",
+      "notes_for_ai": "Use speech transcript; consider hesitation reasonably."
+    },
+    "politeness": {
+      "score_1": "Rude or commanding",
+      "score_2": "Too direct",
+      "score_3": "Some polite forms",
+      "score_4": "Polite and respectful",
+      "score_5": "Highly appropriate politeness strategy",
+      "notes_for_ai": "Assess softeners, greetings, thanks, apology."
+    },
+    "pragmatic_appropriateness": {
+      "score_1": "Response does not fit context",
+      "score_2": "Partly inappropriate",
+      "score_3": "Generally appropriate",
+      "score_4": "Appropriate to role/context",
+      "score_5": "Highly appropriate and context-sensitive",
+      "notes_for_ai": "Assess function: request, refusal, apology, disagreement."
+    },
+    "intercultural_awareness": {
+      "score_1": "Stereotyping or culturally insensitive",
+      "score_2": "Limited awareness",
+      "score_3": "Some awareness",
+      "score_4": "Clear awareness",
+      "score_5": "Strong empathy, reflection, and respectful comparison",
+      "notes_for_ai": "Assess avoiding assumptions, respect, curiosity, repair."
+    }
+  },
+  "reference_dialogue": [],
+  "ai_output_format": {
+    "schema_version": "2.0",
+    "required_fields": [
+      "scenario_id",
+      "turn_number",
+      "ai_message",
+      "detected_category",
+      "scores",
+      "feedback",
+      "cultural_note",
+      "improved_response",
+      "continue_conversation",
+      "completed_objective_ids",
+      "end_reason"
+    ]
+  },
+  "initial_conversation_state": {
+    "scenario_id": "L-ICC-002",
+    "student_response_count": 0,
+    "conversation_status": "started",
+    "ai_opening_message": "Hi, I think we are roommates. My name is Raka. I just arrived this morning.",
+    "student_expected_action": "Greet the roommate and introduce oneself.",
+    "session_result": null
+  }
+}

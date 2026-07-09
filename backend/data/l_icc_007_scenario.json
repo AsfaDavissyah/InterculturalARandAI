@@ -1,0 +1,380 @@
+{
+  "schema_version": "2.0",
+  "prototype_id": "scenario-l-icc-007-v2",
+  "scenario": {
+    "scenario_id": "L-ICC-007",
+    "title": "Humor and Misunderstanding Across Regions",
+    "scenario_type": "Local Indonesian Intercultural",
+    "level": "B1-B2",
+    "ar_scene": "Campus cafe",
+    "student_role": "Student chatting with friends",
+    "ai_role": "Friend from another region who misunderstands a joke",
+    "icc_dimension": [
+      "Attitudes",
+      "Skills of interpreting and relating",
+      "Critical cultural awareness"
+    ],
+    "cultural_focus": [
+      "Humor",
+      "teasing",
+      "face-saving",
+      "repair strategies"
+    ],
+    "learning_goal": "Repair misunderstanding and explain intention without blaming the other person.",
+    "task_instruction": "Your joke makes your friend uncomfortable. Apologize and clarify your intention.",
+    "ai_character_prompt": "You are a friend from another region. A joke made you uncomfortable. Respond honestly but calmly.",
+    "good_response_examples": [
+      "I’m sorry. I did not mean to make you uncomfortable. I should have been more careful with my joke."
+    ],
+    "poor_response_examples": [
+      "You are too sensitive. It was only a joke.",
+      "People from your region cannot take jokes."
+    ],
+    "cultural_note": "Humor is culturally sensitive; repair strategies are central to intercultural competence."
+  },
+  "context": {
+    "scene_title": "Repairing a Misunderstood Joke",
+    "setting": "Campus cafe",
+    "situation": "Two friends from different regions discuss a joke that caused discomfort in a campus cafe.",
+    "boundaries": [
+      "Remain in the campus cafe conversation.",
+      "Focus on apology, impact, intention, and relationship repair.",
+      "Do not blame sensitivity or stereotype a regional group."
+    ],
+    "forbidden_terms": [
+      "airport pickup",
+      "deadline extension",
+      "group presentation"
+    ]
+  },
+  "characters": [
+    {
+      "name": "Student",
+      "role": "Student learner",
+      "profile": "Student chatting with friends"
+    },
+    {
+      "name": "AI Partner",
+      "role": "AI conversation partner",
+      "profile": "Friend from another region who misunderstands a joke"
+    }
+  ],
+  "prototype_scope": {
+    "input_mode": "voice_with_text_fallback",
+    "voice_enabled": true,
+    "ar_enabled": true,
+    "avatar_enabled": true,
+    "scoring_enabled": true,
+    "feedback_enabled": true,
+    "max_turns": 10,
+    "prototype_focus": "Scenario-based AR speaking practice with adaptive AI role-play, objective tracking, scoring, and post-session feedback."
+  },
+  "session_rules": {
+    "minimum_student_responses": 5,
+    "target_student_responses_min": 6,
+    "target_student_responses_max": 8,
+    "maximum_student_responses": 10,
+    "required_objective_ids": [
+      "apologize_sincerely",
+      "acknowledge_impact",
+      "clarify_intention",
+      "commit_to_repair"
+    ],
+    "natural_closing_message": "I appreciate your apology and reflection. Let us be more careful with jokes like that in the future."
+  },
+  "conversation_objectives": [
+    {
+      "objective_id": "apologize_sincerely",
+      "description": "Give a direct and sincere apology.",
+      "detection_cues": [
+        "i am sorry",
+        "i apologize",
+        "sorry for"
+      ],
+      "ai_follow_up": "Could you acknowledge how the joke affected me?"
+    },
+    {
+      "objective_id": "acknowledge_impact",
+      "description": "Acknowledge discomfort without dismissing it.",
+      "detection_cues": [
+        "made you uncomfortable",
+        "understand",
+        "hurt",
+        "impact",
+        "your feelings"
+      ],
+      "ai_follow_up": "Why do you think the joke felt uncomfortable to me?"
+    },
+    {
+      "objective_id": "clarify_intention",
+      "description": "Clarify intention without using it as an excuse.",
+      "detection_cues": [
+        "did not mean",
+        "my intention",
+        "i was trying",
+        "not an excuse"
+      ],
+      "ai_follow_up": "Would you like to explain your intention without dismissing the impact?"
+    },
+    {
+      "objective_id": "commit_to_repair",
+      "description": "Commit to more culturally sensitive humor.",
+      "detection_cues": [
+        "more careful",
+        "will not repeat",
+        "learn",
+        "next time",
+        "respect"
+      ],
+      "ai_follow_up": "What could we do differently with jokes in the future?"
+    }
+  ],
+  "conversation_stages": [
+    {
+      "stage_order": 1,
+      "stage": "Opening",
+      "speaker": "AI",
+      "message_or_student_goal": "I know you were joking, but I felt a little uncomfortable with that comment.",
+      "expected_function": "Misunderstanding",
+      "success_indicator": "Student apologizes."
+    },
+    {
+      "stage_order": 2,
+      "stage": "Repair",
+      "speaker": "Student Goal",
+      "message_or_student_goal": "Apologize and clarify intention without blaming.",
+      "expected_function": "Repair strategy",
+      "success_indicator": "Student uses 'I'm sorry' and takes responsibility."
+    },
+    {
+      "stage_order": 3,
+      "stage": "Branching",
+      "speaker": "AI",
+      "message_or_student_goal": "If sincere: Thank you for explaining. If dismissive: It still made me uncomfortable.",
+      "expected_function": "Adaptive response",
+      "success_indicator": "AI reacts to repair quality."
+    },
+    {
+      "stage_order": 4,
+      "stage": "Reflection",
+      "speaker": "Student Goal",
+      "message_or_student_goal": "Show awareness that humor can be culturally sensitive.",
+      "expected_function": "Critical awareness",
+      "success_indicator": "Student avoids 'too sensitive'."
+    },
+    {
+      "stage_order": 5,
+      "stage": "Closing",
+      "speaker": "AI",
+      "message_or_student_goal": "I appreciate that. Let's be more careful with jokes like that.",
+      "expected_function": "Resolution",
+      "success_indicator": "Relationship repaired."
+    }
+  ],
+  "conversation_flow": [
+    {
+      "turn": 1,
+      "stage": "Opening",
+      "speaker": "AI",
+      "message": "I know you were joking, but I felt a little uncomfortable with that comment.",
+      "expected_function": "Misunderstanding",
+      "success_indicator": "Student apologizes."
+    },
+    {
+      "turn": 2,
+      "stage": "Repair",
+      "speaker": "Student Goal",
+      "student_goal": "Apologize and clarify intention without blaming.",
+      "expected_function": "Repair strategy",
+      "success_indicator": "Student uses 'I'm sorry' and takes responsibility."
+    },
+    {
+      "turn": 3,
+      "stage": "Branching",
+      "speaker": "AI",
+      "message": "If sincere: Thank you for explaining. If dismissive: It still made me uncomfortable.",
+      "expected_function": "Adaptive response",
+      "success_indicator": "AI reacts to repair quality."
+    },
+    {
+      "turn": 4,
+      "stage": "Reflection",
+      "speaker": "Student Goal",
+      "student_goal": "Show awareness that humor can be culturally sensitive.",
+      "expected_function": "Critical awareness",
+      "success_indicator": "Student avoids 'too sensitive'."
+    },
+    {
+      "turn": 5,
+      "stage": "Closing",
+      "speaker": "AI",
+      "message": "I appreciate that. Let's be more careful with jokes like that.",
+      "expected_function": "Resolution",
+      "success_indicator": "Relationship repaired."
+    }
+  ],
+  "branching_rules": [
+    {
+      "rule_id": "BR-038",
+      "student_response_category": "GOOD",
+      "detection_cues": [
+        "polite",
+        "clear",
+        "relevant",
+        "culturally sensitive"
+      ],
+      "ai_response_strategy": "Continue conversation and reinforce good strategy",
+      "example_ai_response": "That is a respectful way to say it. Let's continue.",
+      "feedback_focus": "Positive reinforcement",
+      "score_impact": "+1 politeness/ICC"
+    },
+    {
+      "rule_id": "BR-039",
+      "student_response_category": "ACCEPTABLE",
+      "detection_cues": [
+        "understandable but slightly direct or limited"
+      ],
+      "ai_response_strategy": "Continue but model improved expression",
+      "example_ai_response": "Your meaning is clear. You can make it more polite by saying...",
+      "feedback_focus": "Improvement",
+      "score_impact": "neutral"
+    },
+    {
+      "rule_id": "BR-040",
+      "student_response_category": "TOO_DIRECT",
+      "detection_cues": [
+        "commands",
+        "blunt disagreement",
+        "no softeners"
+      ],
+      "ai_response_strategy": "Ask student to soften language and explain pragmatics",
+      "example_ai_response": "Your message is understandable, but it sounds too direct in this context.",
+      "feedback_focus": "Politeness strategy",
+      "score_impact": "-1 politeness/pragmatics"
+    },
+    {
+      "rule_id": "BR-041",
+      "student_response_category": "STEREOTYPING",
+      "detection_cues": [
+        "always",
+        "everyone from",
+        "people from your region",
+        "accent jokes"
+      ],
+      "ai_response_strategy": "Challenge generalization and redirect respectfully",
+      "example_ai_response": "Be careful not to generalize a whole group. Try asking about individual experience.",
+      "feedback_focus": "Critical cultural awareness",
+      "score_impact": "-1 or -2 ICC"
+    },
+    {
+      "rule_id": "BR-042",
+      "student_response_category": "DISMISSIVE",
+      "detection_cues": [
+        "just eat anything",
+        "too sensitive",
+        "not important"
+      ],
+      "ai_response_strategy": "Explain cultural or personal importance and request repair",
+      "example_ai_response": "This response may dismiss the other person's concern. Try acknowledging their preference first.",
+      "feedback_focus": "Empathy and repair",
+      "score_impact": "-1 ICC"
+    },
+    {
+      "rule_id": "BR-043",
+      "student_response_category": "SILENCE_OR_UNCLEAR",
+      "detection_cues": [
+        "empty",
+        "very short",
+        "unclear pronunciation/transcription"
+      ],
+      "ai_response_strategy": "Prompt clarification and give support",
+      "example_ai_response": "Could you say that again in a complete sentence? You can start with...",
+      "feedback_focus": "Fluency support",
+      "score_impact": "no score until retry"
+    }
+  ],
+  "fallback_responses": {
+    "GOOD": "Thank you for listening. What would you do differently next time?",
+    "ACCEPTABLE": "Thank you for listening. What would you do differently next time?",
+    "TOO_DIRECT": "I understand what you mean. Could we continue this conversation in a more respectful way?",
+    "STEREOTYPING": "I would rather talk about individual experiences than generalize a whole group.",
+    "TOO_PERSONAL": "I would prefer not to discuss that yet. Could we stay with the topic we are discussing?",
+    "DISMISSIVE": "I understand, but I would appreciate it if we could acknowledge the concern and discuss it together.",
+    "SILENCE_OR_UNCLEAR": "Sorry, I did not quite understand. Could you say that again in a complete sentence?"
+  },
+  "rubric": {
+    "grammar": {
+      "score_1": "Many errors obscure meaning",
+      "score_2": "Frequent errors but some meaning clear",
+      "score_3": "Some errors but understandable",
+      "score_4": "Minor errors only",
+      "score_5": "Accurate and natural for level",
+      "notes_for_ai": "Do not over-penalize accent or minor EFL errors."
+    },
+    "vocabulary": {
+      "score_1": "Very limited or inappropriate",
+      "score_2": "Limited vocabulary",
+      "score_3": "Adequate vocabulary",
+      "score_4": "Appropriate vocabulary",
+      "score_5": "Varied and context-appropriate vocabulary",
+      "notes_for_ai": "Focus on communicative appropriateness."
+    },
+    "fluency": {
+      "score_1": "Very hesitant or fragmented",
+      "score_2": "Frequent pauses",
+      "score_3": "Generally understandable",
+      "score_4": "Mostly smooth",
+      "score_5": "Smooth and natural",
+      "notes_for_ai": "Use speech transcript; consider hesitation reasonably."
+    },
+    "politeness": {
+      "score_1": "Rude or commanding",
+      "score_2": "Too direct",
+      "score_3": "Some polite forms",
+      "score_4": "Polite and respectful",
+      "score_5": "Highly appropriate politeness strategy",
+      "notes_for_ai": "Assess softeners, greetings, thanks, apology."
+    },
+    "pragmatic_appropriateness": {
+      "score_1": "Response does not fit context",
+      "score_2": "Partly inappropriate",
+      "score_3": "Generally appropriate",
+      "score_4": "Appropriate to role/context",
+      "score_5": "Highly appropriate and context-sensitive",
+      "notes_for_ai": "Assess function: request, refusal, apology, disagreement."
+    },
+    "intercultural_awareness": {
+      "score_1": "Stereotyping or culturally insensitive",
+      "score_2": "Limited awareness",
+      "score_3": "Some awareness",
+      "score_4": "Clear awareness",
+      "score_5": "Strong empathy, reflection, and respectful comparison",
+      "notes_for_ai": "Assess avoiding assumptions, respect, curiosity, repair."
+    }
+  },
+  "reference_dialogue": [],
+  "ai_output_format": {
+    "schema_version": "2.0",
+    "required_fields": [
+      "scenario_id",
+      "turn_number",
+      "ai_message",
+      "detected_category",
+      "scores",
+      "feedback",
+      "cultural_note",
+      "improved_response",
+      "continue_conversation",
+      "completed_objective_ids",
+      "end_reason"
+    ]
+  },
+  "initial_conversation_state": {
+    "scenario_id": "L-ICC-007",
+    "student_response_count": 0,
+    "conversation_status": "started",
+    "ai_opening_message": "I know you were joking, but I felt a little uncomfortable with that comment.",
+    "student_expected_action": "Give a direct and sincere apology.",
+    "session_result": null
+  }
+}

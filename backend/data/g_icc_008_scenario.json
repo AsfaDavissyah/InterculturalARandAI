@@ -1,0 +1,561 @@
+{
+  "schema_version": "2.0",
+  "prototype_id": "scenario-g-icc-008-v2",
+  "scenario": {
+    "scenario_id": "G-ICC-008",
+    "title": "Meeting an International Student on Campus",
+    "scenario_type": "Global Intercultural",
+    "level": "B1",
+    "ar_scene": "In front of the International Office on campus",
+    "student_role": "Rina, a student volunteer welcoming an international student",
+    "ai_role": "David, an exchange student from Melbourne, Australia",
+    "icc_dimension": [
+      "Attitudes",
+      "Knowledge",
+      "Skills of discovery and interaction"
+    ],
+    "cultural_focus": [
+      "Greetings and introductions",
+      "Campus orientation",
+      "Safe small talk",
+      "Local customs",
+      "Campus organizations",
+      "Intercultural support"
+    ],
+    "learning_goal": "Welcome an international student on campus, get acquainted, provide orientation, and explain campus life and local customs respectfully.",
+    "task_instruction": "Meet David in front of the International Office, get acquainted, answer his campus and cultural questions, and begin the campus tour.",
+    "ai_character_prompt": "You are David, an exchange student from Melbourne, Australia. You have already arrived on campus and are meeting Rina in front of the International Office. You are friendly, curious, slightly nervous about the unfamiliar campus, interested in local culture, basketball, and the English Debate Club. Never return to an airport or pickup scenario.",
+    "good_response_examples": [
+      "Hi, David. Yes, I am Rina. Welcome to our university!",
+      "Today I can show you the library, faculty building, student center, and cafeteria.",
+      "It is common to greet lecturers politely and arrive on time for class."
+    ],
+    "poor_response_examples": [
+      "Go back to the airport pickup area.",
+      "Foreign students always get lost.",
+      "Just follow me and do not ask questions."
+    ],
+    "cultural_note": "Campus orientation can combine practical guidance with safe small talk, respectful cultural explanation, and support that avoids treating international students as stereotypes."
+  },
+  "context": {
+    "scene_title": "In Front of the International Office",
+    "setting": "In front of the International Office on campus",
+    "situation": "David has already arrived on campus and meets Rina before a campus orientation tour.",
+    "boundaries": [
+      "Remain on campus, beginning in front of the International Office.",
+      "David speaks only as David and never writes Rina's dialogue.",
+      "Focus on getting acquainted, campus orientation, campus life, and intercultural communication.",
+      "Never move the conversation to an airport, pickup area, or arrival terminal."
+    ],
+    "forbidden_terms": [
+      "airport",
+      "pickup area",
+      "arrival terminal",
+      "luggage carousel",
+      "flight pickup"
+    ]
+  },
+  "characters": [
+    {
+      "name": "Rina",
+      "role": "Student learner",
+      "profile": "A third-year English Education student who volunteers to help international students adjust to campus life."
+    },
+    {
+      "name": "David",
+      "role": "AI conversation partner",
+      "profile": "An exchange student from Melbourne, Australia studying for one semester."
+    }
+  ],
+  "prototype_scope": {
+    "input_mode": "voice_with_text_fallback",
+    "voice_enabled": true,
+    "ar_enabled": true,
+    "avatar_enabled": true,
+    "scoring_enabled": true,
+    "feedback_enabled": true,
+    "max_turns": 10,
+    "prototype_focus": "Scenario-based AR speaking practice with adaptive AI role-play, objective tracking, scoring, and post-session feedback."
+  },
+  "session_rules": {
+    "minimum_student_responses": 5,
+    "target_student_responses_min": 6,
+    "target_student_responses_max": 8,
+    "maximum_student_responses": 10,
+    "required_objective_ids": [
+      "confirm_and_welcome",
+      "arrival_small_talk",
+      "get_acquainted",
+      "orient_campus",
+      "explain_customs",
+      "discuss_clubs_and_plan"
+    ],
+    "natural_closing_message": "Perfect! Thank you, Rina. I am really looking forward to studying here. Let us start exploring the campus!"
+  },
+  "conversation_objectives": [
+    {
+      "objective_id": "confirm_and_welcome",
+      "description": "Confirm identities and welcome David to the university.",
+      "detection_cues": [
+        "yes, i am",
+        "you must be david",
+        "welcome to our university",
+        "nice to meet you"
+      ],
+      "ai_follow_up": "It is nice to finally meet you. What would you like to say before we begin?"
+    },
+    {
+      "objective_id": "arrival_small_talk",
+      "description": "Ask about David's journey from his accommodation and respond reassuringly.",
+      "detection_cues": [
+        "journey",
+        "accommodation",
+        "nervous",
+        "glad",
+        "do not worry",
+        "familiar with campus"
+      ],
+      "ai_follow_up": "I was a little nervous because I was not familiar with the area. Is the campus easy to learn?"
+    },
+    {
+      "objective_id": "get_acquainted",
+      "description": "Exchange personal introductions using safe topics.",
+      "detection_cues": [
+        "tell me about yourself",
+        "english education",
+        "third-year",
+        "volunteer",
+        "basketball",
+        "hobby",
+        "exchange student"
+      ],
+      "ai_follow_up": "Could you tell me a little about yourself and your role on campus?"
+    },
+    {
+      "objective_id": "orient_campus",
+      "description": "Explain important places included in the campus tour.",
+      "detection_cues": [
+        "library",
+        "faculty building",
+        "student center",
+        "cafeteria",
+        "campus tour",
+        "show you"
+      ],
+      "ai_follow_up": "Which important places will we visit during the campus tour?"
+    },
+    {
+      "objective_id": "explain_customs",
+      "description": "Explain student life or local customs without overgeneralizing.",
+      "detection_cues": [
+        "greet lecturers",
+        "on time",
+        "student event",
+        "local custom",
+        "friendly",
+        "respect",
+        "culture"
+      ],
+      "ai_follow_up": "Is there anything I should know about student life or local customs here?"
+    },
+    {
+      "objective_id": "discuss_clubs_and_plan",
+      "description": "Discuss clubs and agree on a friendly next step.",
+      "detection_cues": [
+        "club",
+        "organization",
+        "debate",
+        "basketball",
+        "introduce you",
+        "coffee",
+        "cafe",
+        "start the tour",
+        "let us explore"
+      ],
+      "ai_follow_up": "Do students usually join clubs here, and could you recommend one before we start the tour?"
+    }
+  ],
+  "conversation_stages": [
+    {
+      "stage_order": 1,
+      "stage": "Opening",
+      "speaker": "AI",
+      "message_or_student_goal": "Hi, excuse me. Are you Rina?",
+      "expected_function": "Confirm identities and welcome David.",
+      "success_indicator": "Confirm identities and welcome David."
+    },
+    {
+      "stage_order": 2,
+      "stage": "Arrival Small Talk",
+      "speaker": "AI",
+      "message_or_student_goal": "I have just arrived on campus, and everything looks beautiful.",
+      "expected_function": "Discuss the journey from accommodation and reassure David.",
+      "success_indicator": "Discuss the journey from accommodation and reassure David."
+    },
+    {
+      "stage_order": 3,
+      "stage": "Getting Acquainted",
+      "speaker": "AI",
+      "message_or_student_goal": "I am an exchange student from Melbourne, and I will study here for one semester.",
+      "expected_function": "Exchange safe personal introductions.",
+      "success_indicator": "Exchange safe personal introductions."
+    },
+    {
+      "stage_order": 4,
+      "stage": "Campus Orientation",
+      "speaker": "AI",
+      "message_or_student_goal": "Which important places will we visit today?",
+      "expected_function": "Explain the campus tour.",
+      "success_indicator": "Explain the campus tour."
+    },
+    {
+      "stage_order": 5,
+      "stage": "Intercultural Conversation",
+      "speaker": "AI",
+      "message_or_student_goal": "Is there anything I should know about student life or local customs here?",
+      "expected_function": "Explain norms without overgeneralizing.",
+      "success_indicator": "Explain norms without overgeneralizing."
+    },
+    {
+      "stage_order": 6,
+      "stage": "Campus Life",
+      "speaker": "AI",
+      "message_or_student_goal": "Do students usually join clubs or organizations here?",
+      "expected_function": "Discuss clubs and opportunities.",
+      "success_indicator": "Discuss clubs and opportunities."
+    },
+    {
+      "stage_order": 7,
+      "stage": "Closing",
+      "speaker": "AI",
+      "message_or_student_goal": "Before we start the campus tour, is there anything else I should know?",
+      "expected_function": "Make a plan and begin the tour.",
+      "success_indicator": "Make a plan and begin the tour."
+    }
+  ],
+  "conversation_flow": [
+    {
+      "turn": 1,
+      "stage": "Opening",
+      "speaker": "AI",
+      "message": "Hi, excuse me. Are you Rina?",
+      "expected_function": "Confirm identities and welcome David.",
+      "success_indicator": "Confirm identities and welcome David."
+    },
+    {
+      "turn": 2,
+      "stage": "Arrival Small Talk",
+      "speaker": "AI",
+      "message": "I have just arrived on campus, and everything looks beautiful.",
+      "expected_function": "Discuss the journey from accommodation and reassure David.",
+      "success_indicator": "Discuss the journey from accommodation and reassure David."
+    },
+    {
+      "turn": 3,
+      "stage": "Getting Acquainted",
+      "speaker": "AI",
+      "message": "I am an exchange student from Melbourne, and I will study here for one semester.",
+      "expected_function": "Exchange safe personal introductions.",
+      "success_indicator": "Exchange safe personal introductions."
+    },
+    {
+      "turn": 4,
+      "stage": "Campus Orientation",
+      "speaker": "AI",
+      "message": "Which important places will we visit today?",
+      "expected_function": "Explain the campus tour.",
+      "success_indicator": "Explain the campus tour."
+    },
+    {
+      "turn": 5,
+      "stage": "Intercultural Conversation",
+      "speaker": "AI",
+      "message": "Is there anything I should know about student life or local customs here?",
+      "expected_function": "Explain norms without overgeneralizing.",
+      "success_indicator": "Explain norms without overgeneralizing."
+    },
+    {
+      "turn": 6,
+      "stage": "Campus Life",
+      "speaker": "AI",
+      "message": "Do students usually join clubs or organizations here?",
+      "expected_function": "Discuss clubs and opportunities.",
+      "success_indicator": "Discuss clubs and opportunities."
+    },
+    {
+      "turn": 7,
+      "stage": "Closing",
+      "speaker": "AI",
+      "message": "Before we start the campus tour, is there anything else I should know?",
+      "expected_function": "Make a plan and begin the tour.",
+      "success_indicator": "Make a plan and begin the tour."
+    }
+  ],
+  "branching_rules": [
+    {
+      "rule_id": "BR-044",
+      "student_response_category": "GOOD",
+      "detection_cues": [
+        "polite",
+        "clear",
+        "relevant",
+        "culturally sensitive"
+      ],
+      "ai_response_strategy": "Continue conversation and reinforce good strategy",
+      "example_ai_response": "That is a respectful way to say it. Let's continue.",
+      "feedback_focus": "Positive reinforcement",
+      "score_impact": "+1 politeness/ICC"
+    },
+    {
+      "rule_id": "BR-045",
+      "student_response_category": "ACCEPTABLE",
+      "detection_cues": [
+        "understandable but slightly direct or limited"
+      ],
+      "ai_response_strategy": "Continue but model improved expression",
+      "example_ai_response": "Your meaning is clear. You can make it more polite by saying...",
+      "feedback_focus": "Improvement",
+      "score_impact": "neutral"
+    },
+    {
+      "rule_id": "BR-046",
+      "student_response_category": "TOO_DIRECT",
+      "detection_cues": [
+        "commands",
+        "blunt disagreement",
+        "no softeners"
+      ],
+      "ai_response_strategy": "Ask student to soften language and explain pragmatics",
+      "example_ai_response": "Your message is understandable, but it sounds too direct in this context.",
+      "feedback_focus": "Politeness strategy",
+      "score_impact": "-1 politeness/pragmatics"
+    },
+    {
+      "rule_id": "BR-047",
+      "student_response_category": "STEREOTYPING",
+      "detection_cues": [
+        "always",
+        "everyone from",
+        "people from your region",
+        "accent jokes"
+      ],
+      "ai_response_strategy": "Challenge generalization and redirect respectfully",
+      "example_ai_response": "Be careful not to generalize a whole group. Try asking about individual experience.",
+      "feedback_focus": "Critical cultural awareness",
+      "score_impact": "-1 or -2 ICC"
+    },
+    {
+      "rule_id": "BR-048",
+      "student_response_category": "TOO_PERSONAL",
+      "detection_cues": [
+        "marriage",
+        "income",
+        "religion asked abruptly",
+        "private family question"
+      ],
+      "ai_response_strategy": "Set boundary and teach safe topics",
+      "example_ai_response": "That question may feel too personal at a first meeting. Try asking about travel, campus, or hometown generally.",
+      "feedback_focus": "Safe small talk",
+      "score_impact": "-1 pragmatics/ICC"
+    },
+    {
+      "rule_id": "BR-049",
+      "student_response_category": "DISMISSIVE",
+      "detection_cues": [
+        "just eat anything",
+        "too sensitive",
+        "not important"
+      ],
+      "ai_response_strategy": "Explain cultural or personal importance and request repair",
+      "example_ai_response": "This response may dismiss the other person's concern. Try acknowledging their preference first.",
+      "feedback_focus": "Empathy and repair",
+      "score_impact": "-1 ICC"
+    },
+    {
+      "rule_id": "BR-050",
+      "student_response_category": "SILENCE_OR_UNCLEAR",
+      "detection_cues": [
+        "empty",
+        "very short",
+        "unclear pronunciation/transcription"
+      ],
+      "ai_response_strategy": "Prompt clarification and give support",
+      "example_ai_response": "Could you say that again in a complete sentence? You can start with...",
+      "feedback_focus": "Fluency support",
+      "score_impact": "no score until retry"
+    }
+  ],
+  "fallback_responses": {
+    "GOOD": "That is helpful. I am looking forward to learning more about campus life.",
+    "ACCEPTABLE": "That is helpful. I am looking forward to learning more about campus life.",
+    "TOO_DIRECT": "I understand what you mean. Could we continue this conversation in a more respectful way?",
+    "STEREOTYPING": "I would rather talk about individual experiences than generalize a whole group.",
+    "TOO_PERSONAL": "I would prefer not to discuss that yet. Could we stay with the topic we are discussing?",
+    "DISMISSIVE": "I understand, but I would appreciate it if we could acknowledge the concern and discuss it together.",
+    "SILENCE_OR_UNCLEAR": "Sorry, I did not quite understand. Could you say that again in a complete sentence?"
+  },
+  "rubric": {
+    "grammar": {
+      "score_1": "Many errors obscure meaning",
+      "score_2": "Frequent errors but some meaning clear",
+      "score_3": "Some errors but understandable",
+      "score_4": "Minor errors only",
+      "score_5": "Accurate and natural for level",
+      "notes_for_ai": "Do not over-penalize accent or minor EFL errors."
+    },
+    "vocabulary": {
+      "score_1": "Very limited or inappropriate",
+      "score_2": "Limited vocabulary",
+      "score_3": "Adequate vocabulary",
+      "score_4": "Appropriate vocabulary",
+      "score_5": "Varied and context-appropriate vocabulary",
+      "notes_for_ai": "Focus on communicative appropriateness."
+    },
+    "fluency": {
+      "score_1": "Very hesitant or fragmented",
+      "score_2": "Frequent pauses",
+      "score_3": "Generally understandable",
+      "score_4": "Mostly smooth",
+      "score_5": "Smooth and natural",
+      "notes_for_ai": "Use speech transcript; consider hesitation reasonably."
+    },
+    "politeness": {
+      "score_1": "Rude or commanding",
+      "score_2": "Too direct",
+      "score_3": "Some polite forms",
+      "score_4": "Polite and respectful",
+      "score_5": "Highly appropriate politeness strategy",
+      "notes_for_ai": "Assess softeners, greetings, thanks, apology."
+    },
+    "pragmatic_appropriateness": {
+      "score_1": "Response does not fit context",
+      "score_2": "Partly inappropriate",
+      "score_3": "Generally appropriate",
+      "score_4": "Appropriate to role/context",
+      "score_5": "Highly appropriate and context-sensitive",
+      "notes_for_ai": "Assess function: request, refusal, apology, disagreement."
+    },
+    "intercultural_awareness": {
+      "score_1": "Stereotyping or culturally insensitive",
+      "score_2": "Limited awareness",
+      "score_3": "Some awareness",
+      "score_4": "Clear awareness",
+      "score_5": "Strong empathy, reflection, and respectful comparison",
+      "notes_for_ai": "Assess avoiding assumptions, respect, curiosity, repair."
+    }
+  },
+  "reference_dialogue": [
+    {
+      "speaker": "David",
+      "message": "Hi, excuse me. Are you Rina?"
+    },
+    {
+      "speaker": "Rina",
+      "message": "Hi! Yes, I am. You must be David. It is so nice to finally meet you. Welcome to our university!"
+    },
+    {
+      "speaker": "David",
+      "message": "Thank you! It is great to be here. I have just arrived on campus, and everything looks really beautiful."
+    },
+    {
+      "speaker": "Rina",
+      "message": "I am glad you like it. How was your journey from your accommodation?"
+    },
+    {
+      "speaker": "David",
+      "message": "It was good, thanks. I was a little nervous because I was not familiar with the area, but everything went smoothly."
+    },
+    {
+      "speaker": "Rina",
+      "message": "Do not worry. You will become familiar with the campus very quickly."
+    },
+    {
+      "speaker": "Rina",
+      "message": "Could you tell me a little about yourself?"
+    },
+    {
+      "speaker": "David",
+      "message": "I am David from Melbourne, Australia. I am an exchange student for one semester. I enjoy traveling, basketball, and learning about cultures."
+    },
+    {
+      "speaker": "Rina",
+      "message": "I am a third-year English Education student. I volunteer to help international students adjust to campus life."
+    },
+    {
+      "speaker": "David",
+      "message": "That is really kind of you. I appreciate your help."
+    },
+    {
+      "speaker": "Rina",
+      "message": "I will show you the library, faculty building, student center, and cafeteria."
+    },
+    {
+      "speaker": "David",
+      "message": "That sounds perfect. I would probably get lost without your help!"
+    },
+    {
+      "speaker": "David",
+      "message": "Is there anything I should know about student life or local customs here?"
+    },
+    {
+      "speaker": "Rina",
+      "message": "Students are friendly. It is common to greet lecturers politely and arrive on time for class."
+    },
+    {
+      "speaker": "David",
+      "message": "Do students usually join clubs or organizations here?"
+    },
+    {
+      "speaker": "Rina",
+      "message": "Yes. We have sports, language, music, volunteer, and cultural organizations."
+    },
+    {
+      "speaker": "David",
+      "message": "I might join the English Debate Club or the basketball club."
+    },
+    {
+      "speaker": "Rina",
+      "message": "I can introduce you to students from those clubs later."
+    },
+    {
+      "speaker": "David",
+      "message": "Where can I get a good cup of coffee on campus?"
+    },
+    {
+      "speaker": "Rina",
+      "message": "I will show you my favorite cafe after the tour."
+    },
+    {
+      "speaker": "David",
+      "message": "Perfect! Thank you, Rina. I am really looking forward to studying here."
+    },
+    {
+      "speaker": "Rina",
+      "message": "You are welcome, David. Let us start exploring the campus!"
+    }
+  ],
+  "ai_output_format": {
+    "schema_version": "2.0",
+    "required_fields": [
+      "scenario_id",
+      "turn_number",
+      "ai_message",
+      "detected_category",
+      "scores",
+      "feedback",
+      "cultural_note",
+      "improved_response",
+      "continue_conversation",
+      "completed_objective_ids",
+      "end_reason"
+    ]
+  },
+  "initial_conversation_state": {
+    "scenario_id": "G-ICC-008",
+    "student_response_count": 0,
+    "conversation_status": "started",
+    "ai_opening_message": "Hi, excuse me. Are you Rina?",
+    "student_expected_action": "Confirm identities and welcome David to the university.",
+    "session_result": null
+  }
+}

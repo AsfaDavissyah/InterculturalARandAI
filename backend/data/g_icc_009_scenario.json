@@ -1,0 +1,375 @@
+{
+  "schema_version": "2.0",
+  "prototype_id": "scenario-g-icc-009-v2",
+  "scenario": {
+    "scenario_id": "G-ICC-009",
+    "title": "Asking for a Deadline Extension",
+    "scenario_type": "Global Academic Intercultural",
+    "level": "B1-B2",
+    "ar_scene": "Lecturer's office",
+    "student_role": "Student requesting a deadline extension",
+    "ai_role": "English-speaking lecturer",
+    "icc_dimension": [
+      "Skills of interaction",
+      "Critical cultural awareness"
+    ],
+    "cultural_focus": [
+      "Academic politeness",
+      "indirect request",
+      "responsibility",
+      "respect for deadlines"
+    ],
+    "learning_goal": "Make a polite academic request in English.",
+    "task_instruction": "Ask your lecturer politely for a short deadline extension because you have been sick.",
+    "ai_character_prompt": "You are an English-speaking university lecturer. Respond naturally and evaluate whether the student uses an appropriate academic request.",
+    "good_response_examples": [
+      "Good morning, Professor. I’m sorry to bother you, but I have been unwell. Would it be possible to have a short extension?"
+    ],
+    "poor_response_examples": [
+      "Professor, I am sick. Give me more time.",
+      "You must extend the deadline."
+    ],
+    "cultural_note": "In many academic contexts, requests are softened with indirect language and responsibility is acknowledged."
+  },
+  "context": {
+    "scene_title": "Requesting an Extension in a Lecturer's Office",
+    "setting": "Lecturer's office",
+    "situation": "A student explains illness and requests a short, specific deadline extension from an English-speaking lecturer.",
+    "boundaries": [
+      "Remain in the lecturer's office and academic request context.",
+      "Focus on the assignment deadline, reason, requested duration, and responsibility.",
+      "The lecturer is professional and fair, not punitive or overly personal."
+    ],
+    "forbidden_terms": [
+      "airport pickup",
+      "campus tour",
+      "group presentation idea"
+    ]
+  },
+  "characters": [
+    {
+      "name": "Student",
+      "role": "Student learner",
+      "profile": "Student requesting a deadline extension"
+    },
+    {
+      "name": "AI Partner",
+      "role": "AI conversation partner",
+      "profile": "English-speaking lecturer"
+    }
+  ],
+  "prototype_scope": {
+    "input_mode": "voice_with_text_fallback",
+    "voice_enabled": true,
+    "ar_enabled": true,
+    "avatar_enabled": true,
+    "scoring_enabled": true,
+    "feedback_enabled": true,
+    "max_turns": 10,
+    "prototype_focus": "Scenario-based AR speaking practice with adaptive AI role-play, objective tracking, scoring, and post-session feedback."
+  },
+  "session_rules": {
+    "minimum_student_responses": 5,
+    "target_student_responses_min": 6,
+    "target_student_responses_max": 8,
+    "maximum_student_responses": 10,
+    "required_objective_ids": [
+      "greet_and_request",
+      "explain_reason",
+      "propose_extension",
+      "acknowledge_responsibility"
+    ],
+    "natural_closing_message": "Thank you for explaining the situation responsibly. Your request is reasonable. Please submit the assignment by the new deadline we agreed on."
+  },
+  "conversation_objectives": [
+    {
+      "objective_id": "greet_and_request",
+      "description": "Greet the lecturer and make a polite extension request.",
+      "detection_cues": [
+        "good morning",
+        "good afternoon",
+        "would it be possible",
+        "may i ask",
+        "could i have",
+        "extension"
+      ],
+      "ai_follow_up": "What would you like to request about the assignment?"
+    },
+    {
+      "objective_id": "explain_reason",
+      "description": "Give an appropriate and concise reason.",
+      "detection_cues": [
+        "sick",
+        "unwell",
+        "ill",
+        "health",
+        "because"
+      ],
+      "ai_follow_up": "Could you briefly explain why you need the extension?"
+    },
+    {
+      "objective_id": "propose_extension",
+      "description": "Propose a specific and realistic new deadline.",
+      "detection_cues": [
+        "one day",
+        "two days",
+        "three days",
+        "until",
+        "by monday",
+        "by tuesday",
+        "by wednesday",
+        "by thursday",
+        "by friday",
+        "next week"
+      ],
+      "ai_follow_up": "How much extra time do you need, and when could you submit the assignment?"
+    },
+    {
+      "objective_id": "acknowledge_responsibility",
+      "description": "Acknowledge responsibility and confirm the new commitment.",
+      "detection_cues": [
+        "i understand",
+        "i will submit",
+        "thank you",
+        "i appreciate",
+        "responsibility",
+        "sorry"
+      ],
+      "ai_follow_up": "Can you confirm that you will complete the work by the new deadline?"
+    }
+  ],
+  "conversation_stages": [
+    {
+      "stage_order": 1,
+      "stage": "Opening",
+      "speaker": "AI",
+      "message_or_student_goal": "Good morning. How can I help you?",
+      "expected_function": "Academic opening",
+      "success_indicator": "Student greets and opens politely."
+    },
+    {
+      "stage_order": 2,
+      "stage": "Request",
+      "speaker": "Student Goal",
+      "message_or_student_goal": "Explain situation and request extension indirectly.",
+      "expected_function": "Polite request",
+      "success_indicator": "Student uses softeners."
+    },
+    {
+      "stage_order": 3,
+      "stage": "Branching",
+      "speaker": "AI",
+      "message_or_student_goal": "If polite: How much extra time do you need? If direct: Could you explain more politely? If no reason: Why do you need it?",
+      "expected_function": "Adaptive response",
+      "success_indicator": "AI evaluates request quality."
+    },
+    {
+      "stage_order": 4,
+      "stage": "Responsibility",
+      "speaker": "Student Goal",
+      "message_or_student_goal": "Request specific extension and show responsibility.",
+      "expected_function": "Accountability",
+      "success_indicator": "Student acknowledges deadline."
+    },
+    {
+      "stage_order": 5,
+      "stage": "Closing",
+      "speaker": "AI",
+      "message_or_student_goal": "I can give you two additional days. Please submit it by Friday.",
+      "expected_function": "Decision",
+      "success_indicator": "Request handled."
+    }
+  ],
+  "conversation_flow": [
+    {
+      "turn": 1,
+      "stage": "Opening",
+      "speaker": "AI",
+      "message": "Good morning. How can I help you?",
+      "expected_function": "Academic opening",
+      "success_indicator": "Student greets and opens politely."
+    },
+    {
+      "turn": 2,
+      "stage": "Request",
+      "speaker": "Student Goal",
+      "student_goal": "Explain situation and request extension indirectly.",
+      "expected_function": "Polite request",
+      "success_indicator": "Student uses softeners."
+    },
+    {
+      "turn": 3,
+      "stage": "Branching",
+      "speaker": "AI",
+      "message": "If polite: How much extra time do you need? If direct: Could you explain more politely? If no reason: Why do you need it?",
+      "expected_function": "Adaptive response",
+      "success_indicator": "AI evaluates request quality."
+    },
+    {
+      "turn": 4,
+      "stage": "Responsibility",
+      "speaker": "Student Goal",
+      "student_goal": "Request specific extension and show responsibility.",
+      "expected_function": "Accountability",
+      "success_indicator": "Student acknowledges deadline."
+    },
+    {
+      "turn": 5,
+      "stage": "Closing",
+      "speaker": "AI",
+      "message": "I can give you two additional days. Please submit it by Friday.",
+      "expected_function": "Decision",
+      "success_indicator": "Request handled."
+    }
+  ],
+  "branching_rules": [
+    {
+      "rule_id": "BR-051",
+      "student_response_category": "GOOD",
+      "detection_cues": [
+        "polite",
+        "clear",
+        "relevant",
+        "culturally sensitive"
+      ],
+      "ai_response_strategy": "Continue conversation and reinforce good strategy",
+      "example_ai_response": "That is a respectful way to say it. Let's continue.",
+      "feedback_focus": "Positive reinforcement",
+      "score_impact": "+1 politeness/ICC"
+    },
+    {
+      "rule_id": "BR-052",
+      "student_response_category": "ACCEPTABLE",
+      "detection_cues": [
+        "understandable but slightly direct or limited"
+      ],
+      "ai_response_strategy": "Continue but model improved expression",
+      "example_ai_response": "Your meaning is clear. You can make it more polite by saying...",
+      "feedback_focus": "Improvement",
+      "score_impact": "neutral"
+    },
+    {
+      "rule_id": "BR-053",
+      "student_response_category": "TOO_DIRECT",
+      "detection_cues": [
+        "commands",
+        "blunt disagreement",
+        "no softeners"
+      ],
+      "ai_response_strategy": "Ask student to soften language and explain pragmatics",
+      "example_ai_response": "Your message is understandable, but it sounds too direct in this context.",
+      "feedback_focus": "Politeness strategy",
+      "score_impact": "-1 politeness/pragmatics"
+    },
+    {
+      "rule_id": "BR-054",
+      "student_response_category": "DISMISSIVE",
+      "detection_cues": [
+        "just eat anything",
+        "too sensitive",
+        "not important"
+      ],
+      "ai_response_strategy": "Explain cultural or personal importance and request repair",
+      "example_ai_response": "This response may dismiss the other person's concern. Try acknowledging their preference first.",
+      "feedback_focus": "Empathy and repair",
+      "score_impact": "-1 ICC"
+    },
+    {
+      "rule_id": "BR-055",
+      "student_response_category": "SILENCE_OR_UNCLEAR",
+      "detection_cues": [
+        "empty",
+        "very short",
+        "unclear pronunciation/transcription"
+      ],
+      "ai_response_strategy": "Prompt clarification and give support",
+      "example_ai_response": "Could you say that again in a complete sentence? You can start with...",
+      "feedback_focus": "Fluency support",
+      "score_impact": "no score until retry"
+    }
+  ],
+  "fallback_responses": {
+    "GOOD": "Thank you for explaining. Please tell me the specific new deadline you are requesting.",
+    "ACCEPTABLE": "Thank you for explaining. Please tell me the specific new deadline you are requesting.",
+    "TOO_DIRECT": "I understand what you mean. Could we continue this conversation in a more respectful way?",
+    "STEREOTYPING": "I would rather talk about individual experiences than generalize a whole group.",
+    "TOO_PERSONAL": "I would prefer not to discuss that yet. Could we stay with the topic we are discussing?",
+    "DISMISSIVE": "I understand, but I would appreciate it if we could acknowledge the concern and discuss it together.",
+    "SILENCE_OR_UNCLEAR": "Sorry, I did not quite understand. Could you say that again in a complete sentence?"
+  },
+  "rubric": {
+    "grammar": {
+      "score_1": "Many errors obscure meaning",
+      "score_2": "Frequent errors but some meaning clear",
+      "score_3": "Some errors but understandable",
+      "score_4": "Minor errors only",
+      "score_5": "Accurate and natural for level",
+      "notes_for_ai": "Do not over-penalize accent or minor EFL errors."
+    },
+    "vocabulary": {
+      "score_1": "Very limited or inappropriate",
+      "score_2": "Limited vocabulary",
+      "score_3": "Adequate vocabulary",
+      "score_4": "Appropriate vocabulary",
+      "score_5": "Varied and context-appropriate vocabulary",
+      "notes_for_ai": "Focus on communicative appropriateness."
+    },
+    "fluency": {
+      "score_1": "Very hesitant or fragmented",
+      "score_2": "Frequent pauses",
+      "score_3": "Generally understandable",
+      "score_4": "Mostly smooth",
+      "score_5": "Smooth and natural",
+      "notes_for_ai": "Use speech transcript; consider hesitation reasonably."
+    },
+    "politeness": {
+      "score_1": "Rude or commanding",
+      "score_2": "Too direct",
+      "score_3": "Some polite forms",
+      "score_4": "Polite and respectful",
+      "score_5": "Highly appropriate politeness strategy",
+      "notes_for_ai": "Assess softeners, greetings, thanks, apology."
+    },
+    "pragmatic_appropriateness": {
+      "score_1": "Response does not fit context",
+      "score_2": "Partly inappropriate",
+      "score_3": "Generally appropriate",
+      "score_4": "Appropriate to role/context",
+      "score_5": "Highly appropriate and context-sensitive",
+      "notes_for_ai": "Assess function: request, refusal, apology, disagreement."
+    },
+    "intercultural_awareness": {
+      "score_1": "Stereotyping or culturally insensitive",
+      "score_2": "Limited awareness",
+      "score_3": "Some awareness",
+      "score_4": "Clear awareness",
+      "score_5": "Strong empathy, reflection, and respectful comparison",
+      "notes_for_ai": "Assess avoiding assumptions, respect, curiosity, repair."
+    }
+  },
+  "reference_dialogue": [],
+  "ai_output_format": {
+    "schema_version": "2.0",
+    "required_fields": [
+      "scenario_id",
+      "turn_number",
+      "ai_message",
+      "detected_category",
+      "scores",
+      "feedback",
+      "cultural_note",
+      "improved_response",
+      "continue_conversation",
+      "completed_objective_ids",
+      "end_reason"
+    ]
+  },
+  "initial_conversation_state": {
+    "scenario_id": "G-ICC-009",
+    "student_response_count": 0,
+    "conversation_status": "started",
+    "ai_opening_message": "Good morning. How can I help you?",
+    "student_expected_action": "Greet the lecturer and make a polite extension request.",
+    "session_result": null
+  }
+}

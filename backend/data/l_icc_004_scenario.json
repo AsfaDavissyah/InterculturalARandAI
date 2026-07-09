@@ -1,0 +1,382 @@
+{
+  "schema_version": "2.0",
+  "prototype_id": "scenario-l-icc-004-v2",
+  "scenario": {
+    "scenario_id": "L-ICC-004",
+    "title": "Urban and Rural Communication Styles",
+    "scenario_type": "Local Indonesian Intercultural",
+    "level": "B1-B2",
+    "ar_scene": "Campus project meeting",
+    "student_role": "Student collaborating in a group project",
+    "ai_role": "Quiet but capable peer from a different social or regional background",
+    "icc_dimension": [
+      "Skills of interpreting and relating",
+      "Critical cultural awareness"
+    ],
+    "cultural_focus": [
+      "Urban-rural assumptions",
+      "participation styles",
+      "social sensitivity",
+      "equal participation"
+    ],
+    "learning_goal": "Encourage participation without making assumptions about social or regional background.",
+    "task_instruction": "Your groupmate is quiet during a project discussion. Encourage them to share ideas respectfully.",
+    "ai_character_prompt": "You are a quiet but capable student from a different social or regional background. You need encouragement, but you do not want to be judged or treated as less capable.",
+    "good_response_examples": [
+      "No problem. We would like to hear your idea when you are ready.",
+      "Your opinion is important for the group."
+    ],
+    "poor_response_examples": [
+      "You are from a small town, so maybe you do not understand.",
+      "Why are you so quiet?",
+      "You must speak now."
+    ],
+    "cultural_note": "Quietness does not always mean lack of knowledge; participation styles vary."
+  },
+  "context": {
+    "scene_title": "Inclusive Campus Project Meeting",
+    "setting": "Campus project meeting",
+    "situation": "A quiet but capable group member needs space and encouragement to contribute to a campus project.",
+    "boundaries": [
+      "Remain in the campus project meeting.",
+      "Focus on equal participation and the group project.",
+      "Do not make urban, rural, social, or regional assumptions."
+    ],
+    "forbidden_terms": [
+      "airport pickup",
+      "deadline extension",
+      "cultural festival"
+    ]
+  },
+  "characters": [
+    {
+      "name": "Student",
+      "role": "Student learner",
+      "profile": "Student collaborating in a group project"
+    },
+    {
+      "name": "AI Partner",
+      "role": "AI conversation partner",
+      "profile": "Quiet but capable peer from a different social or regional background"
+    }
+  ],
+  "prototype_scope": {
+    "input_mode": "voice_with_text_fallback",
+    "voice_enabled": true,
+    "ar_enabled": true,
+    "avatar_enabled": true,
+    "scoring_enabled": true,
+    "feedback_enabled": true,
+    "max_turns": 10,
+    "prototype_focus": "Scenario-based AR speaking practice with adaptive AI role-play, objective tracking, scoring, and post-session feedback."
+  },
+  "session_rules": {
+    "minimum_student_responses": 5,
+    "target_student_responses_min": 6,
+    "target_student_responses_max": 8,
+    "maximum_student_responses": 10,
+    "required_objective_ids": [
+      "invite_without_pressure",
+      "avoid_assumptions",
+      "acknowledge_competence",
+      "agree_participation"
+    ],
+    "natural_closing_message": "That approach feels inclusive. We can divide the project based on everyone's strengths."
+  },
+  "conversation_objectives": [
+    {
+      "objective_id": "invite_without_pressure",
+      "description": "Invite the peer to contribute without pressure.",
+      "detection_cues": [
+        "when you are ready",
+        "would you like",
+        "take your time",
+        "we would like to hear"
+      ],
+      "ai_follow_up": "Would you like to hear my idea when I am ready?"
+    },
+    {
+      "objective_id": "avoid_assumptions",
+      "description": "Avoid assumptions about quietness or background.",
+      "detection_cues": [
+        "no assumption",
+        "everyone is different",
+        "quiet does not mean",
+        "understand"
+      ],
+      "ai_follow_up": "What do you think my quietness might mean in this discussion?"
+    },
+    {
+      "objective_id": "acknowledge_competence",
+      "description": "Show that the peer's contribution is valued.",
+      "detection_cues": [
+        "your opinion is important",
+        "value your idea",
+        "your strength",
+        "capable",
+        "contribution"
+      ],
+      "ai_follow_up": "How could my strengths contribute to this project?"
+    },
+    {
+      "objective_id": "agree_participation",
+      "description": "Agree on a practical way for everyone to participate.",
+      "detection_cues": [
+        "divide",
+        "take turns",
+        "share ideas",
+        "everyone",
+        "work together"
+      ],
+      "ai_follow_up": "How should we organize the discussion so everyone can participate?"
+    }
+  ],
+  "conversation_stages": [
+    {
+      "stage_order": 1,
+      "stage": "Opening",
+      "speaker": "AI",
+      "message_or_student_goal": "I'm still thinking. You can continue the discussion first.",
+      "expected_function": "Participation issue",
+      "success_indicator": "Student encourages without pressure."
+    },
+    {
+      "stage_order": 2,
+      "stage": "Encouragement",
+      "speaker": "Student Goal",
+      "message_or_student_goal": "Invite opinion without making assumptions.",
+      "expected_function": "Turn-taking",
+      "success_indicator": "Student uses respectful invitation."
+    },
+    {
+      "stage_order": 3,
+      "stage": "Branching",
+      "speaker": "AI",
+      "message_or_student_goal": "If respectful: I have an idea. If patronizing: Please don't assume I don't understand. If pressuring: I feel uncomfortable.",
+      "expected_function": "Adaptive response",
+      "success_indicator": "AI detects pressure/patronizing language."
+    },
+    {
+      "stage_order": 4,
+      "stage": "Support",
+      "speaker": "Student Goal",
+      "message_or_student_goal": "Support equal participation.",
+      "expected_function": "Inclusion",
+      "success_indicator": "Student acknowledges peer competence."
+    },
+    {
+      "stage_order": 5,
+      "stage": "Closing",
+      "speaker": "AI",
+      "message_or_student_goal": "That helps. We can divide the presentation based on our strengths.",
+      "expected_function": "Collaboration",
+      "success_indicator": "Group planning improves."
+    }
+  ],
+  "conversation_flow": [
+    {
+      "turn": 1,
+      "stage": "Opening",
+      "speaker": "AI",
+      "message": "I'm still thinking. You can continue the discussion first.",
+      "expected_function": "Participation issue",
+      "success_indicator": "Student encourages without pressure."
+    },
+    {
+      "turn": 2,
+      "stage": "Encouragement",
+      "speaker": "Student Goal",
+      "student_goal": "Invite opinion without making assumptions.",
+      "expected_function": "Turn-taking",
+      "success_indicator": "Student uses respectful invitation."
+    },
+    {
+      "turn": 3,
+      "stage": "Branching",
+      "speaker": "AI",
+      "message": "If respectful: I have an idea. If patronizing: Please don't assume I don't understand. If pressuring: I feel uncomfortable.",
+      "expected_function": "Adaptive response",
+      "success_indicator": "AI detects pressure/patronizing language."
+    },
+    {
+      "turn": 4,
+      "stage": "Support",
+      "speaker": "Student Goal",
+      "student_goal": "Support equal participation.",
+      "expected_function": "Inclusion",
+      "success_indicator": "Student acknowledges peer competence."
+    },
+    {
+      "turn": 5,
+      "stage": "Closing",
+      "speaker": "AI",
+      "message": "That helps. We can divide the presentation based on our strengths.",
+      "expected_function": "Collaboration",
+      "success_indicator": "Group planning improves."
+    }
+  ],
+  "branching_rules": [
+    {
+      "rule_id": "BR-020",
+      "student_response_category": "GOOD",
+      "detection_cues": [
+        "polite",
+        "clear",
+        "relevant",
+        "culturally sensitive"
+      ],
+      "ai_response_strategy": "Continue conversation and reinforce good strategy",
+      "example_ai_response": "That is a respectful way to say it. Let's continue.",
+      "feedback_focus": "Positive reinforcement",
+      "score_impact": "+1 politeness/ICC"
+    },
+    {
+      "rule_id": "BR-021",
+      "student_response_category": "ACCEPTABLE",
+      "detection_cues": [
+        "understandable but slightly direct or limited"
+      ],
+      "ai_response_strategy": "Continue but model improved expression",
+      "example_ai_response": "Your meaning is clear. You can make it more polite by saying...",
+      "feedback_focus": "Improvement",
+      "score_impact": "neutral"
+    },
+    {
+      "rule_id": "BR-022",
+      "student_response_category": "TOO_DIRECT",
+      "detection_cues": [
+        "commands",
+        "blunt disagreement",
+        "no softeners"
+      ],
+      "ai_response_strategy": "Ask student to soften language and explain pragmatics",
+      "example_ai_response": "Your message is understandable, but it sounds too direct in this context.",
+      "feedback_focus": "Politeness strategy",
+      "score_impact": "-1 politeness/pragmatics"
+    },
+    {
+      "rule_id": "BR-023",
+      "student_response_category": "STEREOTYPING",
+      "detection_cues": [
+        "always",
+        "everyone from",
+        "people from your region",
+        "accent jokes"
+      ],
+      "ai_response_strategy": "Challenge generalization and redirect respectfully",
+      "example_ai_response": "Be careful not to generalize a whole group. Try asking about individual experience.",
+      "feedback_focus": "Critical cultural awareness",
+      "score_impact": "-1 or -2 ICC"
+    },
+    {
+      "rule_id": "BR-024",
+      "student_response_category": "DISMISSIVE",
+      "detection_cues": [
+        "just eat anything",
+        "too sensitive",
+        "not important"
+      ],
+      "ai_response_strategy": "Explain cultural or personal importance and request repair",
+      "example_ai_response": "This response may dismiss the other person's concern. Try acknowledging their preference first.",
+      "feedback_focus": "Empathy and repair",
+      "score_impact": "-1 ICC"
+    },
+    {
+      "rule_id": "BR-025",
+      "student_response_category": "SILENCE_OR_UNCLEAR",
+      "detection_cues": [
+        "empty",
+        "very short",
+        "unclear pronunciation/transcription"
+      ],
+      "ai_response_strategy": "Prompt clarification and give support",
+      "example_ai_response": "Could you say that again in a complete sentence? You can start with...",
+      "feedback_focus": "Fluency support",
+      "score_impact": "no score until retry"
+    }
+  ],
+  "fallback_responses": {
+    "GOOD": "Thank you for giving me space. I am ready to share one idea now.",
+    "ACCEPTABLE": "Thank you for giving me space. I am ready to share one idea now.",
+    "TOO_DIRECT": "I understand what you mean. Could we continue this conversation in a more respectful way?",
+    "STEREOTYPING": "I would rather talk about individual experiences than generalize a whole group.",
+    "TOO_PERSONAL": "I would prefer not to discuss that yet. Could we stay with the topic we are discussing?",
+    "DISMISSIVE": "I understand, but I would appreciate it if we could acknowledge the concern and discuss it together.",
+    "SILENCE_OR_UNCLEAR": "Sorry, I did not quite understand. Could you say that again in a complete sentence?"
+  },
+  "rubric": {
+    "grammar": {
+      "score_1": "Many errors obscure meaning",
+      "score_2": "Frequent errors but some meaning clear",
+      "score_3": "Some errors but understandable",
+      "score_4": "Minor errors only",
+      "score_5": "Accurate and natural for level",
+      "notes_for_ai": "Do not over-penalize accent or minor EFL errors."
+    },
+    "vocabulary": {
+      "score_1": "Very limited or inappropriate",
+      "score_2": "Limited vocabulary",
+      "score_3": "Adequate vocabulary",
+      "score_4": "Appropriate vocabulary",
+      "score_5": "Varied and context-appropriate vocabulary",
+      "notes_for_ai": "Focus on communicative appropriateness."
+    },
+    "fluency": {
+      "score_1": "Very hesitant or fragmented",
+      "score_2": "Frequent pauses",
+      "score_3": "Generally understandable",
+      "score_4": "Mostly smooth",
+      "score_5": "Smooth and natural",
+      "notes_for_ai": "Use speech transcript; consider hesitation reasonably."
+    },
+    "politeness": {
+      "score_1": "Rude or commanding",
+      "score_2": "Too direct",
+      "score_3": "Some polite forms",
+      "score_4": "Polite and respectful",
+      "score_5": "Highly appropriate politeness strategy",
+      "notes_for_ai": "Assess softeners, greetings, thanks, apology."
+    },
+    "pragmatic_appropriateness": {
+      "score_1": "Response does not fit context",
+      "score_2": "Partly inappropriate",
+      "score_3": "Generally appropriate",
+      "score_4": "Appropriate to role/context",
+      "score_5": "Highly appropriate and context-sensitive",
+      "notes_for_ai": "Assess function: request, refusal, apology, disagreement."
+    },
+    "intercultural_awareness": {
+      "score_1": "Stereotyping or culturally insensitive",
+      "score_2": "Limited awareness",
+      "score_3": "Some awareness",
+      "score_4": "Clear awareness",
+      "score_5": "Strong empathy, reflection, and respectful comparison",
+      "notes_for_ai": "Assess avoiding assumptions, respect, curiosity, repair."
+    }
+  },
+  "reference_dialogue": [],
+  "ai_output_format": {
+    "schema_version": "2.0",
+    "required_fields": [
+      "scenario_id",
+      "turn_number",
+      "ai_message",
+      "detected_category",
+      "scores",
+      "feedback",
+      "cultural_note",
+      "improved_response",
+      "continue_conversation",
+      "completed_objective_ids",
+      "end_reason"
+    ]
+  },
+  "initial_conversation_state": {
+    "scenario_id": "L-ICC-004",
+    "student_response_count": 0,
+    "conversation_status": "started",
+    "ai_opening_message": "I am still thinking. You can continue the discussion first.",
+    "student_expected_action": "Invite the peer to contribute without pressure.",
+    "session_result": null
+  }
+}
