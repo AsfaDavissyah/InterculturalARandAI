@@ -12,6 +12,8 @@ const {
   detectCategory,
   detectCompletedObjectives,
   generateAIMessage,
+  normalizePracticeSessionPayload,
+  serializePracticeSession,
 } = require("../server");
 
 const airportScenario = JSON.parse(
@@ -366,4 +368,47 @@ test("all ten scenarios are listed and can evaluate a first response", async () 
       server.close((error) => (error ? reject(error) : resolve()))
     );
   }
+});
+
+test("history payload maps between mobile snake_case and MongoDB fields", () => {
+  const normalized = normalizePracticeSessionPayload(
+    {
+      session_id: "session_history_test",
+      student: {
+        student_id: "student_1",
+        display_name: "Rina",
+      },
+      scenario: {
+        scenario_id: "G-ICC-008",
+        title: "Meeting an International Student on Campus",
+      },
+      started_at: "2026-07-12T01:00:00.000Z",
+      completed_at: "2026-07-12T01:05:00.000Z",
+      duration_seconds: 300,
+      status: "ended_manually",
+      end_reason: "manual_finish",
+      student_response_count: 5,
+      transcript: [{ speaker: "Student", message: "Welcome, David." }],
+      average_scores: { grammar: 4, politeness: 5 },
+      overall_score: 4.5,
+      evaluations: [{ turn_number: 1 }],
+      completed_objective_ids: ["confirm_and_welcome"],
+    },
+    "user_1"
+  );
+
+  assert.equal(normalized.sessionId, "session_history_test");
+  assert.equal(normalized.durationSeconds, 300);
+  assert.equal(normalized.studentResponseCount, 5);
+  assert.equal(normalized.overallScore, 4.5);
+  assert.equal(normalized.averageScores.politeness, 5);
+
+  const serialized = serializePracticeSession(normalized);
+
+  assert.equal(serialized.session_id, "session_history_test");
+  assert.equal(serialized.completed_at, "2026-07-12T01:05:00.000Z");
+  assert.equal(serialized.duration_seconds, 300);
+  assert.equal(serialized.student_response_count, 5);
+  assert.equal(serialized.overall_score, 4.5);
+  assert.deepEqual(serialized.completed_objective_ids, ["confirm_and_welcome"]);
 });

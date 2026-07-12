@@ -16,10 +16,12 @@ const TranscriptItemSchema = new mongoose.Schema({
 });
 
 const ScoreBreakdownSchema = new mongoose.Schema({
-  appropriateness: { type: Number, default: 0 },
-  politeness: { type: Number, default: 0 },
   grammar: { type: Number, default: 0 },
-  cultural_sensitivity: { type: Number, default: 0 },
+  vocabulary: { type: Number, default: 0 },
+  fluency: { type: Number, default: 0 },
+  politeness: { type: Number, default: 0 },
+  pragmatic_appropriateness: { type: Number, default: 0 },
+  intercultural_awareness: { type: Number, default: 0 },
 });
 
 const PracticeSessionSchema = new mongoose.Schema({
@@ -43,6 +45,10 @@ const PracticeSessionSchema = new mongoose.Schema({
     ai_role: { type: String },
     task_instruction: { type: String },
   },
+  student: {
+    student_id: { type: String },
+    display_name: { type: String },
+  },
   transcript: [TranscriptItemSchema],
   overallScore: {
     type: Number,
@@ -51,8 +57,11 @@ const PracticeSessionSchema = new mongoose.Schema({
   averageScores: ScoreBreakdownSchema,
   status: {
     type: String,
-    enum: ["completed", "active", "abandoned"],
+    enum: ["completed", "active", "abandoned", "ended_manually"],
     default: "completed",
+  },
+  endReason: {
+    type: String,
   },
   durationSeconds: {
     type: Number,
@@ -65,6 +74,17 @@ const PracticeSessionSchema = new mongoose.Schema({
   completedAt: {
     type: Date,
     default: Date.now,
+  },
+  startedAt: {
+    type: Date,
+  },
+  evaluations: {
+    type: [mongoose.Schema.Types.Mixed],
+    default: [],
+  },
+  completedObjectiveIds: {
+    type: [String],
+    default: [],
   },
 });
 

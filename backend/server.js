@@ -14,13 +14,20 @@ const PracticeSession = require("./models/PracticeSession");
 const MONGODB_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET || "intercultural_ai_secret_key_2026";
 
-if (MONGODB_URI) {
-  mongoose
-    .connect(MONGODB_URI)
-    .then(() => console.log("Connected to MongoDB Atlas successfully."))
-    .catch((err) => console.error("MongoDB Atlas connection error:", err));
-} else {
-  console.log("MONGODB_URI is not defined in .env. Database operations will be disabled.");
+async function connectDatabase() {
+  if (!MONGODB_URI) {
+    console.log("MONGODB_URI is not defined in .env. Database operations will be disabled.");
+    return;
+  }
+
+  if (mongoose.connection.readyState !== 0) return;
+
+  try {
+    await mongoose.connect(MONGODB_URI);
+    console.log("Connected to MongoDB Atlas successfully.");
+  } catch (err) {
+    console.error("MongoDB Atlas connection error:", err);
+  }
 }
 
 let evaluateWithOpenAI = null;
@@ -764,6 +771,70 @@ function authenticateJWT(req, res, next) {
   }
 }
 
+function normalizePracticeSessionPayload(rawSession, userId) {
+  const student = rawSession.student || {};
+
+  return {
+    userId,
+    sessionId: rawSession.sessionId || rawSession.session_id,
+    scenario: rawSession.scenario || {},
+    transcript: Array.isArray(rawSession.transcript)
+      ? rawSession.transcript.map((item) => ({
+          speaker: item.speaker,
+          message: item.message,
+          timestamp: item.timestamp,
+        }))
+      : [],
+    overallScore: Number(rawSession.overallScore ?? rawSession.overall_score ?? 0),
+    averageScores: rawSession.averageScores || rawSession.average_scores || {},
+    status: rawSession.status || "completed",
+    endReason: rawSession.endReason || rawSession.end_reason,
+    durationSeconds: Number(rawSession.durationSeconds ?? rawSession.duration_seconds ?? 0),
+    studentResponseCount: Number(
+      rawSession.studentResponseCount ?? rawSession.student_response_count ?? 0
+    ),
+    startedAt: rawSession.startedAt || rawSession.started_at,
+    completedAt: rawSession.completedAt || rawSession.completed_at || new Date(),
+    evaluations: Array.isArray(rawSession.evaluations) ? rawSession.evaluations : [],
+    completedObjectiveIds:
+      rawSession.completedObjectiveIds || rawSession.completed_objective_ids || [],
+    student: {
+      student_id: student.student_id || rawSession.studentId || "local_student",
+      display_name: student.display_name || rawSession.studentName || null,
+    },
+  };
+}
+
+function serializePracticeSession(session) {
+  const data = typeof session.toObject === "function" ? session.toObject() : session;
+
+  return {
+    schema_version: 1,
+    session_id: data.sessionId,
+    student: data.student || {
+      student_id: "local_student",
+      display_name: null,
+    },
+    scenario: data.scenario || {},
+    started_at: data.startedAt
+      ? new Date(data.startedAt).toISOString()
+      : new Date(data.completedAt || Date.now()).toISOString(),
+    completed_at: new Date(data.completedAt || Date.now()).toISOString(),
+    duration_seconds: data.durationSeconds || 0,
+    status: data.status || "completed",
+    end_reason: data.endReason || null,
+    student_response_count: data.studentResponseCount || 0,
+    transcript: (data.transcript || []).map((item) => ({
+      speaker: item.speaker,
+      message: item.message,
+    })),
+    evaluations: data.evaluations || [],
+    average_scores: data.averageScores || {},
+    overall_score: data.overallScore || 0,
+    completed_objective_ids: data.completedObjectiveIds || [],
+  };
+}
+
 // ─── Authentication Endpoints ───
 
 app.post("/api/auth/signup", async (req, res) => {
@@ -829,7 +900,7 @@ app.post("/api/auth/login", async (req, res) => {
 app.get("/api/history", authenticateJWT, async (req, res) => {
   try {
     const sessions = await PracticeSession.find({ userId: req.user.userId }).sort({ completedAt: -1 });
-    res.json(sessions);
+    res.json(sessions.map(serializePracticeSession));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -837,16 +908,19 @@ app.get("/api/history", authenticateJWT, async (req, res) => {
 
 app.post("/api/history", authenticateJWT, async (req, res) => {
   try {
-    const sessionData = req.body;
-    sessionData.userId = req.user.userId;
+    const sessionData = normalizePracticeSessionPayload(req.body, req.user.userId);
+
+    if (!sessionData.sessionId) {
+      return res.status(400).json({ error: "session_id is required" });
+    }
     
     // Upsert based on sessionId
     const session = await PracticeSession.findOneAndUpdate(
       { sessionId: sessionData.sessionId, userId: req.user.userId },
       sessionData,
-      { new: true, upsert: true }
+      { new: true, upsert: true, runValidators: true }
     );
-    res.status(201).json(session);
+    res.status(201).json(serializePracticeSession(session));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1017,9 +1091,9 @@ app.post("/api/tts", async (req, res) => {
 });
 
 if (require.main === module) {
-  app.listen(PORT, "0.0.0.0", () => {
+  connectDatabase().finally(() => app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running at http://localhost:${PORT}`);
-  });
+  }));
 }
 
 module.exports = {
@@ -1031,4 +1105,7 @@ module.exports = {
   generateAIMessage,
   getSessionRules,
   validateScenarioData,
+  normalizePracticeSessionPayload,
+  serializePracticeSession,
+  connectDatabase,
 };

@@ -15,13 +15,10 @@ import '../models/practice_session.dart';
 import '../models/scenario_topic.dart';
 import '../services/app_settings.dart';
 import '../services/chat_service.dart';
-import '../services/auth_service.dart';
 import '../services/practice_history_store.dart';
 import '../widgets/ar_avatar.dart';
 import '../widgets/ar_avatar_3d.dart';
 import 'result_screen.dart';
-
-
 
 Size cameraPreviewDisplaySize(Size previewSize, Orientation orientation) {
   return orientation == Orientation.portrait
@@ -63,7 +60,6 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   late final AudioPlayer _audioPlayer;
   StreamSubscription<PlayerState>? _audioSubscription;
 
-
   int _studentResponseCount = 0;
   bool _sessionLoading = true;
   bool _speechAvailable = false;
@@ -77,7 +73,6 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   String _recognizedWords = '';
   String? _cameraError;
   String? _sessionError;
-  String _studentGender = 'female';
 
   @override
   void initState() {
@@ -89,14 +84,17 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     WidgetsBinding.instance.addObserver(this);
     _lifecycleState =
         WidgetsBinding.instance.lifecycleState ?? AppLifecycleState.resumed;
-    
+
     _audioPlayer = AudioPlayer();
-    _audioSubscription = _audioPlayer.onPlayerStateChanged.listen((PlayerState state) {
+    _audioSubscription = _audioPlayer.onPlayerStateChanged.listen((
+      PlayerState state,
+    ) {
       if (!mounted) return;
       setState(() {
         if (state == PlayerState.playing) {
           _activity = AvatarActivity.speaking;
-        } else if (state == PlayerState.completed || state == PlayerState.stopped) {
+        } else if (state == PlayerState.completed ||
+            state == PlayerState.stopped) {
           if (!_sessionLoading && _sessionError == null) {
             _activity = AvatarActivity.idle;
           }
@@ -106,7 +104,6 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
     unawaited(_initializeSession());
   }
-
 
   Future<void> _initializeSession() async {
     if (mounted) {
@@ -119,16 +116,6 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
     final baseUrl = await AppSettings.getBaseUrl();
     _chatService = ChatService(baseUrl: baseUrl);
-
-    // Muat gender mahasiswa untuk menentukan visual avatar 3D
-    try {
-      final profile = await AuthService.getProfile();
-      if (profile != null && mounted) {
-        setState(() {
-          _studentGender = profile.gender;
-        });
-      }
-    } catch (_) {}
 
     await _initializeCamera();
     await _initializeSpeech();
@@ -261,15 +248,17 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     try {
       if (_chatService != null) {
         final baseUrl = _chatService!.baseUrl;
-        final response = await http.post(
-          Uri.parse('$baseUrl/api/tts'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'text': text,
-            'gender': gender,
-            'ai_role': widget.scenario.aiRole,
-          }),
-        ).timeout(const Duration(seconds: 8));
+        final response = await http
+            .post(
+              Uri.parse('$baseUrl/api/tts'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'text': text,
+                'gender': gender,
+                'ai_role': widget.scenario.aiRole,
+              }),
+            )
+            .timeout(const Duration(seconds: 8));
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
@@ -311,7 +300,9 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("Microphone is required for this practice. Please enable microphone permissions in your settings."),
+            content: Text(
+              "Microphone is required for this practice. Please enable microphone permissions in your settings.",
+            ),
           ),
         );
       }
@@ -471,8 +462,6 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       _submissionStarted = false;
     }
   }
-
-
 
   Future<void> _requestFinish() async {
     if (_lastResponse == null) {
@@ -638,7 +627,11 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   }
 
   String get _modelPath {
-    if (_studentGender == 'male') {
+    final aiRoleLower = widget.scenario.aiRole.toLowerCase();
+    if (aiRoleLower.contains('david') ||
+        aiRoleLower.contains('male') ||
+        aiRoleLower.contains('man') ||
+        aiRoleLower.contains('mr.')) {
       return 'assets/models/male_char.glb';
     }
     return 'assets/models/female_char.glb';
@@ -901,55 +894,58 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                                     : Icons.videocam_off_outlined,
                                 onPressed: _toggleCamera,
                               ),
-                               Semantics(
-                                 button: true,
-                                 label: _speech.isListening
-                                     ? 'Stop listening'
-                                     : 'Start speaking',
-                                 child: AnimatedBuilder(
-                                   animation: _pulsingController,
-                                   builder: (context, child) {
-                                     final pulse = _pulsingController.value;
-                                     return Stack(
-                                       alignment: Alignment.center,
-                                       children: [
-                                         if (_speech.isListening)
-                                           Container(
-                                             width: 68 + (pulse * 24),
-                                             height: 68 + (pulse * 24),
-                                             decoration: BoxDecoration(
-                                               shape: BoxShape.circle,
-                                               color: const Color(0xFFD54343).withValues(alpha: 0.45 * (1.0 - pulse)),
-                                             ),
-                                           ),
-                                         child!,
-                                       ],
-                                     );
-                                   },
-                                   child: IconButton.filled(
-                                     tooltip: _speech.isListening
-                                         ? 'Stop listening'
-                                         : 'Speak',
-                                     onPressed: canInteract
-                                         ? _toggleListening
-                                         : null,
-                                     style: IconButton.styleFrom(
-                                       minimumSize: const Size(68, 68),
-                                       backgroundColor: _speech.isListening
-                                           ? const Color(0xFFD54343)
-                                           : const Color(0xFF35C6A5),
-                                       foregroundColor: const Color(0xFF102621),
-                                       disabledBackgroundColor: Colors.white24,
-                                     ),
-                                     iconSize: 31,
-                                     icon: Icon(
-                                       _speech.isListening
-                                           ? Icons.stop_rounded
-                                           : Icons.mic_rounded,
-                                     ),
-                                   ),
-                                 ),
-                               ),
+                              Semantics(
+                                button: true,
+                                label: _speech.isListening
+                                    ? 'Stop listening'
+                                    : 'Start speaking',
+                                child: AnimatedBuilder(
+                                  animation: _pulsingController,
+                                  builder: (context, child) {
+                                    final pulse = _pulsingController.value;
+                                    return Stack(
+                                      alignment: Alignment.center,
+                                      children: [
+                                        if (_speech.isListening)
+                                          Container(
+                                            width: 68 + (pulse * 24),
+                                            height: 68 + (pulse * 24),
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: const Color(0xFFD54343)
+                                                  .withValues(
+                                                    alpha: 0.45 * (1.0 - pulse),
+                                                  ),
+                                            ),
+                                          ),
+                                        child!,
+                                      ],
+                                    );
+                                  },
+                                  child: IconButton.filled(
+                                    tooltip: _speech.isListening
+                                        ? 'Stop listening'
+                                        : 'Speak',
+                                    onPressed: canInteract
+                                        ? _toggleListening
+                                        : null,
+                                    style: IconButton.styleFrom(
+                                      minimumSize: const Size(68, 68),
+                                      backgroundColor: _speech.isListening
+                                          ? const Color(0xFFD54343)
+                                          : const Color(0xFF35C6A5),
+                                      foregroundColor: const Color(0xFF102621),
+                                      disabledBackgroundColor: Colors.white24,
+                                    ),
+                                    iconSize: 31,
+                                    icon: Icon(
+                                      _speech.isListening
+                                          ? Icons.stop_rounded
+                                          : Icons.mic_rounded,
+                                    ),
+                                  ),
+                                ),
+                              ),
                               _buildIconButton(
                                 tooltip: 'Finish practice',
                                 icon: Icons.flag_outlined,

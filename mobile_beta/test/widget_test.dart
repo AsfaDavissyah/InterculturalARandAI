@@ -10,14 +10,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_beta/main.dart';
 
 void main() {
-  testWidgets('Scenario library loads', (WidgetTester tester) async {
-    await tester.pumpWidget(const InterculturalAISpeakingBetaApp(isLoggedIn: false));
-
-    expect(find.text('AI Speaking Practice Beta'), findsOneWidget);
-    expect(find.text('Scenario Library'), findsOneWidget);
-    expect(
-      find.textContaining('Choose an intercultural English scenario'),
-      findsOneWidget,
+  testWidgets('Login screen loads for signed out students', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      const InterculturalAISpeakingBetaApp(isLoggedIn: false),
     );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Welcome back,\nSign in to practice'), findsOneWidget);
+    expect(find.text('Email Address'), findsOneWidget);
+    expect(find.text('Password'), findsOneWidget);
+    expect(find.text('SIGN IN'), findsOneWidget);
   });
 }
