@@ -14,9 +14,12 @@ class _SignupScreenState extends State<SignupScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _studentIdController = TextEditingController();
+  final _lecturerCodeController = TextEditingController();
   
   String _selectedGender = 'female';
   bool _loading = false;
+  bool _consentChecked = false;
   String? _errorMessage;
 
   static const Color _cream = Color(0xFFFFFCF4);
@@ -28,11 +31,20 @@ class _SignupScreenState extends State<SignupScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _studentIdController.dispose();
+    _lecturerCodeController.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
+    if (!_consentChecked) {
+      setState(() {
+        _errorMessage = 'Anda harus menyetujui Lembar Persetujuan Penelitian.';
+      });
+      return;
+    }
 
     setState(() {
       _loading = true;
@@ -45,6 +57,9 @@ class _SignupScreenState extends State<SignupScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
         gender: _selectedGender,
+        studentId: _studentIdController.text.trim(),
+        studentLecturerCode: _lecturerCodeController.text.trim().toUpperCase(),
+        consent: _consentChecked,
       );
 
       if (!mounted) return;
@@ -56,14 +71,10 @@ class _SignupScreenState extends State<SignupScreen> {
           MaterialPageRoute(builder: (context) => const HomeShell()),
           (route) => false,
         );
-      } else {
-        setState(() {
-          _errorMessage = 'Email might be already registered. Try another.';
-        });
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Connection error. Check your backend server connection.';
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
       });
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -212,6 +223,73 @@ class _SignupScreenState extends State<SignupScreen> {
                     return null;
                   },
                 ),
+                const SizedBox(height: 20),
+
+                // Student ID Field
+                TextFormField(
+                  controller: _studentIdController,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(color: _black),
+                  decoration: InputDecoration(
+                    labelText: 'Student ID / NIM',
+                    labelStyle: TextStyle(color: _black.withValues(alpha: 0.6)),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: const BorderSide(color: _black, width: 1.5),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: const BorderSide(color: _orange, width: 2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.red.shade700, width: 1.5),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedErrorBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.red.shade700, width: 2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter your Student ID';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+
+                // Lecturer Research Code Field
+                TextFormField(
+                  controller: _lecturerCodeController,
+                  style: const TextStyle(color: _black),
+                  decoration: InputDecoration(
+                    labelText: 'Lecturer Research Code',
+                    labelStyle: TextStyle(color: _black.withValues(alpha: 0.6)),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: const BorderSide(color: _black, width: 1.5),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: const BorderSide(color: _orange, width: 2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.red.shade700, width: 1.5),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedErrorBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.red.shade700, width: 2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter your lecturer research code';
+                    }
+                    return null;
+                  },
+                ),
                 const SizedBox(height: 24),
                 Text(
                   'Select Gender',
@@ -287,7 +365,39 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                 ],
                 
-                const SizedBox(height: 36),
+                const SizedBox(height: 24),
+                
+                // Consent Checkbox
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Checkbox(
+                      value: _consentChecked,
+                      activeColor: _orange,
+                      checkColor: Colors.white,
+                      onChanged: (val) {
+                        setState(() {
+                          _consentChecked = val ?? false;
+                        });
+                      },
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 12.0),
+                        child: Text(
+                          'Saya bersedia dan memberikan persetujuan (consent) agar data latihan speaking saya digunakan untuk kepentingan penelitian.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: _black.withValues(alpha: 0.7),
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: 24),
                 
                 // Submit Button
                 SizedBox(

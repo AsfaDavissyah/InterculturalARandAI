@@ -7,14 +7,30 @@ class UserProfile {
   final String name;
   final String email;
   final String gender;
+  final String role;
+  final String studentId;
+  final String studentLecturerCode;
+  final bool consent;
 
-  UserProfile({required this.name, required this.email, required this.gender});
+  UserProfile({
+    required this.name,
+    required this.email,
+    required this.gender,
+    required this.role,
+    required this.studentId,
+    required this.studentLecturerCode,
+    required this.consent,
+  });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
       name: json['name'] ?? '',
       email: json['email'] ?? '',
       gender: json['gender'] ?? 'female',
+      role: json['role'] ?? 'student',
+      studentId: json['studentId'] ?? '',
+      studentLecturerCode: json['studentLecturerCode'] ?? '',
+      consent: json['consent'] ?? false,
     );
   }
 
@@ -22,6 +38,10 @@ class UserProfile {
         'name': name,
         'email': email,
         'gender': gender,
+        'role': role,
+        'studentId': studentId,
+        'studentLecturerCode': studentLecturerCode,
+        'consent': consent,
       };
 }
 
@@ -99,6 +119,9 @@ class AuthService {
     required String email,
     required String password,
     required String gender,
+    required String studentId,
+    required String studentLecturerCode,
+    required bool consent,
   }) async {
     final baseUrl = await AppSettings.getBaseUrl();
     final url = Uri.parse('$baseUrl/api/auth/signup');
@@ -112,6 +135,9 @@ class AuthService {
           'email': email,
           'password': password,
           'gender': gender,
+          'studentId': studentId,
+          'studentLecturerCode': studentLecturerCode,
+          'consent': consent,
         }),
       );
 
@@ -124,10 +150,13 @@ class AuthService {
 
         await _saveAuth(token, profile);
         return true;
+      } else {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        throw Exception(data['error'] ?? 'Registrasi gagal.');
       }
-      return false;
-    } catch (_) {
-      return false;
+    } catch (e) {
+      if (e.toString().contains('Exception:')) rethrow;
+      throw Exception('Connection error. Check your backend server connection.');
     }
   }
 

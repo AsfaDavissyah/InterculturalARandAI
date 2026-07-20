@@ -59,11 +59,13 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   AiResponse? _lastResponse;
   late final AudioPlayer _audioPlayer;
   StreamSubscription<PlayerState>? _audioSubscription;
+  StreamSubscription<Duration>? _positionSubscription;
 
   int _studentResponseCount = 0;
   bool _sessionLoading = true;
   bool _speechAvailable = false;
   bool _showSubtitles = true;
+  ConversationMessage? _activeSubtitle;
 
   bool _cameraEnabled = true;
   bool _cameraInitializationInProgress = false;
@@ -91,15 +93,25 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     ) {
       if (!mounted) return;
       setState(() {
-        if (state == PlayerState.playing) {
-          _activity = AvatarActivity.speaking;
-        } else if (state == PlayerState.completed ||
+        if (state == PlayerState.completed ||
             state == PlayerState.stopped) {
           if (!_sessionLoading && _sessionError == null) {
             _activity = AvatarActivity.idle;
           }
         }
       });
+    });
+
+    _positionSubscription = _audioPlayer.onPositionChanged.listen((position) {
+      if (!mounted) return;
+      if (_activity == AvatarActivity.loading && position > Duration.zero) {
+        setState(() {
+          _activity = AvatarActivity.speaking;
+          if (_messages.isNotEmpty && _messages.last.speaker == 'AI') {
+            _activeSubtitle = _messages.last;
+          }
+        });
+      }
     });
 
     unawaited(_initializeSession());
@@ -142,7 +154,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       setState(() {
         _sessionLoading = false;
         _sessionError =
-            'Cannot connect to the scenario server. Check the backend address and Wi-Fi connection.\n\n$error';
+            'Cannot connect to the scenario server. Please check your internet connection or server status.\n\n$error';
         _activity = AvatarActivity.error;
       });
     }
@@ -232,7 +244,10 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       await _audioPlayer.stop();
     } catch (_) {}
 
-    setState(() => _activity = AvatarActivity.loading);
+    setState(() {
+      _activity = AvatarActivity.loading;
+      _activeSubtitle = null; // Bersihkan subtitle mahasiswa/lama selama memproses audio AI baru
+    });
 
     String gender = "female";
     final aiRoleLower = widget.scenario.aiRole.toLowerCase();
@@ -276,7 +291,12 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
     if (!success) {
       if (!mounted) return;
-      setState(() => _activity = AvatarActivity.speaking);
+      setState(() {
+        _activity = AvatarActivity.speaking;
+        if (_messages.isNotEmpty && _messages.last.speaker == 'AI') {
+          _activeSubtitle = _messages.last;
+        }
+      });
       try {
         await _tts.stop();
         await _tts.speak(text);
@@ -401,7 +421,9 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     setState(() {
       _recognizedWords = '';
       if (addStudentMessage) {
-        _messages.add(ConversationMessage(speaker: 'Student', message: text));
+        final studentMsg = ConversationMessage(speaker: 'Student', message: text);
+        _messages.add(studentMsg);
+        _activeSubtitle = studentMsg;
       }
       _activity = AvatarActivity.thinking;
     });
@@ -604,7 +626,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
   String get _statusLabel {
     final activityLabel = switch (_activity) {
-      AvatarActivity.loading => 'Preparing session',
+      AvatarActivity.loading => _sessionLoading ? 'Preparing session' : 'AI is preparing to speak',
       AvatarActivity.idle =>
         _speechAvailable ? 'Tap to speak' : 'Type response',
       AvatarActivity.listening => 'Listening',
@@ -692,11 +714,12 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   }
 
   Widget _buildSubtitle() {
-    if (!_showSubtitles || _messages.isEmpty) return const SizedBox.shrink();
+    if (!_showSubtitles) return const SizedBox.shrink();
     final isListening = _activity == AvatarActivity.listening;
-    final message = isListening && _recognizedWords.isNotEmpty
+    final displayMessage = isListening && _recognizedWords.isNotEmpty
         ? ConversationMessage(speaker: 'You', message: _recognizedWords)
-        : _messages.last;
+        : _activeSubtitle;
+    if (displayMessage == null) return const SizedBox.shrink();
     return Container(
       constraints: const BoxConstraints(maxWidth: 520, minHeight: 58),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -709,7 +732,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            message.speaker,
+            displayMessage.speaker,
             style: const TextStyle(
               color: Color(0xFF65E0C4),
               fontWeight: FontWeight.w700,
@@ -718,7 +741,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
           ),
           const SizedBox(height: 3),
           Text(
-            message.message,
+            displayMessage.message,
             maxLines: 4,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: Colors.white, fontSize: 15),
@@ -763,7 +786,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         !_sessionLoading &&
         _sessionError == null &&
         _activity != AvatarActivity.thinking &&
-        _activity != AvatarActivity.speaking;
+        _activity != AvatarActivity.speaking &&
+        _activity != AvatarActivity.loading;
 
     return PopScope(
       canPop: _evaluationResults.isEmpty,
@@ -781,11 +805,11 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
               Positioned(
                 left: 0,
                 right: 0,
-                bottom: 214,
+                top: 75,
+                bottom: 140, // Diperkecil agar tinggi area avatar lebih besar (melewati panel kontrol transparan)
                 child: Center(
-                  child: SizedBox(
-                    width: 280,
-                    height: 400,
+                  child: AspectRatio(
+                    aspectRatio: 0.7,
                     child: ArAvatar3d(
                       modelPath: _modelPath,
                       activity: _activity,
@@ -997,6 +1021,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_audioSubscription?.cancel());
+    unawaited(_positionSubscription?.cancel());
     unawaited(_cameraController?.dispose());
     unawaited(_speech.cancel());
     unawaited(_tts.stop());

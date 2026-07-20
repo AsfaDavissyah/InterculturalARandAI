@@ -10,9 +10,58 @@ const bcrypt = require("bcryptjs");
 
 const User = require("./models/User");
 const PracticeSession = require("./models/PracticeSession");
+const Scenario = require("./models/Scenario");
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET || "intercultural_ai_secret_key_2026";
+
+async function seedAdmin() {
+  try {
+    const adminExists = await User.findOne({ role: "admin" });
+    if (adminExists) {
+      console.log("Admin account already exists. Skipping seed.");
+      return;
+    }
+    const admin = new User({
+      name: "System Admin",
+      email: "admin@icc.com",
+      password: "Admin123!",
+      gender: "male",
+      role: "admin",
+    });
+    await admin.save();
+    console.log("Default admin account created successfully: admin@icc.com / Admin123!");
+  } catch (err) {
+    console.error("Error seeding admin account:", err);
+  }
+}
+
+async function seedScenarios() {
+  try {
+    const count = await Scenario.countDocuments();
+    if (count > 0) {
+      console.log("Scenarios already exist in database. Skipping seed.");
+      return;
+    }
+    console.log("Database scenarios collection is empty. Seeding from files...");
+    const scenarios = loadScenarios(dataDir);
+    const scenariosToInsert = [];
+    for (const [key, data] of scenarios.entries()) {
+      scenariosToInsert.push({
+        scenarioId: data.scenario.scenario_id,
+        title: data.scenario.title,
+        isActive: true,
+        data: data,
+      });
+    }
+    if (scenariosToInsert.length > 0) {
+      await Scenario.insertMany(scenariosToInsert);
+      console.log(`Seeded ${scenariosToInsert.length} scenarios successfully.`);
+    }
+  } catch (err) {
+    console.error("Error seeding scenarios:", err);
+  }
+}
 
 async function connectDatabase() {
   if (!MONGODB_URI) {
@@ -25,6 +74,8 @@ async function connectDatabase() {
   try {
     await mongoose.connect(MONGODB_URI);
     console.log("Connected to MongoDB Atlas successfully.");
+    await seedAdmin();
+    await seedScenarios();
   } catch (err) {
     console.error("MongoDB Atlas connection error:", err);
   }
@@ -54,7 +105,15 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 app.use((req, res, next) => {
-  console.log(`[HTTP] ${req.method} ${req.url} - body: ${JSON.stringify(req.body || {})}`);
+  if (process.env.NODE_ENV === "production") {
+    console.log(`[HTTP] ${req.method} ${req.url}`);
+  } else {
+    const logBody = { ...req.body };
+    if (logBody.password) {
+      logBody.password = "[REDACTED]";
+    }
+    console.log(`[HTTP] ${req.method} ${req.url} - body: ${JSON.stringify(logBody)}`);
+  }
   next();
 });
 
@@ -127,8 +186,29 @@ function loadScenarios(directory) {
   return scenarios;
 }
 
-function getScenarioData(scenarioId) {
-  return scenarioMap.get(String(scenarioId || "").toUpperCase());
+async function getScenarioData(scenarioId) {
+  try {
+    const scenario = await Scenario.findOne({ scenarioId: String(scenarioId || "").toUpperCase() });
+    return scenario ? scenario.data : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+function generateLecturerCode(name) {
+  const cleanName = String(name || "DR").replace(/[^a-zA-Z]/g, "").substring(0, 3).toUpperCase();
+  const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `DR-${cleanName}-${randomStr}`;
+}
+
+function requireRole(roles) {
+  return (req, res, next) => {
+    if (req.user && roles.includes(req.user.role)) {
+      next();
+    } else {
+      res.status(403).json({ error: "Access denied. Insufficient permissions." });
+    }
+  };
 }
 
 function scenarioSummary(scenarioData) {
@@ -741,14 +821,15 @@ function normalizeOpenAIResult(
   return normalized;
 }
 
-app.get("/", (req, res) => {
-  const defaultScenario = getScenarioData(defaultScenarioId);
+app.get("/", async (req, res) => {
+  const defaultScenario = await getScenarioData(defaultScenarioId);
+  const scenarioCount = await Scenario.countDocuments();
 
   res.json({
     message: "Intercultural AI Backend is running",
     default_scenario_id: defaultScenarioId,
     default_title: defaultScenario?.scenario?.title,
-    scenario_count: scenarioMap.size,
+    scenario_count: scenarioCount,
     use_openai: process.env.USE_OPENAI === "true",
     openai_service_loaded: Boolean(evaluateWithOpenAI),
   });
@@ -763,7 +844,7 @@ function authenticateJWT(req, res, next) {
       if (err) {
         return res.status(403).json({ error: "Invalid or expired token" });
       }
-      req.user = decoded; // Decoded is { userId, email }
+      req.user = decoded; // Decoded is { userId, email, role }
       next();
     });
   } else {
@@ -838,20 +919,56 @@ function serializePracticeSession(session) {
 // ─── Authentication Endpoints ───
 
 app.post("/api/auth/signup", async (req, res) => {
-  const { name, email, password, gender } = req.body;
+  const { name, email, password, gender, studentId, studentLecturerCode, consent } = req.body;
   if (!name || !email || !password || !gender) {
     return res.status(400).json({ error: "Name, email, password, and gender are required" });
   }
+
+  // Validasi khusus untuk mahasiswa
+  if (!studentId || !studentLecturerCode || consent !== true) {
+    return res.status(400).json({ error: "Student ID, valid lecturer code, and research consent are required." });
+  }
+
   try {
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ error: "Email is already registered" });
     }
-    const user = new User({ name, email, password, gender });
+
+    // Validasi lecturer code ke DB
+    const lecturer = await User.findOne({
+      role: "lecturer",
+      lecturerCode: String(studentLecturerCode).trim().toUpperCase()
+    });
+    if (!lecturer) {
+      return res.status(400).json({ error: "Lecturer code is invalid" });
+    }
+
+    const user = new User({
+      name,
+      email,
+      password,
+      gender,
+      role: "student",
+      studentId: studentId.trim(),
+      studentLecturerCode: studentLecturerCode.trim().toUpperCase(),
+      consent: true
+    });
     await user.save();
     
-    const token = jwt.sign({ userId: user._id, email: user.email }, JWT_SECRET, { expiresIn: "30d" });
-    res.status(201).json({ token, user: { name: user.name, email: user.email, gender: user.gender } });
+    const token = jwt.sign({ userId: user._id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: "30d" });
+    res.status(201).json({
+      token,
+      user: {
+        name: user.name,
+        email: user.email,
+        gender: user.gender,
+        role: user.role,
+        studentId: user.studentId,
+        studentLecturerCode: user.studentLecturerCode,
+        consent: user.consent
+      }
+    });
   } catch (err) {
     console.error("Signup Endpoint Error:", err);
     res.status(500).json({ error: err.message });
@@ -868,13 +985,27 @@ app.post("/api/auth/login", async (req, res) => {
     if (!user || !(await user.comparePassword(password))) {
       return res.status(400).json({ error: "Invalid email or password" });
     }
-    const token = jwt.sign({ userId: user._id, email: user.email }, JWT_SECRET, { expiresIn: "30d" });
-    res.json({ token, user: { name: user.name, email: user.email, gender: user.gender } });
+    const token = jwt.sign({ userId: user._id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: "30d" });
+    res.json({
+      token,
+      user: {
+        name: user.name,
+        email: user.email,
+        gender: user.gender,
+        role: user.role,
+        lecturerCode: user.lecturerCode,
+        studentLecturerCode: user.studentLecturerCode,
+        studentId: user.studentId,
+        consent: user.consent
+      }
+    });
   } catch (err) {
     console.error("Login Endpoint Error:", err);
     res.status(500).json({ error: err.message });
   }
-});app.post("/api/auth/update", authenticateJWT, async (req, res) => {
+});
+
+app.post("/api/auth/update", authenticateJWT, async (req, res) => {
   const { name, gender } = req.body;
   if (!name || !gender) {
     return res.status(400).json({ error: "Name and gender are required" });
@@ -888,7 +1019,19 @@ app.post("/api/auth/login", async (req, res) => {
     user.gender = gender;
     await user.save();
     
-    res.json({ success: true, user: { name: user.name, email: user.email, gender: user.gender } });
+    res.json({
+      success: true,
+      user: {
+        name: user.name,
+        email: user.email,
+        gender: user.gender,
+        role: user.role,
+        lecturerCode: user.lecturerCode,
+        studentLecturerCode: user.studentLecturerCode,
+        studentId: user.studentId,
+        consent: user.consent
+      }
+    });
   } catch (err) {
     console.error("Profile Update Endpoint Error:", err);
     res.status(500).json({ error: err.message });
@@ -941,26 +1084,227 @@ app.delete("/api/history/:session_id", authenticateJWT, async (req, res) => {
   }
 });
 
-app.get("/api/scenarios", (req, res) => {
-  res.json(
-    Array.from(scenarioMap.values())
-      .map(scenarioSummary)
-      .sort((left, right) => left.scenario_id.localeCompare(right.scenario_id))
-  );
-});
-
-app.get("/api/scenarios/:scenario_id", (req, res) => {
-  const scenarioData = getScenarioData(req.params.scenario_id);
-
-  if (!scenarioData) {
-    return res.status(404).json({
-      error: true,
-      message: `Scenario ${req.params.scenario_id} is not available.`,
-    });
+app.get("/api/scenarios", async (req, res) => {
+  try {
+    const list = await Scenario.find({ isActive: true });
+    const summaries = list
+      .map((item) => scenarioSummary(item.data))
+      .sort((left, right) => left.scenario_id.localeCompare(right.scenario_id));
+    res.json(summaries);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-
-  return res.json(scenarioData);
 });
+
+app.get("/api/scenarios/:scenario_id", async (req, res) => {
+  try {
+    const scenario = await Scenario.findOne({
+      scenarioId: req.params.scenario_id.toUpperCase(),
+      isActive: true
+    });
+
+    if (!scenario) {
+      return res.status(404).json({
+        error: true,
+        message: `Scenario ${req.params.scenario_id} is not available.`,
+      });
+    }
+
+    return res.json(scenario.data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Lecturer Endpoints ───
+
+app.get("/api/lecturer/students", authenticateJWT, requireRole(["lecturer"]), async (req, res) => {
+  try {
+    const lecturer = await User.findById(req.user.userId);
+    if (!lecturer || !lecturer.lecturerCode) {
+      return res.status(400).json({ error: "Lecturer profile is incomplete." });
+    }
+    const students = await User.find({
+      role: "student",
+      studentLecturerCode: lecturer.lecturerCode
+    }).sort({ name: 1 });
+
+    res.json(students.map(s => ({
+      id: s._id,
+      name: s.name,
+      email: s.email,
+      gender: s.gender,
+      studentId: s.studentId,
+      consent: s.consent,
+      createdAt: s.createdAt
+    })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/lecturer/history", authenticateJWT, requireRole(["lecturer"]), async (req, res) => {
+  try {
+    const lecturer = await User.findById(req.user.userId);
+    if (!lecturer || !lecturer.lecturerCode) {
+      return res.status(400).json({ error: "Lecturer profile is incomplete." });
+    }
+    const students = await User.find({
+      role: "student",
+      studentLecturerCode: lecturer.lecturerCode
+    });
+    const studentIds = students.map(s => s._id);
+
+    const sessions = await PracticeSession.find({ userId: { $in: studentIds } })
+      .populate("userId", "name email studentId consent")
+      .sort({ completedAt: -1 });
+
+    res.json(sessions.map(s => {
+      const serialized = serializePracticeSession(s);
+      return {
+        ...serialized,
+        student_details: s.userId ? {
+          name: s.userId.name,
+          email: s.userId.email,
+          student_id: s.userId.studentId,
+          consent: s.userId.consent
+        } : null
+      };
+    }));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Admin Endpoints (Lecturers & Scenario CRUD) ───
+
+app.post("/api/admin/create-lecturer", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  const { name, email, password, gender } = req.body;
+  if (!name || !email || !password || !gender) {
+    return res.status(400).json({ error: "Name, email, password, and gender are required" });
+  }
+  try {
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: "Email is already registered" });
+    }
+
+    // Generate unique lecturer code
+    let code;
+    let codeUnique = false;
+    let attempts = 0;
+    while (!codeUnique && attempts < 10) {
+      code = generateLecturerCode(name);
+      const isExist = await User.findOne({ lecturerCode: code });
+      if (!isExist) codeUnique = true;
+      attempts++;
+    }
+
+    const lecturer = new User({
+      name,
+      email,
+      password,
+      gender,
+      role: "lecturer",
+      lecturerCode: code
+    });
+    await lecturer.save();
+
+    res.status(201).json({
+      success: true,
+      lecturer: {
+        id: lecturer._id,
+        name: lecturer.name,
+        email: lecturer.email,
+        gender: lecturer.gender,
+        role: lecturer.role,
+        lecturerCode: lecturer.lecturerCode
+      }
+    });
+  } catch (err) {
+    console.error("Create Lecturer Error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/admin/lecturers", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  try {
+    const lecturers = await User.find({ role: "lecturer" }).sort({ createdAt: -1 });
+    res.json(lecturers.map(u => ({
+      id: u._id,
+      name: u.name,
+      email: u.email,
+      gender: u.gender,
+      lecturerCode: u.lecturerCode,
+      createdAt: u.createdAt
+    })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/admin/scenarios", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  try {
+    const list = await Scenario.find().sort({ scenarioId: 1 });
+    res.json(list);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/admin/scenarios", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  const { scenarioId, title, isActive, data } = req.body;
+  if (!scenarioId || !title || !data) {
+    return res.status(400).json({ error: "scenarioId, title, and data are required" });
+  }
+  try {
+    const existing = await Scenario.findOne({ scenarioId: scenarioId.toUpperCase() });
+    if (existing) {
+      return res.status(400).json({ error: `Scenario with ID ${scenarioId} already exists.` });
+    }
+    const scenario = new Scenario({
+      scenarioId: scenarioId.toUpperCase(),
+      title,
+      isActive: isActive !== false,
+      data
+    });
+    await scenario.save();
+    res.status(201).json(scenario);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put("/api/admin/scenarios/:id", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  const { title, isActive, data } = req.body;
+  try {
+    const scenario = await Scenario.findById(req.params.id);
+    if (!scenario) {
+      return res.status(404).json({ error: "Scenario not found" });
+    }
+    if (title !== undefined) scenario.title = title;
+    if (isActive !== undefined) scenario.isActive = isActive;
+    if (data !== undefined) scenario.data = data;
+    await scenario.save();
+    res.json(scenario);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete("/api/admin/scenarios/:id", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  try {
+    const result = await Scenario.findByIdAndDelete(req.params.id);
+    if (!result) {
+      return res.status(404).json({ error: "Scenario not found" });
+    }
+    res.json({ success: true, message: "Scenario deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Evaluation Endpoint ───
 
 app.post("/api/chat/evaluate-turn", async (req, res) => {
   const {
@@ -979,15 +1323,19 @@ app.post("/api/chat/evaluate-turn", async (req, res) => {
     });
   }
 
-  const scenarioData = getScenarioData(scenario_id);
+  const scenarioDoc = await Scenario.findOne({
+    scenarioId: scenario_id.toUpperCase(),
+    isActive: true
+  });
 
-  if (!scenarioData) {
+  if (!scenarioDoc) {
     return res.status(400).json({
       error: true,
-      message: `Scenario ${scenario_id} is not supported.`,
+      message: `Scenario ${scenario_id} is not supported or active.`,
     });
   }
 
+  const scenarioData = scenarioDoc.data;
   const responseCount = Number(student_response_count ?? turn_number);
   const normalizedHistory = normalizeConversationHistory(conversation_history);
   const sessionRules = getSessionRules(scenarioData);

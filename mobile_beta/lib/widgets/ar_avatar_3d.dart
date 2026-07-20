@@ -57,6 +57,8 @@ class _ArAvatar3dState extends State<ArAvatar3d> {
         ar: false, // Gunakan camera preview native, bukan bawaan ARCore webview
         autoRotate: false,
         backgroundColor: Colors.transparent, // Sangat penting agar feed kamera belakang terlihat
+        cameraOrbit: CameraOrbit(0, 80, 1.8),
+        cameraTarget: CameraTarget(0, 1.25, 0),
       ),
     );
   }

@@ -23,6 +23,29 @@ const UserSchema = new mongoose.Schema({
     enum: ["male", "female"],
     required: true,
   },
+  role: {
+    type: String,
+    enum: ["student", "lecturer", "admin"],
+    default: "student",
+  },
+  lecturerCode: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true,
+  },
+  studentLecturerCode: {
+    type: String,
+    trim: true,
+  },
+  studentId: {
+    type: String,
+    trim: true,
+  },
+  consent: {
+    type: Boolean,
+    default: false,
+  },
   createdAt: {
     type: Date,
     default: Date.now,
