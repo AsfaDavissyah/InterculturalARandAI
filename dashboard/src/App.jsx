@@ -5,7 +5,7 @@ import {
   TrendingUp, Activity, Award, UserCheck, ShieldCheck
 } from 'lucide-react';
 
-const DEFAULT_API_BASE_URL = 'http://localhost:3000';
+const DEFAULT_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
 // Format template JSON skenario default untuk admin agar mudah membuat skenario baru
 const DEFAULT_SCENARIO_JSON = {

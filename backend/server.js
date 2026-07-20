@@ -101,21 +101,71 @@ try {
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const NODE_ENV = process.env.NODE_ENV || "development";
+const isProduction = NODE_ENV === "production";
+const allowedOrigins = (process.env.CORS_ORIGIN || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
-app.use(cors());
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!isProduction || !origin || allowedOrigins.length === 0) {
+        return callback(null, true);
+      }
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error("Not allowed by CORS"));
+    },
+  })
+);
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 app.use((req, res, next) => {
-  if (process.env.NODE_ENV === "production") {
-    console.log(`[HTTP] ${req.method} ${req.url}`);
-  } else {
+  const startedAt = Date.now();
+  const requestId = `${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+  req.requestId = requestId;
+
+  res.on("finish", () => {
+    const durationMs = Date.now() - startedAt;
+    const userId = req.user?.userId || "anonymous";
+    const scenarioId = req.body?.scenario_id || req.params?.scenario_id || "-";
+
+    console.log(
+      `[HTTP] request_id=${requestId} method=${req.method} path=${req.originalUrl} status=${res.statusCode} duration_ms=${durationMs} user_id=${userId} scenario_id=${scenarioId}`
+    );
+  });
+
+  if (!isProduction) {
     const logBody = { ...req.body };
     if (logBody.password) {
       logBody.password = "[REDACTED]";
     }
-    console.log(`[HTTP] ${req.method} ${req.url} - body: ${JSON.stringify(logBody)}`);
+    if (logBody.conversation_history) {
+      logBody.conversation_history = `[${logBody.conversation_history.length} messages]`;
+    }
+    if (logBody.transcript) {
+      logBody.transcript = `[${logBody.transcript.length} messages]`;
+    }
+    if (logBody.evaluations) {
+      logBody.evaluations = `[${logBody.evaluations.length} evaluations]`;
+    }
+    console.log(`[HTTP:debug] request_id=${requestId} body=${JSON.stringify(logBody)}`);
   }
   next();
+});
+app.use((err, req, res, next) => {
+  if (err?.message === "Not allowed by CORS") {
+    return res.status(403).json({
+      error: "CORS origin is not allowed",
+      request_id: req.requestId,
+    });
+  }
+  next(err);
 });
 
 const dataDir = path.join(__dirname, "data");
