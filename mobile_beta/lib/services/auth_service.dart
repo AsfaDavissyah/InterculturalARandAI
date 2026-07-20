@@ -11,6 +11,7 @@ class UserProfile {
   final String studentId;
   final String studentLecturerCode;
   final bool consent;
+  final String? consentAcceptedAt;
 
   UserProfile({
     required this.name,
@@ -20,6 +21,7 @@ class UserProfile {
     required this.studentId,
     required this.studentLecturerCode,
     required this.consent,
+    this.consentAcceptedAt,
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
@@ -31,18 +33,20 @@ class UserProfile {
       studentId: json['studentId'] ?? '',
       studentLecturerCode: json['studentLecturerCode'] ?? '',
       consent: json['consent'] ?? false,
+      consentAcceptedAt: json['consentAcceptedAt']?.toString(),
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'email': email,
-        'gender': gender,
-        'role': role,
-        'studentId': studentId,
-        'studentLecturerCode': studentLecturerCode,
-        'consent': consent,
-      };
+    'name': name,
+    'email': email,
+    'gender': gender,
+    'role': role,
+    'studentId': studentId,
+    'studentLecturerCode': studentLecturerCode,
+    'consent': consent,
+    'consentAcceptedAt': consentAcceptedAt,
+  };
 }
 
 class AuthService {
@@ -156,7 +160,9 @@ class AuthService {
       }
     } catch (e) {
       if (e.toString().contains('Exception:')) rethrow;
-      throw Exception('Connection error. Check your backend server connection.');
+      throw Exception(
+        'Connection error. Check your backend server connection.',
+      );
     }
   }
 
@@ -165,7 +171,7 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, token);
     await prefs.setString(_profileKey, jsonEncode(profile.toJson()));
-    
+
     _cachedToken = token;
     _cachedProfile = profile;
   }
@@ -175,7 +181,7 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
     await prefs.remove(_profileKey);
-    
+
     _cachedToken = null;
     _cachedProfile = null;
   }
@@ -198,10 +204,7 @@ class AuthService {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: jsonEncode({
-          'name': name,
-          'gender': gender,
-        }),
+        body: jsonEncode({'name': name, 'gender': gender}),
       );
 
       if (response.statusCode == 200) {

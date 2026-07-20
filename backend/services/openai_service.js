@@ -4,7 +4,23 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-function buildSystemPrompt(scenarioData) {
+function buildLearnerPrompt(learnerProfile = {}) {
+  const displayName = String(learnerProfile.displayName || "").trim();
+  const studentId = String(learnerProfile.studentId || "").trim();
+
+  return `
+Learner profile:
+- Display name: ${displayName || "the learner"}
+- Student ID: ${studentId || "not provided"}
+
+Personalization rules:
+- If a display name is provided, you may call the learner by that name naturally.
+- Do not overuse the learner's name. Use it mostly in greetings, warm acknowledgements, or closing.
+- The learner's real display name replaces any default student character name in the scenario.
+`;
+}
+
+function buildSystemPrompt(scenarioData, learnerProfile = {}) {
   const scenario = scenarioData.scenario;
 
   return `
@@ -23,6 +39,8 @@ ${scenario.ai_character_prompt}
 
 Student role:
 ${scenario.student_role}
+
+${buildLearnerPrompt(learnerProfile)}
 
 Characters:
 ${JSON.stringify(scenarioData.characters || [], null, 2)}
@@ -58,17 +76,11 @@ Natural conversation behavior:
 Scenario:
 ${JSON.stringify(scenarioData.scenario, null, 2)}
 
-Conversation flow:
-${JSON.stringify(scenarioData.conversation_flow, null, 2)}
-
 Session rules:
 ${JSON.stringify(scenarioData.session_rules || {}, null, 2)}
 
 Conversation objectives:
 ${JSON.stringify(scenarioData.conversation_objectives || [], null, 2)}
-
-Reference dialogue (style and content reference, not a fixed script):
-${JSON.stringify(scenarioData.reference_dialogue || [], null, 2)}
 
 Branching rules:
 ${JSON.stringify(scenarioData.branching_rules, null, 2)}
@@ -78,6 +90,8 @@ ${JSON.stringify(scenarioData.rubric, null, 2)}
 
 Rules:
 - Stay in the role defined above.
+- Treat this scenario as context, roles, objectives, constraints, and rubric. Do not follow or recreate any fixed dialogue script.
+- If legacy dialogue fields exist in the scenario data, ignore them as a script.
 - Evaluate the student's latest response.
 - Keep English suitable for the scenario level.
 - Do not become a general free chatbot.
@@ -87,20 +101,17 @@ Rules:
 }
 
 function getTurnGuidance(scenarioData, studentResponseCount) {
-  const flow = scenarioData.conversation_flow || [];
-  const studentStages = flow.filter((item) =>
-    String(item.speaker || "").toLowerCase().includes("student")
-  );
+  const stages = scenarioData.conversation_stages || [];
   const stageIndex = Math.min(
     Math.max(Number(studentResponseCount) - 1, 0),
-    Math.max(studentStages.length - 1, 0)
+    Math.max(stages.length - 1, 0)
   );
-  const currentStage = studentStages[stageIndex] || null;
+  const currentStage = stages[stageIndex] || null;
 
   return `
 Student response count: ${studentResponseCount}
 
-Closest planned student stage:
+Current scenario phase:
 ${JSON.stringify(currentStage || null, null, 2)}
 
 Session rules:
@@ -109,14 +120,15 @@ ${JSON.stringify(scenarioData.session_rules || {}, null, 2)}
 Conversation objectives:
 ${JSON.stringify(scenarioData.conversation_objectives || [], null, 2)}
 
-Identify every objective already completed across the full conversation. Generate a natural next message as the AI role. If the target response count has been reached and all required objectives are complete, close the conversation naturally. Keep corrections and examples out of ai_message.
+Identify every objective already completed across the full conversation. Generate a natural next message as the AI role from the context and objectives, not from a fixed script. If the target response count has been reached and all required objectives are complete, close the conversation naturally. Keep corrections and examples out of ai_message.
 `;
 }
 
 function buildPromptMemory(
   scenarioData,
   conversationHistory = [],
-  studentResponse = ""
+  studentResponse = "",
+  learnerProfile = {}
 ) {
   const normalizedHistory = (Array.isArray(conversationHistory)
     ? conversationHistory
@@ -139,6 +151,8 @@ function buildPromptMemory(
       student_role: scenarioData.scenario.student_role,
       ai_role: scenarioData.scenario.ai_role,
       boundaries: scenarioData.context.boundaries,
+      learner_display_name: learnerProfile.displayName || null,
+      learner_student_id: learnerProfile.studentId || null,
     },
     recent_exchanges: normalizedHistory,
     latest_student_response: String(studentResponse || "").trim(),
@@ -237,15 +251,17 @@ async function evaluateWithOpenAI({
   studentResponseCount,
   conversationHistory,
   studentResponse,
+  learnerProfile = {},
 }) {
   const model = process.env.OPENAI_MODEL || "gpt-5.4-mini";
   const scenario = scenarioData.scenario;
 
-  const systemPrompt = buildSystemPrompt(scenarioData);
+  const systemPrompt = buildSystemPrompt(scenarioData, learnerProfile);
   const sessionMemory = buildPromptMemory(
     scenarioData,
     conversationHistory,
-    studentResponse
+    studentResponse,
+    learnerProfile
   );
 
   const userPrompt = `
@@ -267,12 +283,13 @@ ${JSON.stringify(sessionMemory, null, 2)}
 Latest student response:
 ${studentResponse}
 
-Evaluate the latest student response based on the scenario, conversation flow, branching rules, and rubric.
+Evaluate the latest student response based on the scenario context, objectives, branching rules, and rubric.
 Identify completed objective IDs from the entire conversation, not only the latest response.
 
 Then generate the next AI message as the role-play character.
 
 Respond to the meaning of the latest student turn first. Continue from the recent exchange without resetting the scene, reintroducing the characters, or repeating a recent question.
+Use the learner profile for natural name personalization when appropriate.
 
 Remember: ai_message is role-play dialogue only. Feedback and corrections belong in the feedback fields, not in ai_message.
 Do not include "For example" or a model sentence in ai_message.

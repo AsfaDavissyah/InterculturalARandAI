@@ -11,8 +11,10 @@ const DEFAULT_API_BASE_URL = 'http://localhost:3000';
 const DEFAULT_SCENARIO_JSON = {
   "schema_version": "2.0",
   "prototype_id": "scenario-custom-id",
+  "version": 1,
   "scenario": {
     "scenario_id": "CUSTOM-001",
+    "scenario_version": 1,
     "title": "Judul Skenario Baru",
     "scenario_type": "Intercultural English",
     "level": "B1",
@@ -77,18 +79,7 @@ const DEFAULT_SCENARIO_JSON = {
     {
       "stage_order": 1,
       "stage": "Opening",
-      "speaker": "AI",
-      "message_or_student_goal": "Hi, is this seat taken?",
-      "expected_function": "Greeting trigger",
-      "success_indicator": "Student responds politely"
-    }
-  ],
-  "conversation_flow": [
-    {
-      "turn": 1,
-      "stage": "Opening",
-      "speaker": "AI",
-      "message": "Hi, is this seat taken?",
+      "student_goal": "Respond politely to the AI character's opening.",
       "expected_function": "Greeting trigger",
       "success_indicator": "Student responds politely"
     }
@@ -259,6 +250,9 @@ export default function App() {
       // Validasi kecil agar ID sync
       parsedJson.scenario.scenario_id = scenarioFormIdStr.trim().toUpperCase();
       parsedJson.scenario.title = scenarioFormTitle.trim();
+      const nextVersion = Number(parsedJson.scenario.scenario_version || parsedJson.scenario.version || parsedJson.version || 1);
+      parsedJson.version = nextVersion;
+      parsedJson.scenario.scenario_version = nextVersion;
     } catch (err) {
       setErrorMessage('Format data JSON salah. Pastikan sintaksis JSON Anda valid.');
       return;

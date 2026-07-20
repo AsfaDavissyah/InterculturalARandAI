@@ -7,6 +7,7 @@ class ScenarioTopic {
   final String studentRole;
   final String aiRole;
   final String taskInstruction;
+  final int scenarioVersion;
   final bool isAvailable;
 
   const ScenarioTopic({
@@ -18,6 +19,7 @@ class ScenarioTopic {
     required this.studentRole,
     required this.aiRole,
     required this.taskInstruction,
+    this.scenarioVersion = 1,
     this.isAvailable = true,
   });
 
@@ -31,6 +33,7 @@ class ScenarioTopic {
       studentRole: json['student_role'] ?? '',
       aiRole: json['ai_role'] ?? '',
       taskInstruction: json['task_instruction'] ?? '',
+      scenarioVersion: (json['scenario_version'] as num?)?.toInt() ?? 1,
     );
   }
 
@@ -43,6 +46,7 @@ class ScenarioTopic {
     'student_role': studentRole,
     'ai_role': aiRole,
     'task_instruction': taskInstruction,
+    'scenario_version': scenarioVersion,
     'is_available': isAvailable,
   };
 }

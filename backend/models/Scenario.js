@@ -14,6 +14,11 @@ const ScenarioSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
+  version: {
+    type: Number,
+    default: 1,
+    min: 1,
+  },
   isActive: {
     type: Boolean,
     default: true,

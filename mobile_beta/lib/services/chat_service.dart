@@ -55,6 +55,8 @@ class ChatService {
     required int studentResponseCount,
     required List<Map<String, String>> conversationHistory,
     required String studentResponse,
+    String? studentDisplayName,
+    String? studentId,
   }) async {
     final url = Uri.parse("$baseUrl/api/chat/evaluate-turn");
 
@@ -68,6 +70,8 @@ class ChatService {
             "student_response_count": studentResponseCount,
             "conversation_history": conversationHistory,
             "student_response": studentResponse,
+            "student_display_name": studentDisplayName,
+            "student_id": studentId,
           }),
         )
         .timeout(const Duration(seconds: 35));

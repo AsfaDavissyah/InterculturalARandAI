@@ -16,7 +16,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final _passwordController = TextEditingController();
   final _studentIdController = TextEditingController();
   final _lecturerCodeController = TextEditingController();
-  
+
   String _selectedGender = 'female';
   bool _loading = false;
   bool _consentChecked = false;
@@ -113,7 +113,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                 ),
                 const SizedBox(height: 32),
-                
+
                 // Name Field
                 TextFormField(
                   controller: _nameController,
@@ -131,11 +131,17 @@ class _SignupScreenState extends State<SignupScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     errorBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.red.shade700, width: 1.5),
+                      borderSide: BorderSide(
+                        color: Colors.red.shade700,
+                        width: 1.5,
+                      ),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     focusedErrorBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.red.shade700, width: 2),
+                      borderSide: BorderSide(
+                        color: Colors.red.shade700,
+                        width: 2,
+                      ),
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
@@ -150,7 +156,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   },
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Email Field
                 TextFormField(
                   controller: _emailController,
@@ -168,11 +174,17 @@ class _SignupScreenState extends State<SignupScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     errorBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.red.shade700, width: 1.5),
+                      borderSide: BorderSide(
+                        color: Colors.red.shade700,
+                        width: 1.5,
+                      ),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     focusedErrorBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.red.shade700, width: 2),
+                      borderSide: BorderSide(
+                        color: Colors.red.shade700,
+                        width: 2,
+                      ),
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
@@ -180,14 +192,16 @@ class _SignupScreenState extends State<SignupScreen> {
                     if (value == null || value.trim().isEmpty) {
                       return 'Please enter your email';
                     }
-                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
+                    if (!RegExp(
+                      r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                    ).hasMatch(value.trim())) {
                       return 'Please enter a valid email address';
                     }
                     return null;
                   },
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Password Field
                 TextFormField(
                   controller: _passwordController,
@@ -205,11 +219,17 @@ class _SignupScreenState extends State<SignupScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     errorBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.red.shade700, width: 1.5),
+                      borderSide: BorderSide(
+                        color: Colors.red.shade700,
+                        width: 1.5,
+                      ),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     focusedErrorBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.red.shade700, width: 2),
+                      borderSide: BorderSide(
+                        color: Colors.red.shade700,
+                        width: 2,
+                      ),
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
@@ -242,11 +262,17 @@ class _SignupScreenState extends State<SignupScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     errorBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.red.shade700, width: 1.5),
+                      borderSide: BorderSide(
+                        color: Colors.red.shade700,
+                        width: 1.5,
+                      ),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     focusedErrorBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.red.shade700, width: 2),
+                      borderSide: BorderSide(
+                        color: Colors.red.shade700,
+                        width: 2,
+                      ),
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
@@ -275,11 +301,17 @@ class _SignupScreenState extends State<SignupScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     errorBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.red.shade700, width: 1.5),
+                      borderSide: BorderSide(
+                        color: Colors.red.shade700,
+                        width: 1.5,
+                      ),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     focusedErrorBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.red.shade700, width: 2),
+                      borderSide: BorderSide(
+                        color: Colors.red.shade700,
+                        width: 2,
+                      ),
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
@@ -309,7 +341,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         child: Container(
                           height: 50,
                           decoration: BoxDecoration(
-                            color: _selectedGender == 'male' ? _orange : Colors.transparent,
+                            color: _selectedGender == 'male'
+                                ? _orange
+                                : Colors.transparent,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: _black, width: 1.5),
                           ),
@@ -317,7 +351,9 @@ class _SignupScreenState extends State<SignupScreen> {
                             child: Text(
                               'Laki-laki',
                               style: TextStyle(
-                                color: _selectedGender == 'male' ? Colors.white : _black,
+                                color: _selectedGender == 'male'
+                                    ? Colors.white
+                                    : _black,
                                 fontWeight: FontWeight.w800,
                                 fontSize: 14,
                               ),
@@ -334,7 +370,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         child: Container(
                           height: 50,
                           decoration: BoxDecoration(
-                            color: _selectedGender == 'female' ? _orange : Colors.transparent,
+                            color: _selectedGender == 'female'
+                                ? _orange
+                                : Colors.transparent,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: _black, width: 1.5),
                           ),
@@ -342,7 +380,9 @@ class _SignupScreenState extends State<SignupScreen> {
                             child: Text(
                               'Perempuan',
                               style: TextStyle(
-                                color: _selectedGender == 'female' ? Colors.white : _black,
+                                color: _selectedGender == 'female'
+                                    ? Colors.white
+                                    : _black,
                                 fontWeight: FontWeight.w800,
                                 fontSize: 14,
                               ),
@@ -353,7 +393,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                   ],
                 ),
-                
+
                 if (_errorMessage != null) ...[
                   const SizedBox(height: 20),
                   Text(
@@ -364,9 +404,9 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                   ),
                 ],
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Consent Checkbox
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -385,7 +425,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       child: Padding(
                         padding: const EdgeInsets.only(top: 12.0),
                         child: Text(
-                          'Saya bersedia dan memberikan persetujuan (consent) agar data latihan speaking saya digunakan untuk kepentingan penelitian.',
+                          'Saya menyetujui bahwa suara saya akan diproses menjadi teks, transkrip percakapan dan skor latihan akan disimpan, dan data tersebut dapat dilihat oleh dosen/peneliti untuk kepentingan penelitian.',
                           style: TextStyle(
                             fontSize: 13,
                             color: _black.withValues(alpha: 0.7),
@@ -396,9 +436,9 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Submit Button
                 SizedBox(
                   width: double.infinity,

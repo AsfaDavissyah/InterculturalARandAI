@@ -14,6 +14,7 @@ import '../models/ai_response.dart';
 import '../models/practice_session.dart';
 import '../models/scenario_topic.dart';
 import '../services/app_settings.dart';
+import '../services/auth_service.dart';
 import '../services/chat_service.dart';
 import '../services/practice_history_store.dart';
 import '../widgets/ar_avatar.dart';
@@ -55,6 +56,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
   CameraController? _cameraController;
   ChatService? _chatService;
+  UserProfile? _profile;
   AvatarActivity _activity = AvatarActivity.loading;
   AiResponse? _lastResponse;
   late final AudioPlayer _audioPlayer;
@@ -93,8 +95,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     ) {
       if (!mounted) return;
       setState(() {
-        if (state == PlayerState.completed ||
-            state == PlayerState.stopped) {
+        if (state == PlayerState.completed || state == PlayerState.stopped) {
           if (!_sessionLoading && _sessionError == null) {
             _activity = AvatarActivity.idle;
           }
@@ -128,6 +129,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
     final baseUrl = await AppSettings.getBaseUrl();
     _chatService = ChatService(baseUrl: baseUrl);
+    _profile = await AuthService.getProfile();
 
     await _initializeCamera();
     await _initializeSpeech();
@@ -246,7 +248,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
     setState(() {
       _activity = AvatarActivity.loading;
-      _activeSubtitle = null; // Bersihkan subtitle mahasiswa/lama selama memproses audio AI baru
+      _activeSubtitle =
+          null; // Bersihkan subtitle mahasiswa/lama selama memproses audio AI baru
     });
 
     String gender = "female";
@@ -421,7 +424,10 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     setState(() {
       _recognizedWords = '';
       if (addStudentMessage) {
-        final studentMsg = ConversationMessage(speaker: 'Student', message: text);
+        final studentMsg = ConversationMessage(
+          speaker: 'Student',
+          message: text,
+        );
         _messages.add(studentMsg);
         _activeSubtitle = studentMsg;
       }
@@ -449,6 +455,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         studentResponseCount: _studentResponseCount + 1,
         conversationHistory: history,
         studentResponse: text,
+        studentDisplayName: _profile?.name,
+        studentId: _profile?.studentId,
       );
 
       if (!mounted) return;
@@ -530,6 +538,10 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       completedAt: DateTime.now().toUtc(),
       transcript: history,
       evaluations: List.unmodifiable(_evaluationResults),
+      studentId: _profile?.studentId.isNotEmpty == true
+          ? _profile!.studentId
+          : 'local_student',
+      studentName: _profile?.name,
     );
     await _historyStore.saveSession(session);
     if (!mounted) return;
@@ -626,7 +638,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
   String get _statusLabel {
     final activityLabel = switch (_activity) {
-      AvatarActivity.loading => _sessionLoading ? 'Preparing session' : 'AI is preparing to speak',
+      AvatarActivity.loading =>
+        _sessionLoading ? 'Preparing session' : 'AI is preparing to speak',
       AvatarActivity.idle =>
         _speechAvailable ? 'Tap to speak' : 'Type response',
       AvatarActivity.listening => 'Listening',
@@ -806,7 +819,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                 left: 0,
                 right: 0,
                 top: 75,
-                bottom: 140, // Diperkecil agar tinggi area avatar lebih besar (melewati panel kontrol transparan)
+                bottom:
+                    140, // Diperkecil agar tinggi area avatar lebih besar (melewati panel kontrol transparan)
                 child: Center(
                   child: AspectRatio(
                     aspectRatio: 0.7,

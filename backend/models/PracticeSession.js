@@ -39,6 +39,7 @@ const PracticeSessionSchema = new mongoose.Schema({
     scenario_id: { type: String, required: true },
     title: { type: String, required: true },
     scenario_type: { type: String },
+    scenario_version: { type: Number, default: 1 },
     level: { type: String },
     ar_scene: { type: String },
     student_role: { type: String },

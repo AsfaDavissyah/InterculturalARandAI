@@ -158,6 +158,7 @@ class PracticeSession {
     'student_id': studentId,
     'student_name': studentName,
     'scenario_id': scenario.id,
+    'scenario_version': scenario.scenarioVersion,
     'scenario_title': scenario.title,
     'scenario_type': scenario.type,
     'level': scenario.level,

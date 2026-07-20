@@ -50,6 +50,7 @@ async function seedScenarios() {
       scenariosToInsert.push({
         scenarioId: data.scenario.scenario_id,
         title: data.scenario.title,
+        version: Number(data.scenario.scenario_version || data.scenario.version || data.version || 1),
         isActive: true,
         data: data,
       });
@@ -187,11 +188,17 @@ function loadScenarios(directory) {
 }
 
 async function getScenarioData(scenarioId) {
+  const normalizedScenarioId = String(scenarioId || "").toUpperCase();
+
+  if (mongoose.connection.readyState !== 1) {
+    return scenarioMap.get(normalizedScenarioId) || null;
+  }
+
   try {
-    const scenario = await Scenario.findOne({ scenarioId: String(scenarioId || "").toUpperCase() });
-    return scenario ? scenario.data : null;
+    const scenario = await Scenario.findOne({ scenarioId: normalizedScenarioId });
+    return scenario ? attachScenarioVersion(scenario.data, scenario.version) : null;
   } catch (err) {
-    return null;
+    return scenarioMap.get(normalizedScenarioId) || null;
   }
 }
 
@@ -216,6 +223,7 @@ function scenarioSummary(scenarioData) {
 
   return {
     scenario_id: scenario.scenario_id,
+    scenario_version: Number(scenario.scenario_version || scenario.version || scenarioData.version || 1),
     title: scenario.title,
     scenario_type: scenario.scenario_type,
     level: scenario.level,
@@ -224,6 +232,16 @@ function scenarioSummary(scenarioData) {
     ai_role: scenario.ai_role,
     task_instruction: scenario.task_instruction,
   };
+}
+
+function attachScenarioVersion(scenarioData, version = 1) {
+  const cloned = JSON.parse(JSON.stringify(scenarioData || {}));
+  cloned.version = Number(version || cloned.version || 1);
+  cloned.scenario = cloned.scenario || {};
+  cloned.scenario.scenario_version = Number(
+    cloned.scenario.scenario_version || cloned.scenario.version || cloned.version || 1
+  );
+  return cloned;
 }
 
 function getSessionRules(scenarioData) {
@@ -854,11 +872,18 @@ function authenticateJWT(req, res, next) {
 
 function normalizePracticeSessionPayload(rawSession, userId) {
   const student = rawSession.student || {};
+  const scenario = rawSession.scenario || {};
+  const scenarioVersion = Number(
+    scenario.scenario_version || rawSession.scenario_version || rawSession.scenarioVersion || 1
+  );
 
   return {
     userId,
     sessionId: rawSession.sessionId || rawSession.session_id,
-    scenario: rawSession.scenario || {},
+    scenario: {
+      ...scenario,
+      scenario_version: scenarioVersion,
+    },
     transcript: Array.isArray(rawSession.transcript)
       ? rawSession.transcript.map((item) => ({
           speaker: item.speaker,
@@ -897,6 +922,7 @@ function serializePracticeSession(session) {
       display_name: null,
     },
     scenario: data.scenario || {},
+    scenario_version: data.scenario?.scenario_version || 1,
     started_at: data.startedAt
       ? new Date(data.startedAt).toISOString()
       : new Date(data.completedAt || Date.now()).toISOString(),
@@ -952,7 +978,8 @@ app.post("/api/auth/signup", async (req, res) => {
       role: "student",
       studentId: studentId.trim(),
       studentLecturerCode: studentLecturerCode.trim().toUpperCase(),
-      consent: true
+      consent: true,
+      consentAcceptedAt: new Date(),
     });
     await user.save();
     
@@ -966,7 +993,8 @@ app.post("/api/auth/signup", async (req, res) => {
         role: user.role,
         studentId: user.studentId,
         studentLecturerCode: user.studentLecturerCode,
-        consent: user.consent
+        consent: user.consent,
+        consentAcceptedAt: user.consentAcceptedAt
       }
     });
   } catch (err) {
@@ -996,7 +1024,8 @@ app.post("/api/auth/login", async (req, res) => {
         lecturerCode: user.lecturerCode,
         studentLecturerCode: user.studentLecturerCode,
         studentId: user.studentId,
-        consent: user.consent
+        consent: user.consent,
+        consentAcceptedAt: user.consentAcceptedAt
       }
     });
   } catch (err) {
@@ -1029,7 +1058,8 @@ app.post("/api/auth/update", authenticateJWT, async (req, res) => {
         lecturerCode: user.lecturerCode,
         studentLecturerCode: user.studentLecturerCode,
         studentId: user.studentId,
-        consent: user.consent
+        consent: user.consent,
+        consentAcceptedAt: user.consentAcceptedAt
       }
     });
   } catch (err) {
@@ -1086,9 +1116,17 @@ app.delete("/api/history/:session_id", authenticateJWT, async (req, res) => {
 
 app.get("/api/scenarios", async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.json(
+        Array.from(scenarioMap.values())
+          .map((item) => scenarioSummary(item))
+          .sort((left, right) => left.scenario_id.localeCompare(right.scenario_id))
+      );
+    }
+
     const list = await Scenario.find({ isActive: true });
     const summaries = list
-      .map((item) => scenarioSummary(item.data))
+      .map((item) => scenarioSummary(attachScenarioVersion(item.data, item.version)))
       .sort((left, right) => left.scenario_id.localeCompare(right.scenario_id));
     res.json(summaries);
   } catch (err) {
@@ -1098,6 +1136,17 @@ app.get("/api/scenarios", async (req, res) => {
 
 app.get("/api/scenarios/:scenario_id", async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      const scenarioData = scenarioMap.get(req.params.scenario_id.toUpperCase());
+      if (!scenarioData) {
+        return res.status(404).json({
+          error: true,
+          message: `Scenario ${req.params.scenario_id} is not available.`,
+        });
+      }
+      return res.json(scenarioData);
+    }
+
     const scenario = await Scenario.findOne({
       scenarioId: req.params.scenario_id.toUpperCase(),
       isActive: true
@@ -1110,7 +1159,7 @@ app.get("/api/scenarios/:scenario_id", async (req, res) => {
       });
     }
 
-    return res.json(scenario.data);
+    return res.json(attachScenarioVersion(scenario.data, scenario.version));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1136,6 +1185,7 @@ app.get("/api/lecturer/students", authenticateJWT, requireRole(["lecturer"]), as
       gender: s.gender,
       studentId: s.studentId,
       consent: s.consent,
+      consentAcceptedAt: s.consentAcceptedAt,
       createdAt: s.createdAt
     })));
   } catch (err) {
@@ -1156,7 +1206,7 @@ app.get("/api/lecturer/history", authenticateJWT, requireRole(["lecturer"]), asy
     const studentIds = students.map(s => s._id);
 
     const sessions = await PracticeSession.find({ userId: { $in: studentIds } })
-      .populate("userId", "name email studentId consent")
+      .populate("userId", "name email studentId consent consentAcceptedAt")
       .sort({ completedAt: -1 });
 
     res.json(sessions.map(s => {
@@ -1167,7 +1217,8 @@ app.get("/api/lecturer/history", authenticateJWT, requireRole(["lecturer"]), asy
           name: s.userId.name,
           email: s.userId.email,
           student_id: s.userId.studentId,
-          consent: s.userId.consent
+          consent: s.userId.consent,
+          consent_accepted_at: s.userId.consentAcceptedAt
         } : null
       };
     }));
@@ -1265,8 +1316,9 @@ app.post("/api/admin/scenarios", authenticateJWT, requireRole(["admin"]), async 
     const scenario = new Scenario({
       scenarioId: scenarioId.toUpperCase(),
       title,
+      version: Number(data?.scenario?.scenario_version || data?.scenario?.version || data?.version || 1),
       isActive: isActive !== false,
-      data
+      data: attachScenarioVersion(data, Number(data?.scenario?.scenario_version || data?.scenario?.version || data?.version || 1))
     });
     await scenario.save();
     res.status(201).json(scenario);
@@ -1284,7 +1336,11 @@ app.put("/api/admin/scenarios/:id", authenticateJWT, requireRole(["admin"]), asy
     }
     if (title !== undefined) scenario.title = title;
     if (isActive !== undefined) scenario.isActive = isActive;
-    if (data !== undefined) scenario.data = data;
+    if (data !== undefined) {
+      const nextVersion = Number(data?.scenario?.scenario_version || data?.scenario?.version || data?.version || scenario.version || 1);
+      scenario.version = nextVersion;
+      scenario.data = attachScenarioVersion(data, nextVersion);
+    }
     await scenario.save();
     res.json(scenario);
   } catch (err) {
@@ -1314,6 +1370,8 @@ app.post("/api/chat/evaluate-turn", async (req, res) => {
     student_response_count,
     conversation_history = [],
     student_response,
+    student_display_name,
+    student_id,
   } = req.body;
 
   if (!scenario_id || !student_response) {
@@ -1323,22 +1381,39 @@ app.post("/api/chat/evaluate-turn", async (req, res) => {
     });
   }
 
-  const scenarioDoc = await Scenario.findOne({
-    scenarioId: scenario_id.toUpperCase(),
-    isActive: true
-  });
+  let scenarioDoc = null;
+  let versionedScenarioData = null;
 
-  if (!scenarioDoc) {
+  if (mongoose.connection.readyState === 1) {
+    scenarioDoc = await Scenario.findOne({
+      scenarioId: scenario_id.toUpperCase(),
+      isActive: true
+    });
+    if (scenarioDoc) {
+      const scenarioVersion = Number(scenarioDoc.version || scenarioDoc.data?.scenario?.scenario_version || 1);
+      versionedScenarioData = attachScenarioVersion(scenarioDoc.data, scenarioVersion);
+    }
+  } else {
+    const fallbackScenarioData = scenarioMap.get(scenario_id.toUpperCase());
+    if (fallbackScenarioData) {
+      versionedScenarioData = attachScenarioVersion(fallbackScenarioData, 1);
+    }
+  }
+
+  if (!versionedScenarioData) {
     return res.status(400).json({
       error: true,
       message: `Scenario ${scenario_id} is not supported or active.`,
     });
   }
 
-  const scenarioData = scenarioDoc.data;
   const responseCount = Number(student_response_count ?? turn_number);
   const normalizedHistory = normalizeConversationHistory(conversation_history);
-  const sessionRules = getSessionRules(scenarioData);
+  const sessionRules = getSessionRules(versionedScenarioData);
+  const learnerProfile = {
+    displayName: String(student_display_name || "").trim(),
+    studentId: String(student_id || "").trim(),
+  };
 
   if (
     !Number.isInteger(responseCount) ||
@@ -1360,17 +1435,18 @@ app.post("/api/chat/evaluate-turn", async (req, res) => {
   if (shouldUseOpenAI) {
     try {
       const aiResult = await evaluateWithOpenAI({
-        scenarioData,
+        scenarioData: versionedScenarioData,
         studentResponseCount: responseCount,
         conversationHistory: normalizedHistory,
         studentResponse: student_response,
+        learnerProfile,
       });
       const normalizedResult = normalizeOpenAIResult(
         aiResult,
         String(session_id || ""),
         responseCount,
         student_response,
-        scenarioData,
+        versionedScenarioData,
         normalizedHistory
       );
 
@@ -1387,11 +1463,11 @@ app.post("/api/chat/evaluate-turn", async (req, res) => {
 
   const response = buildRuleBasedResponse({
     session_id: String(session_id || ""),
-    scenario_id: scenarioData.scenario.scenario_id,
+    scenario_id: versionedScenarioData.scenario.scenario_id,
     turn_number: responseCount,
     conversation_history: normalizedHistory,
     student_response,
-    scenarioData,
+    scenarioData: versionedScenarioData,
   });
 
   return res.json({
