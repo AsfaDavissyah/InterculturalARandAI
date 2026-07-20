@@ -1,0 +1,42 @@
+name: Build Release APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: |
+          cd mobile_beta
+          flutter pub get
+
+      - name: Build Release APK
+        run: |
+          cd mobile_beta
+          flutter build apk --release --dart-define=API_BASE_URL=https://interculturalarandai-production.up.railway.app
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: intercultural-ai-app-release.apk
+          path: mobile_beta/build/app/outputs/flutter-apk/app-release.apk
