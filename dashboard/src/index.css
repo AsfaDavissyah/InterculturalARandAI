@@ -1,40 +1,40 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --background: #020617;
-  --foreground: #f8fafc;
-  --card: #0f172a;
-  --card-foreground: #f8fafc;
-  --popover: #0f172a;
-  --popover-foreground: #f8fafc;
-  --primary: #f8fafc;
-  --primary-foreground: #020617;
-  --secondary: #1e293b;
-  --secondary-foreground: #e2e8f0;
-  --muted: #172033;
-  --muted-foreground: #94a3b8;
-  --accent: #1e293b;
-  --accent-foreground: #f8fafc;
-  --destructive: #ef4444;
-  --destructive-foreground: #fef2f2;
-  --border: #1e293b;
-  --input: #1e293b;
-  --ring: #38bdf8;
-  --success: #10b981;
-  --warning: #f59e0b;
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #0a0a0a;
+  --card-foreground: #ffffff;
+  --popover: #0a0a0a;
+  --popover-foreground: #ffffff;
+  --primary: #ffffff;
+  --primary-foreground: #000000;
+  --secondary: #171717;
+  --secondary-foreground: #f5f5f5;
+  --muted: #111111;
+  --muted-foreground: #a3a3a3;
+  --accent: #1f1f1f;
+  --accent-foreground: #ffffff;
+  --destructive: #ffffff;
+  --destructive-foreground: #000000;
+  --border: #262626;
+  --input: #333333;
+  --ring: #ffffff;
+  --success: #ffffff;
+  --warning: #ffffff;
 
   --bg-primary: var(--background);
   --bg-secondary: var(--card);
-  --bg-card: rgba(15, 23, 42, 0.88);
+  --bg-card: rgba(10, 10, 10, 0.94);
   --border-color: var(--border);
   --accent-teal: var(--success);
-  --accent-teal-glow: rgba(16, 185, 129, 0.14);
+  --accent-teal-glow: rgba(255, 255, 255, 0.08);
   --accent-orange: var(--warning);
-  --accent-orange-glow: rgba(245, 158, 11, 0.14);
+  --accent-orange-glow: rgba(255, 255, 255, 0.08);
   --accent-red: var(--destructive);
   --text-primary: var(--foreground);
   --text-secondary: var(--muted-foreground);
-  --text-muted: #64748b;
+  --text-muted: #737373;
 
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color-scheme: dark;
@@ -57,9 +57,7 @@ html {
 
 body {
   min-height: 100vh;
-  background:
-    linear-gradient(180deg, rgba(15, 23, 42, 0.92) 0%, rgba(2, 6, 23, 1) 42%),
-    var(--background);
+  background: var(--background);
   color: var(--foreground);
   overflow-x: hidden;
 }
@@ -89,14 +87,14 @@ select {
   min-height: 40px;
   border-radius: 8px !important;
   border: 1px solid var(--input) !important;
-  background: #020617 !important;
+  background: #050505 !important;
   color: var(--foreground) !important;
   box-shadow: none !important;
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: #64748b;
+  color: #737373;
 }
 
 textarea {
@@ -109,17 +107,17 @@ textarea {
 }
 
 ::-webkit-scrollbar-track {
-  background: #020617;
+  background: #000000;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border: 2px solid #020617;
+  background: #3f3f46;
+  border: 2px solid #000000;
   border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #52525b;
 }
 
 .glass-panel,
@@ -134,11 +132,11 @@ textarea {
 }
 
 .glass-card-teal {
-  border-color: rgba(16, 185, 129, 0.28) !important;
+  border-color: var(--border) !important;
 }
 
 .glass-card-orange {
-  border-color: rgba(245, 158, 11, 0.28) !important;
+  border-color: var(--border) !important;
 }
 
 @keyframes fadeIn {
@@ -173,8 +171,8 @@ textarea {
   position: absolute;
   inset: 0;
   cursor: pointer;
-  background: #334155;
-  border: 1px solid #475569;
+  background: #262626;
+  border: 1px solid #404040;
   border-radius: 999px;
   transition: background-color 0.18s ease;
 }
@@ -223,7 +221,7 @@ input:checked + .slider::before {
   letter-spacing: 0;
   text-transform: uppercase;
   border-bottom: 1px solid var(--border);
-  background: #111827;
+  background: #0f0f0f;
   white-space: nowrap;
 }
 
@@ -240,7 +238,7 @@ input:checked + .slider::before {
 }
 
 .custom-table tr:hover td {
-  background: rgba(148, 163, 184, 0.06);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .btn-teal,
@@ -267,12 +265,12 @@ input:checked + .slider::before {
 
 .btn-teal {
   background: var(--success) !important;
-  color: #052e16 !important;
+  color: #000000 !important;
 }
 
 .btn-orange {
   background: var(--warning) !important;
-  color: #451a03 !important;
+  color: #000000 !important;
 }
 
 .btn-teal:hover,
@@ -301,21 +299,44 @@ button[style*="rgba(255,255,255"],
 button[style*="transparent"] {
   min-height: 36px;
   border: 1px solid var(--border) !important;
-  background: #0f172a !important;
+  background: #0a0a0a !important;
   color: var(--foreground) !important;
   box-shadow: none !important;
 }
 
+button[style*="rgba(245, 158, 11"],
+div[style*="rgba(16, 185, 129"],
+div[style*="rgba(245, 158, 11"],
+span[style*="rgba(16, 185, 129"],
+span[style*="rgba(245, 158, 11"] {
+  background: #0a0a0a !important;
+  border-color: var(--border) !important;
+  box-shadow: none !important;
+}
+
+span[style*="#10b981"],
+span[style*="#f87171"],
+span[style*="var(--accent-teal)"],
+span[style*="var(--accent-orange)"],
+td[style*="var(--accent-teal)"],
+td[style*="var(--accent-orange)"],
+text[fill*="var(--accent-teal)"],
+text[fill*="var(--accent-orange)"] {
+  color: var(--foreground) !important;
+  fill: var(--foreground) !important;
+}
+
 table button:hover,
 button[style*="rgba(16, 185, 129"]:hover,
+button[style*="rgba(245, 158, 11"]:hover,
 button[style*="rgba(255,255,255"]:hover,
 button[style*="transparent"]:hover {
-  background: #1e293b !important;
+  background: #171717 !important;
 }
 
 aside.glass-panel {
   border-right: 1px solid var(--border) !important;
-  background: #020617 !important;
+  background: #000000 !important;
 }
 
 aside nav button {
@@ -324,17 +345,17 @@ aside nav button {
 }
 
 aside nav button:hover {
-  background: #0f172a !important;
+  background: #111111 !important;
   color: var(--foreground) !important;
 }
 
 main {
-  background: #020617 !important;
+  background: #000000 !important;
 }
 
 main > header {
   min-height: 72px;
-  background: rgba(2, 6, 23, 0.95) !important;
+  background: #000000 !important;
 }
 
 h1,
