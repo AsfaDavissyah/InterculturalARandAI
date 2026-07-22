@@ -4,6 +4,7 @@ import {
   Plus, Edit2, Trash2, Key, Download, ChevronRight, Settings, Database,
   TrendingUp, Activity, Award, UserCheck, ShieldCheck
 } from 'lucide-react';
+import { LoginForm } from './components/login-form';
 
 const DEFAULT_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
@@ -574,7 +575,7 @@ export default function App() {
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        minHeight: '100vh', padding: '24px', background: 'radial-gradient(circle at top, #111827 0%, #030712 100%)'
+        minHeight: '100vh', padding: '24px', background: 'var(--background)'
       }}>
         {/* Setelan URL Server Pojok Kanan Atas */}
         <div style={{ position: 'absolute', top: '24px', right: '24px' }}>
@@ -614,8 +615,21 @@ export default function App() {
           )}
         </div>
 
-        {/* Login Form Panel */}
+        <LoginForm
+          className="animate-fade-in"
+          email={email}
+          password={password}
+          loading={loading}
+          errorMessage={errorMessage}
+          apiBaseUrl={apiBaseUrl}
+          onEmailChange={setEmail}
+          onPasswordChange={setPassword}
+          onSubmit={handleLogin}
+        />
+
+        {/* Legacy Login Form Panel */}
         <div className="glass-panel animate-fade-in" style={{
+          display: 'none',
           width: '100%', maxWidth: '420px', padding: '40px 32px', 
           border: '1px solid rgba(255, 255, 255, 0.08)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)'
         }}>
