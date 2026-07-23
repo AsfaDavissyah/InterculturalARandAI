@@ -45,6 +45,11 @@ class ArSpeakingScreen extends StatefulWidget {
 
 class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+  static const Color _cream = Color(0xFFFFFCF4);
+  static const Color _black = Color(0xFF000000);
+  static const Color _orange = Color(0xFFD4842A);
+  static const Color _danger = Color(0xFFD54343);
+
   late final AnimationController _pulsingController;
   final SpeechToText _speech = SpeechToText();
   final FlutterTts _tts = FlutterTts();
@@ -678,13 +683,13 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         controller == null ||
         !controller.value.isInitialized) {
       return ColoredBox(
-        color: const Color(0xFF263238),
+        color: _cream,
         child: Center(
           child: Icon(
             _cameraError == null
                 ? Icons.videocam_off_outlined
                 : Icons.no_photography_outlined,
-            color: Colors.white54,
+            color: _black.withValues(alpha: 0.35),
             size: 48,
           ),
         ),
@@ -719,8 +724,12 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       tooltip: tooltip,
       onPressed: onPressed,
       style: IconButton.styleFrom(
-        backgroundColor: Colors.black.withValues(alpha: 0.48),
-        foregroundColor: Colors.white,
+        backgroundColor: _cream,
+        foregroundColor: _black,
+        disabledBackgroundColor: _cream.withValues(alpha: 0.7),
+        disabledForegroundColor: _black.withValues(alpha: 0.35),
+        side: BorderSide(color: _black.withValues(alpha: 0.14), width: 1.2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
       icon: Icon(icon),
     );
@@ -735,10 +744,18 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     if (displayMessage == null) return const SizedBox.shrink();
     return Container(
       constraints: const BoxConstraints(maxWidth: 520, minHeight: 58),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.68),
-        borderRadius: BorderRadius.circular(8),
+        color: _cream,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _black.withValues(alpha: 0.12)),
+        boxShadow: [
+          BoxShadow(
+            color: _black.withValues(alpha: 0.12),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -746,8 +763,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         children: [
           Text(
             displayMessage.speaker,
-            style: const TextStyle(
-              color: Color(0xFF65E0C4),
+            style: TextStyle(
+              color: _black.withValues(alpha: 0.58),
               fontWeight: FontWeight.w700,
               fontSize: 12,
             ),
@@ -757,7 +774,12 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
             displayMessage.message,
             maxLines: 4,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.white, fontSize: 15),
+            style: const TextStyle(
+              color: _black,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              height: 1.35,
+            ),
           ),
         ],
       ),
@@ -808,12 +830,11 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         if (!didPop) unawaited(_confirmExit());
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF263238),
+        backgroundColor: _cream,
         body: Stack(
           fit: StackFit.expand,
           children: [
             _buildCameraBackground(),
-            ColoredBox(color: Colors.black.withValues(alpha: 0.08)),
             if (_sessionError == null)
               Positioned(
                 left: 0,
@@ -851,16 +872,26 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                               vertical: 8,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.48),
-                              borderRadius: BorderRadius.circular(8),
+                              color: _cream,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: _black.withValues(alpha: 0.12),
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _black.withValues(alpha: 0.08),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   widget.scenario.id,
-                                  style: const TextStyle(
-                                    color: Color(0xFF65E0C4),
+                                  style: TextStyle(
+                                    color: _black.withValues(alpha: 0.55),
                                     fontWeight: FontWeight.w700,
                                     fontSize: 12,
                                   ),
@@ -870,7 +901,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                    color: Colors.white,
+                                    color: _black,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
@@ -904,10 +935,20 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                       ),
                     const SizedBox(height: 12),
                     Container(
-                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
                       decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.58),
-                        borderRadius: BorderRadius.circular(8),
+                        color: _cream,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: _black.withValues(alpha: 0.12),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _black.withValues(alpha: 0.14),
+                            blurRadius: 24,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -915,7 +956,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                           Text(
                             _statusLabel,
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: _black,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -970,10 +1011,13 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                                     style: IconButton.styleFrom(
                                       minimumSize: const Size(68, 68),
                                       backgroundColor: _speech.isListening
-                                          ? const Color(0xFFD54343)
-                                          : const Color(0xFF35C6A5),
-                                      foregroundColor: const Color(0xFF102621),
-                                      disabledBackgroundColor: Colors.white24,
+                                          ? _danger
+                                          : _orange,
+                                      foregroundColor: Colors.white,
+                                      disabledBackgroundColor: _black
+                                          .withValues(alpha: 0.12),
+                                      disabledForegroundColor: _black
+                                          .withValues(alpha: 0.35),
                                     ),
                                     iconSize: 31,
                                     icon: Icon(
