@@ -83,10 +83,12 @@ async function connectDatabase() {
 }
 
 let evaluateWithOpenAI = null;
+let generateChatResponseWithOpenAI = null;
 
 try {
   const openAIService = require("./services/openai_service");
   evaluateWithOpenAI = openAIService.evaluateWithOpenAI;
+  generateChatResponseWithOpenAI = openAIService.generateChatResponseWithOpenAI;
 } catch (error) {
   console.log("OpenAI service not loaded. Backend will use rule-based evaluator.");
 }
@@ -266,6 +268,14 @@ function requireRole(roles) {
       res.status(403).json({ error: "Access denied. Insufficient permissions." });
     }
   };
+}
+
+function withTimeout(promise, timeoutMs, timeoutMessage) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
 }
 
 function scenarioSummary(scenarioData) {
@@ -1473,6 +1483,161 @@ app.delete("/api/admin/scenarios/:id", authenticateJWT, requireRole(["admin"]), 
 
 // ─── Evaluation Endpoint ───
 
+app.post("/api/chat/respond-turn", async (req, res) => {
+  const {
+    session_id,
+    scenario_id,
+    turn_number,
+    student_response_count,
+    conversation_history = [],
+    student_response,
+    student_display_name,
+    student_id,
+  } = req.body;
+
+  if (!scenario_id || !student_response) {
+    return res.status(400).json({
+      error: true,
+      message: "scenario_id and student_response are required.",
+    });
+  }
+
+  let versionedScenarioData = null;
+
+  if (mongoose.connection.readyState === 1) {
+    const scenarioDoc = await Scenario.findOne({
+      scenarioId: scenario_id.toUpperCase(),
+      isActive: true
+    });
+    if (scenarioDoc) {
+      const scenarioVersion = Number(scenarioDoc.version || scenarioDoc.data?.scenario?.scenario_version || 1);
+      versionedScenarioData = attachScenarioVersion(scenarioDoc.data, scenarioVersion);
+    }
+  } else {
+    const fallbackScenarioData = scenarioMap.get(scenario_id.toUpperCase());
+    if (fallbackScenarioData) {
+      versionedScenarioData = attachScenarioVersion(fallbackScenarioData, 1);
+    }
+  }
+
+  if (!versionedScenarioData) {
+    return res.status(400).json({
+      error: true,
+      message: `Scenario ${scenario_id} is not supported or active.`,
+    });
+  }
+
+  const responseCount = Number(student_response_count ?? turn_number);
+  const normalizedHistory = normalizeConversationHistory(conversation_history);
+  const sessionRules = getSessionRules(versionedScenarioData);
+  const learnerProfile = {
+    displayName: String(student_display_name || "").trim(),
+    studentId: String(student_id || "").trim(),
+  };
+
+  if (
+    !Number.isInteger(responseCount) ||
+    responseCount < 1 ||
+    responseCount > sessionRules.maximumStudentResponses
+  ) {
+    return res.status(400).json({
+      error: true,
+      message: `student_response_count must be an integer between 1 and ${sessionRules.maximumStudentResponses}.`,
+    });
+  }
+
+  const detectedCategory = detectCategory(student_response, versionedScenarioData);
+  const cueDetectedObjectiveIds = detectCompletedObjectives(
+    versionedScenarioData,
+    normalizedHistory,
+    student_response
+  );
+  let completedObjectiveIds = cueDetectedObjectiveIds;
+  const fallbackProgress = buildSessionProgress(
+    versionedScenarioData,
+    responseCount,
+    completedObjectiveIds
+  );
+  const rules = getSessionRules(versionedScenarioData);
+  const shouldUseOpenAI =
+    process.env.USE_OPENAI === "true" &&
+    Boolean(process.env.OPENAI_API_KEY) &&
+    typeof generateChatResponseWithOpenAI === "function";
+  let aiMessage = fallbackProgress.session_complete
+    ? rules.naturalClosingMessage
+    : generateAIMessage(
+        detectedCategory,
+        versionedScenarioData,
+        fallbackProgress.remaining_objective_ids,
+        student_response,
+        normalizedHistory
+      );
+  let source = "local_fast_fallback";
+  let fallbackReason = shouldUseOpenAI ? null : "openai_not_configured";
+
+  if (shouldUseOpenAI && !fallbackProgress.session_complete) {
+    try {
+      const chatResult = await withTimeout(
+        generateChatResponseWithOpenAI({
+          scenarioData: versionedScenarioData,
+          studentResponseCount: responseCount,
+          conversationHistory: normalizedHistory,
+          studentResponse: student_response,
+          learnerProfile,
+        }),
+        Number(process.env.OPENAI_CHAT_TIMEOUT_MS) || 4500,
+        "openai_chat_timeout"
+      );
+      aiMessage = chatResult?.ai_message || aiMessage;
+      completedObjectiveIds = normalizeCompletedObjectiveIds(
+        versionedScenarioData,
+        cueDetectedObjectiveIds,
+        chatResult?.completed_objective_ids
+      );
+      source = "openai_chat";
+    } catch (error) {
+      console.error("OpenAI chat response error:", error.message);
+      fallbackReason = error.message === "openai_chat_timeout"
+        ? "openai_chat_timeout"
+        : "openai_chat_failed";
+    }
+  }
+
+  const sessionProgress = buildSessionProgress(
+    versionedScenarioData,
+    responseCount,
+    completedObjectiveIds
+  );
+
+  return res.json({
+    session_id: String(session_id || ""),
+    scenario_id: versionedScenarioData.scenario.scenario_id,
+    turn_number: responseCount,
+    ai_message: cleanAiDialogue(
+      sessionProgress.session_complete ? rules.naturalClosingMessage : aiMessage,
+      versionedScenarioData,
+      learnerProfile
+    ),
+    detected_category: detectedCategory,
+    scores: generateScores(detectedCategory),
+    feedback: generateFeedback(detectedCategory, student_response, versionedScenarioData),
+    cultural_note: cleanScenarioText(versionedScenarioData.scenario.cultural_note, versionedScenarioData),
+    improved_response: generateImprovedResponse(detectedCategory, versionedScenarioData),
+    continue_conversation: !sessionProgress.session_complete,
+    completed_objective_ids: completedObjectiveIds,
+    session_progress: sessionProgress,
+    session_memory: buildSessionMemory(
+      versionedScenarioData,
+      normalizedHistory,
+      student_response,
+      completedObjectiveIds
+    ),
+    end_reason: sessionProgress.end_reason,
+    source,
+    fallback_reason: fallbackReason,
+  });
+});
+
 app.post("/api/chat/evaluate-turn", async (req, res) => {
   const {
     session_id,
@@ -1545,13 +1710,17 @@ app.post("/api/chat/evaluate-turn", async (req, res) => {
 
   if (shouldUseOpenAI) {
     try {
-      const aiResult = await evaluateWithOpenAI({
-        scenarioData: versionedScenarioData,
-        studentResponseCount: responseCount,
-        conversationHistory: normalizedHistory,
-        studentResponse: student_response,
-        learnerProfile,
-      });
+      const aiResult = await withTimeout(
+        evaluateWithOpenAI({
+          scenarioData: versionedScenarioData,
+          studentResponseCount: responseCount,
+          conversationHistory: normalizedHistory,
+          studentResponse: student_response,
+          learnerProfile,
+        }),
+        Number(process.env.OPENAI_EVALUATION_TIMEOUT_MS) || 9000,
+        "openai_evaluation_timeout"
+      );
       const normalizedResult = normalizeOpenAIResult(
         aiResult,
         String(session_id || ""),
@@ -1569,7 +1738,9 @@ app.post("/api/chat/evaluate-turn", async (req, res) => {
     } catch (error) {
       console.error("OpenAI API error:", error.message);
       console.log("Falling back to rule-based evaluator...");
-      fallbackReason = "openai_request_failed";
+      fallbackReason = error.message === "openai_evaluation_timeout"
+        ? "openai_evaluation_timeout"
+        : "openai_request_failed";
     }
   }
 

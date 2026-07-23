@@ -256,6 +256,93 @@ function buildOutputSchema(scenarioData) {
   };
 }
 
+function buildChatOutputSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      ai_message: { type: "string" },
+      completed_objective_ids: {
+        type: "array",
+        items: { type: "string" },
+      },
+    },
+    required: ["ai_message", "completed_objective_ids"],
+  };
+}
+
+async function generateChatResponseWithOpenAI({
+  scenarioData,
+  studentResponseCount,
+  conversationHistory,
+  studentResponse,
+  learnerProfile = {},
+}) {
+  const model = process.env.OPENAI_CHAT_MODEL || process.env.OPENAI_MODEL || "gpt-5.4-mini";
+  const scenario = scenarioData.scenario;
+  const sessionMemory = buildPromptMemory(
+    scenarioData,
+    conversationHistory,
+    studentResponse,
+    learnerProfile
+  );
+
+  const response = await client.responses.create({
+    model,
+    input: [
+      {
+        role: "system",
+        content: `
+You are the role-play character in an English speaking practice app.
+Stay in the scenario. Reply only as the AI character.
+Do not score, correct, teach, or mention categories in ai_message.
+Do not use scripted sample names such as Rina, Raka, or David for the learner. Use the learner's display name only if provided.
+Keep ai_message natural, concise, and speakable: one or two short sentences.
+Ask at most one question.
+
+Scenario:
+${JSON.stringify(buildPromptScenario(scenarioData), null, 2)}
+
+Objectives:
+${JSON.stringify((scenarioData.conversation_objectives || []).map((objective) => ({
+  objective_id: objective.objective_id,
+  description: objective.description,
+  detection_cues: objective.detection_cues,
+  ai_follow_up: objective.ai_follow_up,
+})), null, 2)}
+
+${buildLearnerPrompt(learnerProfile)}
+Return only valid JSON.
+`,
+      },
+      {
+        role: "user",
+        content: `
+Scenario: ${scenario.scenario_id} - ${scenario.title}
+Student response count: ${studentResponseCount}
+Session memory:
+${JSON.stringify(sessionMemory, null, 2)}
+Latest student response:
+${studentResponse}
+
+Generate the next short role-play message and list objective IDs that now appear completed.
+`,
+      },
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "intercultural_chat_response",
+        schema: buildChatOutputSchema(),
+        strict: true,
+      },
+    },
+    max_output_tokens: Number(process.env.OPENAI_CHAT_MAX_OUTPUT_TOKENS) || 180,
+  });
+
+  return JSON.parse(response.output_text);
+}
+
 async function evaluateWithOpenAI({
   scenarioData,
   studentResponseCount,
@@ -334,4 +421,5 @@ module.exports = {
   buildPromptMemory,
   buildSystemPrompt,
   evaluateWithOpenAI,
+  generateChatResponseWithOpenAI,
 };

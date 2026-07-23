@@ -455,10 +455,11 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
             },
           )
           .toList();
-      final result = await _chatService!.evaluateTurn(
+      final turnNumber = _studentResponseCount + 1;
+      final result = await _chatService!.respondTurn(
         sessionId: _sessionId,
         scenarioId: widget.scenario.id,
-        studentResponseCount: _studentResponseCount + 1,
+        studentResponseCount: turnNumber,
         conversationHistory: history,
         studentResponse: text,
         studentDisplayName: _profile?.name,
@@ -476,6 +477,13 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       });
 
       await _speak(result.aiMessage);
+      unawaited(
+        _refreshTurnEvaluation(
+          turnNumber: turnNumber,
+          history: history,
+          studentResponse: text,
+        ),
+      );
       if (!result.continueConversation && mounted) {
         await _openResult();
       }
@@ -496,6 +504,41 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       );
     } finally {
       _submissionStarted = false;
+    }
+  }
+
+  Future<void> _refreshTurnEvaluation({
+    required int turnNumber,
+    required List<Map<String, String>> history,
+    required String studentResponse,
+  }) async {
+    if (_chatService == null) return;
+    try {
+      final detailedResult = await _chatService!.evaluateTurn(
+        sessionId: _sessionId,
+        scenarioId: widget.scenario.id,
+        studentResponseCount: turnNumber,
+        conversationHistory: history,
+        studentResponse: studentResponse,
+        studentDisplayName: _profile?.name,
+        studentId: _profile?.studentId,
+      );
+      if (!mounted) return;
+      setState(() {
+        final index = _evaluationResults.indexWhere(
+          (item) => item.turnNumber == turnNumber,
+        );
+        if (index >= 0) {
+          _evaluationResults[index] = detailedResult;
+        } else {
+          _evaluationResults.add(detailedResult);
+        }
+        if (_lastResponse?.turnNumber == turnNumber) {
+          _lastResponse = detailedResult;
+        }
+      });
+    } catch (error) {
+      debugPrint('Background scoring failed: $error');
     }
   }
 
@@ -649,7 +692,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       AvatarActivity.idle =>
         _speechAvailable ? 'Tap to speak' : 'Type response',
       AvatarActivity.listening => 'Listening',
-      AvatarActivity.thinking => 'Thinking',
+      AvatarActivity.thinking => 'Preparing response',
       AvatarActivity.speaking => 'Speaking',
       AvatarActivity.error => 'Connection needed',
     };
@@ -665,6 +708,47 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         ? ' | Goals $completed/${completed + remaining}'
         : '';
     return '$activityLabel | Response $_studentResponseCount/$maximum$objectiveProgress';
+  }
+
+  Widget _buildThinkingIndicator() {
+    if (_activity != AvatarActivity.thinking) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: _cream,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: _black.withValues(alpha: 0.12)),
+        boxShadow: [
+          BoxShadow(
+            color: _black.withValues(alpha: 0.10),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox.square(
+            dimension: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: _black.withValues(alpha: 0.7),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            'Preparing response...',
+            style: TextStyle(
+              color: _black.withValues(alpha: 0.72),
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   String get _modelPath {
@@ -962,6 +1046,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                       ],
                     ),
                     const Spacer(),
+                    _buildThinkingIndicator(),
                     if (_sessionError == null)
                       Align(
                         alignment: Alignment.center,

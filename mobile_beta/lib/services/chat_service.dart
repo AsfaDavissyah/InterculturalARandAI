@@ -82,4 +82,38 @@ class ChatService {
       throw Exception("Failed to evaluate response: ${response.body}");
     }
   }
+
+  Future<AiResponse> respondTurn({
+    required String sessionId,
+    required String scenarioId,
+    required int studentResponseCount,
+    required List<Map<String, String>> conversationHistory,
+    required String studentResponse,
+    String? studentDisplayName,
+    String? studentId,
+  }) async {
+    final url = Uri.parse("$baseUrl/api/chat/respond-turn");
+
+    final response = await http
+        .post(
+          url,
+          headers: {"Content-Type": "application/json"},
+          body: jsonEncode({
+            "session_id": sessionId,
+            "scenario_id": scenarioId,
+            "student_response_count": studentResponseCount,
+            "conversation_history": conversationHistory,
+            "student_response": studentResponse,
+            "student_display_name": studentDisplayName,
+            "student_id": studentId,
+          }),
+        )
+        .timeout(const Duration(seconds: 12));
+
+    if (response.statusCode == 200) {
+      return AiResponse.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception("Failed to generate response: ${response.body}");
+    }
+  }
 }
