@@ -142,10 +142,11 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
     try {
       final scenarioData = await _chatService!.getScenario(widget.scenario.id);
-      final openingMessage =
-          scenarioData['initial_conversation_state']?['ai_opening_message'] ??
-          scenarioData['conversation_flow']?[0]?['message'] ??
-          'Hello. Shall we begin?';
+      final openingMessage = _sanitizeScenarioOpening(
+        scenarioData['initial_conversation_state']?['ai_opening_message'] ??
+            scenarioData['conversation_flow']?[0]?['message'] ??
+            'Hello. Shall we begin?',
+      );
 
       if (!mounted) return;
       setState(() {
@@ -252,9 +253,10 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     } catch (_) {}
 
     setState(() {
-      _activity = AvatarActivity.loading;
-      _activeSubtitle =
-          null; // Bersihkan subtitle mahasiswa/lama selama memproses audio AI baru
+      _activity = AvatarActivity.speaking;
+      if (_messages.isNotEmpty && _messages.last.speaker == 'AI') {
+        _activeSubtitle = _messages.last;
+      }
     });
 
     String gender = "female";
@@ -355,11 +357,11 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       onResult: _onSpeechResult,
       listenOptions: SpeechListenOptions(
         localeId: 'en_US',
-        listenMode: ListenMode.dictation,
+        listenMode: ListenMode.confirmation,
         partialResults: true,
         cancelOnError: true,
-        pauseFor: const Duration(seconds: 3),
-        listenFor: const Duration(seconds: 45),
+        pauseFor: const Duration(milliseconds: 1200),
+        listenFor: const Duration(seconds: 30),
       ),
     );
   }
@@ -406,7 +408,6 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   Future<void> _stopListeningAndSubmit() async {
     _pulsingController.stop();
     await _speech.stop();
-    await Future<void>.delayed(const Duration(milliseconds: 180));
     if (_submissionStarted) return;
     final words = _recognizedWords.trim();
     if (words.isEmpty) {
@@ -675,6 +676,39 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       return 'assets/models/male_char.glb';
     }
     return 'assets/models/female_char.glb';
+  }
+
+  String _sanitizeScenarioOpening(String text) {
+    final displayName = _profile?.name.trim() ?? '';
+    var cleaned = text.trim();
+
+    cleaned = cleaned
+        .replaceAll(
+          RegExp(r'\bAre you (Rina|Raka)\b', caseSensitive: false),
+          displayName.isNotEmpty
+              ? 'Are you $displayName'
+              : 'Are you the student volunteer',
+        )
+        .replaceAll(
+          RegExp(r'\bHi, (Rina|Raka|David)\b', caseSensitive: false),
+          displayName.isNotEmpty ? 'Hi, $displayName' : 'Hi',
+        )
+        .replaceAll(
+          RegExp(r'\bThank you, (Rina|Raka|David)\b', caseSensitive: false),
+          displayName.isNotEmpty ? 'Thank you, $displayName' : 'Thank you',
+        )
+        .replaceAll(
+          RegExp(r"\bI\s*(am|'m)\s+David\s+from\b", caseSensitive: false),
+          'I am an exchange student from',
+        )
+        .replaceAll(
+          RegExp(r"\bI\s*(am|'m)\s+David\b", caseSensitive: false),
+          'I am an exchange student',
+        )
+        .replaceAll(RegExp(r',\s*(Rina|Raka|David)\b'), '')
+        .replaceAll(RegExp(r'\s{2,}'), ' ');
+
+    return cleaned;
   }
 
   Widget _buildCameraBackground() {

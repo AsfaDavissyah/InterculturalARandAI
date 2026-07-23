@@ -409,6 +409,50 @@ function normalizeConversationHistory(conversationHistory = []) {
     .slice(-20);
 }
 
+function getDefaultLearnerNames(scenarioData) {
+  const names = new Set(["Rina", "Raka"]);
+  const learner = (scenarioData.characters || []).find((character) =>
+    String(character.role || "").toLowerCase().includes("student learner")
+  );
+  const scenarioRole = String(scenarioData.scenario?.student_role || "");
+
+  if (learner?.name && learner.name !== "Student") {
+    names.add(learner.name);
+  }
+
+  const leadingName = scenarioRole.match(/^([A-Z][a-z]+)\b/);
+  if (leadingName?.[1] && leadingName[1] !== "Student") {
+    names.add(leadingName[1]);
+  }
+
+  return [...names];
+}
+
+function replaceDefaultLearnerNames(text, scenarioData, learnerProfile = {}) {
+  if (typeof text !== "string") return text;
+  const displayName = String(learnerProfile.displayName || "").trim();
+  const replacement = displayName || "you";
+  let cleaned = text;
+
+  getDefaultLearnerNames(scenarioData).forEach((name) => {
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    cleaned = cleaned.replace(new RegExp(`\\b${escapedName}\\b`, "g"), replacement);
+  });
+
+  return cleaned
+    .replace(/\bI\s*(am|'m)\s+David\s+from\b/gi, "I am an exchange student from")
+    .replace(/\bI\s*(am|'m)\s+David\b/gi, "I am an exchange student")
+    .replace(/\bAre you you\b/gi, "Are you the student volunteer")
+    .replace(/\bAre you (Rina|Raka)\b/gi, displayName ? `Are you ${displayName}` : "Are you the student volunteer")
+    .replace(/\bHi, you\b/gi, displayName ? `Hi, ${displayName}` : "Hi")
+    .replace(/\bHi, (Rina|Raka|David)\b/gi, displayName ? `Hi, ${displayName}` : "Hi")
+    .replace(/\bThank you, you\b/gi, displayName ? `Thank you, ${displayName}` : "Thank you")
+    .replace(/\bThank you, (Rina|Raka|David)\b/gi, displayName ? `Thank you, ${displayName}` : "Thank you")
+    .replace(/,\s*(Rina|Raka|David)\b/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 function getObjectiveFollowUp(
   scenarioData,
   remainingObjectiveIds,
@@ -461,6 +505,13 @@ function buildSessionMemory(
     completed_objective_ids: completedObjectiveIds,
     recent_exchanges: history.slice(-8),
   };
+}
+
+function cleanAiDialogue(value, scenarioData, learnerProfile = {}) {
+  return cleanScenarioText(
+    replaceDefaultLearnerNames(value, scenarioData, learnerProfile),
+    scenarioData
+  );
 }
 
 function hasCasualCue(text) {
@@ -756,6 +807,7 @@ function buildRuleBasedResponse({
   conversation_history,
   student_response,
   scenarioData,
+  learnerProfile = {},
 }) {
   const detectedCategory = detectCategory(student_response, scenarioData);
   const scores = generateScores(detectedCategory);
@@ -783,9 +835,13 @@ function buildRuleBasedResponse({
     session_id,
     scenario_id,
     turn_number: studentResponseCount,
-    ai_message: sessionProgress.session_complete
-      ? rules.naturalClosingMessage
-      : regularAiMessage,
+    ai_message: cleanAiDialogue(
+      sessionProgress.session_complete
+        ? rules.naturalClosingMessage
+        : regularAiMessage,
+      scenarioData,
+      learnerProfile
+    ),
     detected_category: detectedCategory,
     scores,
     feedback: generateFeedback(detectedCategory, student_response, scenarioData),
@@ -812,7 +868,8 @@ function normalizeOpenAIResult(
   studentResponseCount,
   studentResponse,
   scenarioData,
-  conversationHistory
+  conversationHistory,
+  learnerProfile = {}
 ) {
   const numericTurn = Number(studentResponseCount);
   const detectedCategory = VALID_CATEGORIES.includes(aiResult?.detected_category)
@@ -874,17 +931,21 @@ function normalizeOpenAIResult(
     messageWritesStudentDialogue(aiMessage, scenarioData) ||
     messageLeavesScenarioContext(aiMessage, scenarioData);
 
-  normalized.ai_message = sessionProgress.session_complete
-    ? rules.naturalClosingMessage
-    : shouldUseFallbackMessage
-    ? generateAIMessage(
-        detectedCategory,
-        scenarioData,
-        sessionProgress.remaining_objective_ids,
-        studentResponse,
-        conversationHistory
-      )
-    : cleanScenarioText(aiMessage, scenarioData);
+  normalized.ai_message = cleanAiDialogue(
+    sessionProgress.session_complete
+      ? rules.naturalClosingMessage
+      : shouldUseFallbackMessage
+      ? generateAIMessage(
+          detectedCategory,
+          scenarioData,
+          sessionProgress.remaining_objective_ids,
+          studentResponse,
+          conversationHistory
+        )
+      : aiMessage,
+    scenarioData,
+    learnerProfile
+  );
 
   return normalized;
 }
@@ -1497,7 +1558,8 @@ app.post("/api/chat/evaluate-turn", async (req, res) => {
         responseCount,
         student_response,
         versionedScenarioData,
-        normalizedHistory
+        normalizedHistory,
+        learnerProfile
       );
 
       return res.json({
@@ -1518,6 +1580,7 @@ app.post("/api/chat/evaluate-turn", async (req, res) => {
     conversation_history: normalizedHistory,
     student_response,
     scenarioData: versionedScenarioData,
+    learnerProfile,
   });
 
   return res.json({

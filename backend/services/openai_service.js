@@ -17,7 +17,30 @@ Personalization rules:
 - If a display name is provided, you may call the learner by that name naturally.
 - Do not overuse the learner's name. Use it mostly in greetings, warm acknowledgements, or closing.
 - The learner's real display name replaces any default student character name in the scenario.
+- Never call the learner by default sample names from scenario text, such as Rina, Raka, David, or other scripted names, unless that is the learner's actual display name.
+- Do not introduce yourself with a scripted sample name. Speak as the role, not as a named script character.
 `;
+}
+
+function buildPromptScenario(scenarioData) {
+  const scenario = scenarioData.scenario || {};
+  const context = scenarioData.context || {};
+
+  return {
+    scenario_id: scenario.scenario_id,
+    title: scenario.title,
+    type: scenario.scenario_type,
+    level: scenario.level,
+    setting: scenario.ar_scene || context.setting,
+    task_instruction: scenario.task_instruction,
+    learning_goal: scenario.learning_goal,
+    ai_role: scenario.ai_role,
+    student_role: scenario.student_role,
+    ai_character_prompt: scenario.ai_character_prompt,
+    cultural_focus: scenario.cultural_focus,
+    boundaries: context.boundaries || [],
+    forbidden_terms: context.forbidden_terms || [],
+  };
 }
 
 function buildSystemPrompt(scenarioData, learnerProfile = {}) {
@@ -42,12 +65,6 @@ ${scenario.student_role}
 
 ${buildLearnerPrompt(learnerProfile)}
 
-Characters:
-${JSON.stringify(scenarioData.characters || [], null, 2)}
-
-Fixed context and boundaries:
-${JSON.stringify(scenarioData.context || {}, null, 2)}
-
 Fixed scenario boundaries:
 - Stay inside this scenario only.
 - Keep the physical/social setting as: ${scenario.ar_scene}.
@@ -55,6 +72,7 @@ Fixed scenario boundaries:
 - Speak only as the AI role. Never write the student's dialogue or complete the student's turn.
 - Follow every boundary and forbidden term defined in the scenario context.
 - If the student gives an answer that moves outside the scenario, gently redirect while staying in character.
+- If the scenario text contains sample character names for the learner, treat them as placeholders only.
 
 Output separation:
 - "ai_message" must be only what your role-play character says in the conversation.
@@ -70,23 +88,22 @@ Natural conversation behavior:
 - Refer naturally to relevant details already mentioned in the session.
 - Do not repeat a question that the character asked in the recent conversation.
 - Ask at most one clear question in each ai_message.
-- Keep ai_message concise and speakable, usually one to three sentences.
+- Keep ai_message concise and speakable, usually one or two short sentences.
 - Never announce objectives, stages, categories, scoring, corrections, or session progress.
 
 Scenario:
-${JSON.stringify(scenarioData.scenario, null, 2)}
+${JSON.stringify(buildPromptScenario(scenarioData), null, 2)}
 
 Session rules:
 ${JSON.stringify(scenarioData.session_rules || {}, null, 2)}
 
 Conversation objectives:
-${JSON.stringify(scenarioData.conversation_objectives || [], null, 2)}
-
-Branching rules:
-${JSON.stringify(scenarioData.branching_rules, null, 2)}
-
-Rubric:
-${JSON.stringify(scenarioData.rubric, null, 2)}
+${JSON.stringify((scenarioData.conversation_objectives || []).map((objective) => ({
+  objective_id: objective.objective_id,
+  description: objective.description,
+  detection_cues: objective.detection_cues,
+  ai_follow_up: objective.ai_follow_up,
+})), null, 2)}
 
 Rules:
 - Stay in the role defined above.
@@ -114,12 +131,6 @@ Student response count: ${studentResponseCount}
 Current scenario phase:
 ${JSON.stringify(currentStage || null, null, 2)}
 
-Session rules:
-${JSON.stringify(scenarioData.session_rules || {}, null, 2)}
-
-Conversation objectives:
-${JSON.stringify(scenarioData.conversation_objectives || [], null, 2)}
-
 Identify every objective already completed across the full conversation. Generate a natural next message as the AI role from the context and objectives, not from a fixed script. If the target response count has been reached and all required objectives are complete, close the conversation naturally. Keep corrections and examples out of ai_message.
 `;
 }
@@ -142,13 +153,12 @@ function buildPromptMemory(
       message: String(item?.message || "").trim(),
     }))
     .filter((item) => item.message)
-    .slice(-12);
+    .slice(-6);
 
   return {
     fixed_context: {
       scenario_id: scenarioData.scenario.scenario_id,
       setting: scenarioData.context.setting,
-      student_role: scenarioData.scenario.student_role,
       ai_role: scenarioData.scenario.ai_role,
       boundaries: scenarioData.context.boundaries,
       learner_display_name: learnerProfile.displayName || null,
@@ -274,9 +284,6 @@ ${studentResponseCount}
 Turn guidance:
 ${getTurnGuidance(scenarioData, studentResponseCount)}
 
-Previous conversation:
-${JSON.stringify(conversationHistory, null, 2)}
-
 Authoritative session memory:
 ${JSON.stringify(sessionMemory, null, 2)}
 
@@ -317,6 +324,7 @@ Return only valid JSON using the required output format.
         strict: true,
       },
     },
+    max_output_tokens: Number(process.env.OPENAI_MAX_OUTPUT_TOKENS) || 550,
   });
 
   return JSON.parse(response.output_text);
