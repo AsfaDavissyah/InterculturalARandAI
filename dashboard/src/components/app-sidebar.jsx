@@ -105,7 +105,7 @@ export function AppSidebar({
                 className="w-full justify-start text-destructive hover:bg-destructive/10 hover:text-destructive active:bg-destructive/15 transition-all duration-200 rounded-lg"
               >
                 <LogOut className="size-4.5 mr-2" />
-                <span className="font-semibold text-sm">Keluar</span>
+                <span className="font-semibold text-sm">Logout</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>

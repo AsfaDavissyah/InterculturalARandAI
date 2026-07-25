@@ -36,7 +36,7 @@ export function LoginForm({
                 <div className="space-y-1">
                   <h1 className="text-2xl font-bold">ICC Speaking Portal</h1>
                   <p className="text-sm text-muted-foreground">
-                    Masuk sebagai dosen atau administrator untuk mengelola skenario dan data latihan.
+                    Log in as a lecturer or administrator to manage scenarios and practice data.
                   </p>
                 </div>
               </div>
@@ -48,7 +48,7 @@ export function LoginForm({
                   type="email"
                   value={email}
                   onChange={(event) => onEmailChange(event.target.value)}
-                  placeholder="dosen@universitas.edu"
+                  placeholder="lecturer@university.edu"
                   autoComplete="email"
                   required
                 />
@@ -61,7 +61,7 @@ export function LoginForm({
                   type="password"
                   value={password}
                   onChange={(event) => onPasswordChange(event.target.value)}
-                  placeholder="Masukkan password"
+                  placeholder="Enter your password"
                   autoComplete="current-password"
                   required
                 />
@@ -76,12 +76,12 @@ export function LoginForm({
               <Field>
                 <Button className="w-full" type="submit" disabled={loading}>
                   {loading && <Loader2 className="size-4 animate-spin" />}
-                  {loading ? "Menghubungkan..." : "Masuk ke Portal"}
+                  {loading ? "Connecting..." : "Log in to Portal"}
                 </Button>
               </Field>
 
               <FieldDescription>
-                Server API: <span className="font-medium text-foreground">{apiBaseUrl}</span>
+                API Server: <span className="font-medium text-foreground">{apiBaseUrl}</span>
               </FieldDescription>
             </FieldGroup>
           </form>
@@ -92,15 +92,15 @@ export function LoginForm({
                 Intercultural AR and AI
               </p>
               <h2 className="max-w-sm text-3xl font-bold leading-tight">
-                Dashboard penelitian untuk speaking practice berbasis skenario.
+                Research dashboard for scenario-based speaking practice.
               </h2>
             </div>
             <div className="grid gap-3 text-sm text-muted-foreground">
               <div className="rounded-lg border bg-background p-4">
-                CRUD skenario, akun dosen, riwayat latihan, dan data pengamatan mahasiswa.
+                Manage scenarios, lecturer accounts, practice history, and student observations.
               </div>
               <div className="rounded-lg border bg-background p-4">
-                Layout putih, rapi, dan konsisten dengan komponen shadcn.
+                Clean, neat layout consistent with Shadcn design.
               </div>
             </div>
           </div>

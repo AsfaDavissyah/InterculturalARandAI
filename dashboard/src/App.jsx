@@ -259,6 +259,7 @@ export default function App() {
   const [students, setStudents] = useState([]);
   const [history, setHistory] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
+  const [selectedScenarioForDetail, setSelectedScenarioForDetail] = useState(null);
   const [scenarioModalOpen, setScenarioModalOpen] = useState(false);
   const [editingScenarioId, setEditingScenarioId] = useState(null);
   const [builder, setBuilder] = useState(emptyScenarioBuilder);
@@ -505,7 +506,7 @@ export default function App() {
         <header className="dashboard-header">
           <div>
             <SidebarTrigger className="sidebar-top-trigger" />
-            <span>{new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+            <span>{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
             <h1>{activeTab === 'scenarios' ? 'Scenario Builder' : activeTab === 'lecturers' ? 'Lecturer Accounts' : activeTab === 'overview' ? 'Research Overview' : activeTab === 'students' ? 'Registered Students' : 'Practice History'}</h1>
           </div>
           <div className="search-pill"><Search size={16} /><span>{apiBaseUrl.replace(/^https?:\/\//, '')}</span></div>
@@ -516,44 +517,47 @@ export default function App() {
             <div className="hero-panel">
               <div>
                 <span className="eyebrow">Admin Scenario System</span>
-                <h2>Kelola skenario tanpa dialog nama tetap.</h2>
-                <p>Builder ini memisahkan konteks, peran, tujuan, batasan, dan rubrik agar AI tetap berada di lokasi dan karakter yang benar.</p>
+                <h2>Manage scenarios without fixed character names.</h2>
+                <p>This builder separates context, roles, goals, boundaries, and rubrics so the AI remains in the correct location and character.</p>
               </div>
-              <button className="primary-action" onClick={openNewScenario}><Plus size={17} /> Buat Skenario</button>
+              <button className="primary-action" onClick={openNewScenario}><Plus size={17} /> Create Scenario</button>
             </div>
             <div className="metric-grid">
-              <StatCard icon={BookOpen} label="Total skenario" value={scenarios.length} detail="tersimpan di database" />
-              <StatCard icon={CheckCircle2} label="Aktif" value={scenarios.filter((item) => item.isActive).length} detail="muncul di mobile" />
-              <StatCard icon={FileText} label="Format" value="V2" detail="builder plus JSON advanced" />
+              <StatCard icon={BookOpen} label="Total Scenarios" value={scenarios.length} detail="stored in database" />
+              <StatCard icon={CheckCircle2} label="Active" value={scenarios.filter((item) => item.isActive).length} detail="live on mobile app" />
+              <StatCard icon={FileText} label="Format" value="V2" detail="builder + advanced JSON" />
             </div>
             <div className="data-panel">
-              <div className="panel-heading"><h3>Daftar Skenario</h3><span>{scenarios.length} item</span></div>
+              <div className="panel-heading"><h3>Scenarios List</h3><span>{scenarios.length} {scenarios.length === 1 ? 'item' : 'items'}</span></div>
               <div className="custom-table-container">
                 <table className="custom-table">
-                  <thead><tr><th>ID</th><th>Judul</th><th>Peran Mahasiswa</th><th>AI Role</th><th>Scene</th><th>Status</th><th>Aksi</th></tr></thead>
+                  <thead><tr><th>ID</th><th>Title</th><th>AI Role</th><th>Status</th></tr></thead>
                   <tbody>
                     {scenarios.map((scenario) => (
                       <tr key={scenario._id}>
                         <td><strong>{scenario.scenarioId}</strong></td>
-                        <td>{scenario.title}</td>
-                        <td>{scenario.data?.scenario?.student_role || '-'}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="hover:underline font-semibold text-left text-slate-900"
+                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                            onClick={() => setSelectedScenarioForDetail(scenario)}
+                          >
+                            {scenario.title}
+                          </button>
+                        </td>
                         <td>{scenario.data?.scenario?.ai_role || '-'}</td>
-                        <td>{scenario.data?.scenario?.ar_scene || '-'}</td>
                         <td>
                           <button
                             className={`status-pill ${scenario.isActive ? "active" : "inactive"}`}
                             onClick={() => handleToggleScenarioStatus(scenario._id, scenario.isActive)}
                           >
-                            {scenario.isActive ? "Aktif" : "Nonaktif"}
+                            {scenario.isActive ? "Active" : "Inactive"}
                           </button>
-                        </td>
-                        <td className="row-actions">
-                          <button onClick={() => openEditScenario(scenario)}><Edit2 size={14} /></button>
-                          <button onClick={() => handleDeleteScenario(scenario._id)}><Trash2 size={14} /></button>
                         </td>
                       </tr>
                     ))}
-                    {!scenarios.length && <tr><td colSpan="7" className="empty-cell">Belum ada skenario.</td></tr>}
+                    {!scenarios.length && <tr><td colSpan="4" className="empty-cell">No scenarios found.</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -564,19 +568,19 @@ export default function App() {
         {user.role === 'admin' && activeTab === 'lecturers' && (
           <section className="two-column">
             <form className="data-panel form-panel" onSubmit={handleCreateLecturer}>
-              <div className="panel-heading"><h3>Buat Akun Dosen</h3><Key size={18} /></div>
-              {createdLecturerCode && <div className="success-box">Kode dosen baru: <strong>{createdLecturerCode}</strong></div>}
+              <div className="panel-heading"><h3>Create Lecturer Account</h3><Key size={18} /></div>
+              {createdLecturerCode && <div className="success-box">New lecturer code: <strong>{createdLecturerCode}</strong></div>}
               {errorMessage && <div className="error-box">{errorMessage}</div>}
-              <label>Nama dosen<input required value={lecturerForm.name} onChange={(event) => setLecturerForm({ ...lecturerForm, name: event.target.value })} /></label>
+              <label>Lecturer name<input required value={lecturerForm.name} onChange={(event) => setLecturerForm({ ...lecturerForm, name: event.target.value })} /></label>
               <label>Email<input required type="email" value={lecturerForm.email} onChange={(event) => setLecturerForm({ ...lecturerForm, email: event.target.value })} /></label>
               <label>Password<input required type="password" value={lecturerForm.password} onChange={(event) => setLecturerForm({ ...lecturerForm, password: event.target.value })} /></label>
-              <label>Gender<select value={lecturerForm.gender} onChange={(event) => setLecturerForm({ ...lecturerForm, gender: event.target.value })}><option value="female">Perempuan</option><option value="male">Laki-laki</option></select></label>
-              <button className="primary-action">Buat Akun</button>
+              <label>Gender<select value={lecturerForm.gender} onChange={(event) => setLecturerForm({ ...lecturerForm, gender: event.target.value })}><option value="female">Female</option><option value="male">Male</option></select></label>
+              <button className="primary-action">Create Account</button>
             </form>
             <div className="data-panel">
-              <div className="panel-heading"><h3>Daftar Dosen</h3><span>{lecturers.length} akun</span></div>
-              <table className="custom-table"><thead><tr><th>Nama</th><th>Email</th><th>Kode</th><th>Terdaftar</th></tr></thead><tbody>
-                {lecturers.map((lecturer) => <tr key={lecturer.id}><td>{lecturer.name}</td><td>{lecturer.email}</td><td><strong>{lecturer.lecturerCode}</strong></td><td>{lecturer.createdAt ? new Date(lecturer.createdAt).toLocaleDateString('id-ID') : '-'}</td></tr>)}
+              <div className="panel-heading"><h3>Lecturer List</h3><span>{lecturers.length} {lecturers.length === 1 ? 'account' : 'accounts'}</span></div>
+              <table className="custom-table"><thead><tr><th>Name</th><th>Email</th><th>Code</th><th>Registered</th></tr></thead><tbody>
+                {lecturers.map((lecturer) => <tr key={lecturer.id}><td>{lecturer.name}</td><td>{lecturer.email}</td><td><strong>{lecturer.lecturerCode}</strong></td><td>{lecturer.createdAt ? new Date(lecturer.createdAt).toLocaleDateString('en-US') : '-'}</td></tr>)}
               </tbody></table>
             </div>
           </section>
@@ -587,24 +591,24 @@ export default function App() {
             <div className="hero-panel lecturer-hero">
               <div>
                 <span className="eyebrow">Lecturer Research Monitor</span>
-                <h2>Pengamatan latihan speaking mahasiswa.</h2>
-                <p>Kode dosen menghubungkan data mahasiswa, riwayat sesi, transkrip, durasi, dan skor untuk kebutuhan penelitian.</p>
+                <h2>Student Speaking Practice Insights</h2>
+                <p>Lecturer code links student profiles, practice sessions, transcripts, duration, and metrics for research analysis.</p>
               </div>
-              <div className="code-badge"><span>Kode Dosen</span><strong>{user.lecturerCode}</strong></div>
+              <div className="code-badge"><span>Lecturer Code</span><strong>{user.lecturerCode}</strong></div>
             </div>
             <div className="metric-grid">
-              <StatCard icon={Users} label="Mahasiswa" value={students.length} detail="terhubung ke kode dosen" />
-              <StatCard icon={Activity} label="Sesi selesai" value={dashboardMetrics.completed.length} detail={`${dashboardMetrics.avgResponses.toFixed(1)} respons/sesi`} />
-              <StatCard icon={Award} label="Rata-rata skor" value={dashboardMetrics.avgScore.toFixed(2)} detail={`${Math.round(dashboardMetrics.avgDuration)} detik/sesi`} />
-              <StatCard icon={BookOpen} label="Skenario aktif" value={dashboardMetrics.topScenario?.[0] || '-'} detail={dashboardMetrics.topScenario ? `${dashboardMetrics.topScenario[1]} sesi` : 'belum ada data'} />
+              <StatCard icon={Users} label="Students" value={students.length} detail="linked to lecturer code" />
+              <StatCard icon={Activity} label="Completed sessions" value={dashboardMetrics.completed.length} detail={`${dashboardMetrics.avgResponses.toFixed(1)} responses/session`} />
+              <StatCard icon={Award} label="Average score" value={dashboardMetrics.avgScore.toFixed(2)} detail={`${Math.round(dashboardMetrics.avgDuration)} seconds/session`} />
+              <StatCard icon={BookOpen} label="Most Active" value={dashboardMetrics.topScenario?.[0] || '-'} detail={dashboardMetrics.topScenario ? `${dashboardMetrics.topScenario[1]} sessions` : 'no data available'} />
             </div>
             <div className="research-grid">
               <div className="data-panel">
-                <div className="panel-heading"><h3>Skor Kemampuan</h3><span>rata-rata / 5</span></div>
+                <div className="panel-heading"><h3>Skill Performance</h3><span>average / 5</span></div>
                 {Object.entries(scoreLabels).map(([key, label]) => <ProgressMetric key={key} label={label} value={dashboardMetrics.scoreAverages[key]} />)}
               </div>
               <div className="data-panel">
-                <div className="panel-heading"><h3>Sesi Terbaru</h3><button className="text-button" onClick={() => setActiveTab('history')}>Lihat semua <ChevronRight size={14} /></button></div>
+                <div className="panel-heading"><h3>Recent Sessions</h3><button className="text-button" onClick={() => setActiveTab('history')}>View all <ChevronRight size={14} /></button></div>
                 <div className="session-list">
                   {history.slice(0, 5).map((item, index) => (
                     <button key={index} onClick={() => setSelectedSession(item)}>
@@ -621,50 +625,55 @@ export default function App() {
 
         {user.role === 'lecturer' && activeTab === 'students' && (
           <div className="data-panel">
-            <div className="panel-heading"><h3>Mahasiswa Terdaftar</h3><span>{students.length} mahasiswa</span></div>
-            <table className="custom-table"><thead><tr><th>NIM</th><th>Nama</th><th>Email</th><th>Gender</th><th>Consent</th><th>Terdaftar</th></tr></thead><tbody>
-              {students.map((student) => (
-                <tr key={student.id}>
-                  <td><strong>{student.studentId || '-'}</strong></td>
-                  <td>{student.name}</td>
-                  <td>{student.email}</td>
-                  <td>{student.gender === 'female' ? 'Perempuan' : 'Laki-laki'}</td>
-                  <td>
-                    <span className={`status-badge ${student.consent ? "active" : "inactive"}`}>
-                      {student.consent ? "Disetujui" : "Tidak"}
-                    </span>
-                  </td>
-                  <td>{student.createdAt ? new Date(student.createdAt).toLocaleDateString('id-ID') : '-'}</td>
-                </tr>
-              ))}
-              {!students.length && <tr><td colSpan="6" className="empty-cell">Belum ada mahasiswa.</td></tr>}
-            </tbody></table>
+            <div className="panel-heading"><h3>Registered Students</h3><span>{students.length} {students.length === 1 ? 'student' : 'students'}</span></div>
+            <table className="custom-table">
+              <thead><tr><th>Student ID</th><th>Name</th><th>Email</th><th>Consent</th><th>Registered</th></tr></thead>
+              <tbody>
+                {students.map((student) => (
+                  <tr key={student.id}>
+                    <td><strong>{student.studentId || '-'}</strong></td>
+                    <td>{student.name}</td>
+                    <td>{student.email}</td>
+                    <td>
+                      <span className={`status-badge ${student.consent ? "active" : "inactive"}`}>
+                        {student.consent ? "Consented" : "No"}
+                      </span>
+                    </td>
+                    <td>{student.createdAt ? new Date(student.createdAt).toLocaleDateString('en-US') : '-'}</td>
+                  </tr>
+                ))}
+                {!students.length && <tr><td colSpan="5" className="empty-cell">No students registered yet.</td></tr>}
+              </tbody>
+            </table>
           </div>
         )}
 
         {user.role === 'lecturer' && activeTab === 'history' && (
           <section className="screen-stack">
-            <div className="action-row"><p>Riwayat ini dapat diekspor sebagai data penelitian.</p><button className="primary-action" onClick={exportHistoryToCSV}><Download size={16} /> Ekspor CSV</button></div>
+            <div className="action-row"><p>This history can be exported as research data.</p><button className="primary-action" onClick={exportHistoryToCSV}><Download size={16} /> Export CSV</button></div>
             <div className="data-panel">
-              <table className="custom-table"><thead><tr><th>NIM</th><th>Mahasiswa</th><th>Skenario</th><th>Selesai</th><th>Durasi</th><th>Respons</th><th>Skor</th><th>Aksi</th></tr></thead><tbody>
-                {history.map((item, index) => (
-                  <tr key={index}>
-                    <td>{item.student_details?.student_id || '-'}</td>
-                    <td>{item.student_details?.name || '-'}</td>
-                    <td>{item.scenario?.scenario_id} - {item.scenario?.title}</td>
-                    <td>{item.completed_at ? new Date(item.completed_at).toLocaleString('id-ID') : '-'}</td>
-                    <td>{item.duration_seconds || 0}s</td>
-                    <td>{item.student_response_count || 0}</td>
-                    <td><strong>{Number(item.overall_score || 0).toFixed(2)}</strong></td>
-                    <td>
-                      <button className="btn-table-action" onClick={() => setSelectedSession(item)}>
-                        <Eye size={14} /> Transkrip
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {!history.length && <tr><td colSpan="8" className="empty-cell">Belum ada sesi latihan.</td></tr>}
-              </tbody></table>
+              <table className="custom-table">
+                <thead><tr><th>Student ID</th><th>Student</th><th>Scenario</th><th>Completed At</th><th>Duration</th><th>Responses</th><th>Score</th><th>Action</th></tr></thead>
+                <tbody>
+                  {history.map((item, index) => (
+                    <tr key={index}>
+                      <td>{item.student_details?.student_id || '-'}</td>
+                      <td>{item.student_details?.name || '-'}</td>
+                      <td>{item.scenario?.scenario_id} - {item.scenario?.title}</td>
+                      <td>{item.completed_at ? new Date(item.completed_at).toLocaleString('en-US') : '-'}</td>
+                      <td>{item.duration_seconds || 0}s</td>
+                      <td>{item.student_response_count || 0}</td>
+                      <td><strong>{Number(item.overall_score || 0).toFixed(2)}</strong></td>
+                      <td>
+                        <button className="btn-table-action" onClick={() => setSelectedSession(item)}>
+                          <Eye size={14} /> Transcript
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {!history.length && <tr><td colSpan="8" className="empty-cell">No practice sessions yet.</td></tr>}
+                </tbody>
+              </table>
             </div>
           </section>
         )}
@@ -675,40 +684,40 @@ export default function App() {
         <div className="modal-backdrop">
           <form className="scenario-modal" onSubmit={handleSaveScenario}>
             <div className="panel-heading">
-              <div><h3>{editingScenarioId ? 'Edit Scenario Builder' : 'Buat Scenario Builder'}</h3><span>Nama orang tidak digunakan sebagai subject tetap.</span></div>
-              <button type="button" className="text-button" onClick={() => setScenarioModalOpen(false)}>Tutup</button>
+              <div><h3>{editingScenarioId ? 'Edit Scenario Builder' : 'Create Scenario Builder'}</h3><span>Do not use specific names as fixed characters.</span></div>
+              <button type="button" className="text-button" onClick={() => setScenarioModalOpen(false)}>Close</button>
             </div>
             {errorMessage && <div className="error-box">{errorMessage}</div>}
             <div className="builder-grid">
               <label>Scenario ID<input required disabled={!!editingScenarioId} value={builder.scenarioId} onChange={(event) => setBuilder({ ...builder, scenarioId: event.target.value })} placeholder="G-ICC-011" /></label>
-              <label>Judul<input required value={builder.title} onChange={(event) => setBuilder({ ...builder, title: event.target.value })} placeholder="Meeting an International Student on Campus" /></label>
-              <label>Tipe<input value={builder.type} onChange={(event) => setBuilder({ ...builder, type: event.target.value })} /></label>
+              <label>Title<input required value={builder.title} onChange={(event) => setBuilder({ ...builder, title: event.target.value })} placeholder="Meeting an International Student on Campus" /></label>
+              <label>Type<input value={builder.type} onChange={(event) => setBuilder({ ...builder, type: event.target.value })} /></label>
               <label>Level<input value={builder.level} onChange={(event) => setBuilder({ ...builder, level: event.target.value })} /></label>
               <label>AR Scene<input value={builder.arScene} onChange={(event) => setBuilder({ ...builder, arScene: event.target.value })} placeholder="International Office" /></label>
               <label>Student Role<input value={builder.studentRole} onChange={(event) => setBuilder({ ...builder, studentRole: event.target.value })} /></label>
               <label>AI Role<input value={builder.aiRole} onChange={(event) => setBuilder({ ...builder, aiRole: event.target.value })} /></label>
               <label>AI Personality<input value={builder.aiPersonality} onChange={(event) => setBuilder({ ...builder, aiPersonality: event.target.value })} /></label>
             </div>
-            <label>Deskripsi setting<textarea rows="2" value={builder.sceneDescription} onChange={(event) => setBuilder({ ...builder, sceneDescription: event.target.value })} /></label>
-            <label>Tujuan pembelajaran<textarea rows="2" value={builder.learningGoal} onChange={(event) => setBuilder({ ...builder, learningGoal: event.target.value })} /></label>
-            <label>Tugas mahasiswa<textarea rows="2" value={builder.studentTask} onChange={(event) => setBuilder({ ...builder, studentTask: event.target.value })} /></label>
-            <label>Objectives, satu baris per item: id | deskripsi | cues<textarea rows="4" value={builder.objectivesText} onChange={(event) => setBuilder({ ...builder, objectivesText: event.target.value })} /></label>
+            <label>Setting description<textarea rows="2" value={builder.sceneDescription} onChange={(event) => setBuilder({ ...builder, sceneDescription: event.target.value })} /></label>
+            <label>Learning goal<textarea rows="2" value={builder.learningGoal} onChange={(event) => setBuilder({ ...builder, learningGoal: event.target.value })} /></label>
+            <label>Student task<textarea rows="2" value={builder.studentTask} onChange={(event) => setBuilder({ ...builder, studentTask: event.target.value })} /></label>
+            <label>Objectives, one line per item: id | description | detection_cues<textarea rows="4" value={builder.objectivesText} onChange={(event) => setBuilder({ ...builder, objectivesText: event.target.value })} /></label>
             <div className="builder-grid compact">
-              <label>Minimum respons<input type="number" min="1" value={builder.minResponses} onChange={(event) => setBuilder({ ...builder, minResponses: event.target.value })} /></label>
+              <label>Minimum responses<input type="number" min="1" value={builder.minResponses} onChange={(event) => setBuilder({ ...builder, minResponses: event.target.value })} /></label>
               <label>Target min<input type="number" min="1" value={builder.targetMin} onChange={(event) => setBuilder({ ...builder, targetMin: event.target.value })} /></label>
               <label>Target max<input type="number" min="1" value={builder.targetMax} onChange={(event) => setBuilder({ ...builder, targetMax: event.target.value })} /></label>
-              <label>Maksimum<input type="number" min="1" value={builder.maxResponses} onChange={(event) => setBuilder({ ...builder, maxResponses: event.target.value })} /></label>
+              <label>Maximum<input type="number" min="1" value={builder.maxResponses} onChange={(event) => setBuilder({ ...builder, maxResponses: event.target.value })} /></label>
             </div>
-            <label>Kondisi selesai<textarea rows="3" value={builder.completionConditions} onChange={(event) => setBuilder({ ...builder, completionConditions: event.target.value })} /></label>
-            <label>Batasan lokasi<textarea rows="2" value={builder.locationBoundaries} onChange={(event) => setBuilder({ ...builder, locationBoundaries: event.target.value })} /></label>
-            <label>Batasan peran<textarea rows="2" value={builder.roleBoundaries} onChange={(event) => setBuilder({ ...builder, roleBoundaries: event.target.value })} /></label>
+            <label>Completion conditions<textarea rows="3" value={builder.completionConditions} onChange={(event) => setBuilder({ ...builder, completionConditions: event.target.value })} /></label>
+            <label>Location boundaries<textarea rows="2" value={builder.locationBoundaries} onChange={(event) => setBuilder({ ...builder, locationBoundaries: event.target.value })} /></label>
+            <label>Role boundaries<textarea rows="2" value={builder.roleBoundaries} onChange={(event) => setBuilder({ ...builder, roleBoundaries: event.target.value })} /></label>
             <label>Rubric: criterion | description<textarea rows="4" value={builder.rubricText} onChange={(event) => setBuilder({ ...builder, rubricText: event.target.value })} /></label>
             <div className="modal-options">
-              <label className="switch-row"><input type="checkbox" checked={builder.isActive} onChange={(event) => setBuilder({ ...builder, isActive: event.target.checked })} /> Aktif di mobile</label>
+              <label className="switch-row"><input type="checkbox" checked={builder.isActive} onChange={(event) => setBuilder({ ...builder, isActive: event.target.checked })} /> Active on mobile</label>
               <button type="button" className="text-button" onClick={() => setAdvancedJsonOpen(!advancedJsonOpen)}>Advanced JSON</button>
             </div>
             {advancedJsonOpen && <label>Raw JSON override<textarea rows="8" value={builder.rawJson || JSON.stringify(buildScenarioData(builder), null, 2)} onChange={(event) => setBuilder({ ...builder, rawJson: event.target.value })} /></label>}
-            <div className="modal-actions"><button type="button" className="secondary-action" onClick={() => setScenarioModalOpen(false)}>Batal</button><button className="primary-action">Simpan Skenario</button></div>
+            <div className="modal-actions"><button type="button" className="secondary-action" onClick={() => setScenarioModalOpen(false)}>Cancel</button><button className="primary-action">Save Scenario</button></div>
           </form>
         </div>
       )}
@@ -717,18 +726,130 @@ export default function App() {
         <div className="modal-backdrop">
           <div className="transcript-modal">
             <div className="panel-heading">
-              <div><h3>Transkrip & Analisis</h3><span>{selectedSession.student_details?.name} - {selectedSession.scenario?.title}</span></div>
-              <button className="text-button" onClick={() => setSelectedSession(null)}>Tutup</button>
+              <div><h3>Transcript & Analysis</h3><span>{selectedSession.student_details?.name} - {selectedSession.scenario?.title}</span></div>
+              <button className="text-button" onClick={() => setSelectedSession(null)}>Close</button>
             </div>
             <div className="transcript-grid">
               <div className="chat-log">
-                {(selectedSession.transcript || []).map((chat, index) => <div key={index} className={chat.speaker === 'AI' ? 'bubble ai' : 'bubble student'}><span>{chat.speaker === 'AI' ? selectedSession.scenario?.ai_role || 'AI' : 'Mahasiswa'}</span><p>{chat.message}</p></div>)}
+                {(selectedSession.transcript || []).map((chat, index) => <div key={index} className={chat.speaker === 'AI' ? 'bubble ai' : 'bubble student'}><span>{chat.speaker === 'AI' ? selectedSession.scenario?.ai_role || 'AI' : 'Student'}</span><p>{chat.message}</p></div>)}
               </div>
               <div className="score-panel">
                 <strong className="big-score">{Number(selectedSession.overall_score || 0).toFixed(2)}</strong>
-                <span>Skor akhir / 5</span>
+                <span>Overall Score / 5</span>
                 {Object.entries(scoreLabels).map(([key, label]) => <ProgressMetric key={key} label={label} value={selectedSession.average_scores?.[key]} />)}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedScenarioForDetail && (
+        <div className="modal-backdrop">
+          <div className="scenario-detail-modal">
+            <div className="panel-heading">
+              <div>
+                <h3>Scenario Details</h3>
+                <span style={{ fontSize: '0.8rem', background: '#f1f5f9', padding: '4px 8px', borderRadius: '6px', fontWeight: 'bold' }}>
+                  ID: {selectedScenarioForDetail.scenarioId}
+                </span>
+              </div>
+              <button type="button" className="text-button" onClick={() => setSelectedScenarioForDetail(null)}>Close</button>
+            </div>
+
+            <div className="detail-grid">
+              <div className="detail-section">
+                <h4>General Info</h4>
+                <p><strong>Title:</strong> {selectedScenarioForDetail.title}</p>
+                <p><strong>Type:</strong> {selectedScenarioForDetail.data?.scenario?.scenario_type || '-'}</p>
+                <p><strong>Level:</strong> {selectedScenarioForDetail.data?.scenario?.level || '-'}</p>
+                <p><strong>AR Scene:</strong> {selectedScenarioForDetail.data?.scenario?.ar_scene || '-'}</p>
+                <p>
+                  <strong>Status:</strong>{" "}
+                  <span className={`status-badge ${selectedScenarioForDetail.isActive ? 'active' : 'inactive'}`}>
+                    {selectedScenarioForDetail.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                </p>
+              </div>
+
+              <div className="detail-section">
+                <h4>Roles & Boundaries</h4>
+                <p><strong>Student Role:</strong> {selectedScenarioForDetail.data?.scenario?.student_role || '-'}</p>
+                <p><strong>AI Role:</strong> {selectedScenarioForDetail.data?.scenario?.ai_role || '-'}</p>
+                <p><strong>Location Boundaries:</strong> {selectedScenarioForDetail.data?.boundaries?.location || '-'}</p>
+                <p><strong>Role Boundaries:</strong> {selectedScenarioForDetail.data?.boundaries?.role || '-'}</p>
+              </div>
+
+              <div className="detail-section full-width">
+                <h4>Scenario Context & Background</h4>
+                <p><strong>Setting Situation:</strong> {selectedScenarioForDetail.data?.context?.situation || '-'}</p>
+                <p><strong>Student Task Instruction:</strong> {selectedScenarioForDetail.data?.scenario?.task_instruction || '-'}</p>
+                <p><strong>AI Character Prompt:</strong> {selectedScenarioForDetail.data?.scenario?.ai_character_prompt || '-'}</p>
+              </div>
+
+              <div className="detail-section full-width">
+                <h4>Goals & Completion</h4>
+                <p><strong>Learning Goal:</strong> {selectedScenarioForDetail.data?.scenario?.learning_goal || '-'}</p>
+                <p><strong>Completion Conditions:</strong></p>
+                <ul>
+                  {(selectedScenarioForDetail.data?.objectives?.completion_conditions || []).map((item, idx) => (
+                    <li key={idx}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="detail-section full-width">
+                <h4>Objectives & Detection Cues</h4>
+                <ul>
+                  {(selectedScenarioForDetail.data?.conversation_objectives || []).map((obj, idx) => (
+                    <li key={idx}>
+                      <strong>{obj.objective_id}</strong>: {obj.description}{" "}
+                      {obj.detection_cues?.length > 0 && (
+                        <span className="text-slate-500 font-semibold italic text-xs">
+                          (Cues: {obj.detection_cues.join(", ")})
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="detail-section full-width">
+                <h4>Assessment Rubric</h4>
+                <ul>
+                  {(selectedScenarioForDetail.data?.rubric || []).map((rub, idx) => (
+                    <li key={idx}>
+                      <span className="capitalize font-semibold text-slate-900">{rub.criterion.replace('_', ' ')}</span>: {rub.description}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            <div className="modal-actions" style={{ justifyContent: 'space-between', display: 'flex', width: '100%' }}>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="secondary-action"
+                  onClick={() => {
+                    openEditScenario(selectedScenarioForDetail);
+                    setSelectedScenarioForDetail(null);
+                  }}
+                >
+                  <Edit2 size={14} /> Edit Scenario
+                </button>
+                <button
+                  type="button"
+                  className="text-button"
+                  style={{ color: '#ef4444', borderColor: '#fca5a5' }}
+                  onClick={() => {
+                    handleDeleteScenario(selectedScenarioForDetail._id);
+                    setSelectedScenarioForDetail(null);
+                  }}
+                >
+                  <Trash2 size={14} /> Delete Scenario
+                </button>
+              </div>
+              <button type="button" className="primary-action" onClick={() => setSelectedScenarioForDetail(null)}>Done</button>
             </div>
           </div>
         </div>
