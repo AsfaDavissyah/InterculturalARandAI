@@ -352,13 +352,56 @@
   font-weight: 700;
 }
 
+.scenario-list-table {
+  min-width: 780px;
+}
+
+.scenario-list-table th:nth-child(1) {
+  width: 140px;
+}
+
+.scenario-list-table th:nth-child(3) {
+  width: 120px;
+}
+
+.scenario-list-table th:nth-child(4) {
+  width: 280px;
+}
+
+.clickable-row {
+  cursor: pointer;
+}
+
+.scenario-field-button {
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #0f172a;
+  text-align: left;
+  cursor: pointer;
+}
+
+.scenario-field-button:hover {
+  text-decoration: underline;
+}
+
+.scenario-id-button {
+  font-weight: 800;
+}
+
+.scenario-title-button {
+  font-weight: 650;
+}
+
 /* Row Action Buttons */
 .row-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
-.row-actions button {
+.row-actions > button:not(.btn-table-action) {
   width: 32px;
   height: 32px;
   display: inline-flex;
@@ -371,13 +414,13 @@
   transition: all 0.2s ease;
 }
 
-.row-actions button:hover {
+.row-actions > button:not(.btn-table-action):hover {
   background: #f1f5f9;
   color: #0f172a;
   border-color: #94a3b8;
 }
 
-.row-actions button:last-child:hover {
+.row-actions > button:not(.btn-table-action):last-child:hover {
   color: #ef4444;
   border-color: #fca5a5;
   background: #fef2f2;
@@ -404,6 +447,16 @@
   background: #f1f5f9;
   border-color: #94a3b8;
   color: #0f172a;
+}
+
+.btn-table-action.danger {
+  color: #b91c1c;
+}
+
+.btn-table-action.danger:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
 }
 
 /* Status Pill Badge */
@@ -923,4 +976,3 @@ textarea {
 .detail-section li:last-child {
   margin-bottom: 0;
 }
-

@@ -5,18 +5,14 @@ import {
   BookOpen,
   CheckCircle2,
   ChevronRight,
-  ClipboardList,
   Download,
   Edit2,
   Eye,
   FileText,
-  GraduationCap,
   Key,
-  LogOut,
   Plus,
   Search,
   Settings,
-  ShieldCheck,
   Trash2,
   Users,
 } from 'lucide-react';
@@ -530,30 +526,89 @@ export default function App() {
             <div className="data-panel">
               <div className="panel-heading"><h3>Scenarios List</h3><span>{scenarios.length} {scenarios.length === 1 ? 'item' : 'items'}</span></div>
               <div className="custom-table-container">
-                <table className="custom-table">
-                  <thead><tr><th>ID</th><th>Title</th><th>AI Role</th><th>Status</th></tr></thead>
+                <table className="custom-table scenario-list-table">
+                  <thead><tr><th>ID</th><th>Title</th><th>Status</th><th>Action</th></tr></thead>
                   <tbody>
                     {scenarios.map((scenario) => (
-                      <tr key={scenario._id}>
-                        <td><strong>{scenario.scenarioId}</strong></td>
+                      <tr
+                        key={scenario._id}
+                        className="clickable-row"
+                        onClick={() => setSelectedScenarioForDetail(scenario)}
+                      >
                         <td>
                           <button
                             type="button"
-                            className="hover:underline font-semibold text-left text-slate-900"
-                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
-                            onClick={() => setSelectedScenarioForDetail(scenario)}
+                            className="scenario-field-button scenario-id-button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setSelectedScenarioForDetail(scenario);
+                            }}
+                          >
+                            {scenario.scenarioId}
+                          </button>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="scenario-field-button scenario-title-button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setSelectedScenarioForDetail(scenario);
+                            }}
                           >
                             {scenario.title}
                           </button>
                         </td>
-                        <td>{scenario.data?.scenario?.ai_role || '-'}</td>
                         <td>
                           <button
                             className={`status-pill ${scenario.isActive ? "active" : "inactive"}`}
-                            onClick={() => handleToggleScenarioStatus(scenario._id, scenario.isActive)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleToggleScenarioStatus(scenario._id, scenario.isActive);
+                            }}
                           >
                             {scenario.isActive ? "Active" : "Inactive"}
                           </button>
+                        </td>
+                        <td>
+                          <div className="row-actions">
+                            <button
+                              type="button"
+                              className="btn-table-action"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setSelectedScenarioForDetail(scenario);
+                              }}
+                              title="View scenario detail"
+                            >
+                              <Eye size={14} />
+                              Detail
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-table-action"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openEditScenario(scenario);
+                              }}
+                              title="Edit scenario"
+                            >
+                              <Edit2 size={14} />
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-table-action danger"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleDeleteScenario(scenario._id);
+                              }}
+                              title="Delete scenario"
+                            >
+                              <Trash2 size={14} />
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
