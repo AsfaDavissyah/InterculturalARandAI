@@ -217,6 +217,14 @@ const average = (items, getter) => {
   return items.reduce((sum, item) => sum + Number(getter(item) || 0), 0) / items.length;
 };
 
+const asArray = (value) => Array.isArray(value) ? value : [];
+
+const getScenarioDocumentId = (scenario) => scenario?._id || scenario?.id || scenario?.scenarioId;
+
+const getScenarioData = (scenario) => scenario?.data || {};
+
+const getScenarioCore = (scenario) => getScenarioData(scenario).scenario || {};
+
 function StatCard({ icon: Icon, label, value, detail }) {
   return (
     <section className="metric-card">
@@ -373,7 +381,12 @@ export default function App() {
   };
 
   const openEditScenario = (scenario) => {
-    setEditingScenarioId(scenario._id);
+    const documentId = getScenarioDocumentId(scenario);
+    if (!documentId) {
+      setErrorMessage('Scenario document ID tidak ditemukan. Muat ulang dashboard lalu coba lagi.');
+      return;
+    }
+    setEditingScenarioId(documentId);
     setBuilder(scenarioToBuilder(scenario));
     setAdvancedJsonOpen(false);
     setErrorMessage('');
@@ -411,6 +424,7 @@ export default function App() {
   };
 
   const handleDeleteScenario = async (id) => {
+    if (!id) return alert('Scenario document ID tidak ditemukan. Muat ulang dashboard lalu coba lagi.');
     if (!confirm('Hapus skenario ini dari database?')) return;
     try {
       await callApi(`/api/admin/scenarios/${id}`, 'DELETE');
@@ -421,6 +435,7 @@ export default function App() {
   };
 
   const handleToggleScenarioStatus = async (id, currentStatus) => {
+    if (!id) return alert('Scenario document ID tidak ditemukan. Muat ulang dashboard lalu coba lagi.');
     try {
       await callApi(`/api/admin/scenarios/${id}`, 'PUT', { isActive: !currentStatus });
       fetchAdminScenarios();
@@ -531,7 +546,7 @@ export default function App() {
                   <tbody>
                     {scenarios.map((scenario) => (
                       <tr
-                        key={scenario._id}
+                        key={getScenarioDocumentId(scenario)}
                         className="clickable-row"
                         onClick={() => setSelectedScenarioForDetail(scenario)}
                       >
@@ -564,7 +579,7 @@ export default function App() {
                             className={`status-pill ${scenario.isActive ? "active" : "inactive"}`}
                             onClick={(event) => {
                               event.stopPropagation();
-                              handleToggleScenarioStatus(scenario._id, scenario.isActive);
+                              handleToggleScenarioStatus(getScenarioDocumentId(scenario), scenario.isActive);
                             }}
                           >
                             {scenario.isActive ? "Active" : "Inactive"}
@@ -601,7 +616,7 @@ export default function App() {
                               className="btn-table-action danger"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                handleDeleteScenario(scenario._id);
+                                handleDeleteScenario(getScenarioDocumentId(scenario));
                               }}
                               title="Delete scenario"
                             >
@@ -815,9 +830,9 @@ export default function App() {
               <div className="detail-section">
                 <h4>General Info</h4>
                 <p><strong>Title:</strong> {selectedScenarioForDetail.title}</p>
-                <p><strong>Type:</strong> {selectedScenarioForDetail.data?.scenario?.scenario_type || '-'}</p>
-                <p><strong>Level:</strong> {selectedScenarioForDetail.data?.scenario?.level || '-'}</p>
-                <p><strong>AR Scene:</strong> {selectedScenarioForDetail.data?.scenario?.ar_scene || '-'}</p>
+                <p><strong>Type:</strong> {getScenarioCore(selectedScenarioForDetail).scenario_type || '-'}</p>
+                <p><strong>Level:</strong> {getScenarioCore(selectedScenarioForDetail).level || '-'}</p>
+                <p><strong>AR Scene:</strong> {getScenarioCore(selectedScenarioForDetail).ar_scene || getScenarioData(selectedScenarioForDetail).context?.setting || '-'}</p>
                 <p>
                   <strong>Status:</strong>{" "}
                   <span className={`status-badge ${selectedScenarioForDetail.isActive ? 'active' : 'inactive'}`}>
@@ -828,54 +843,59 @@ export default function App() {
 
               <div className="detail-section">
                 <h4>Roles & Boundaries</h4>
-                <p><strong>Student Role:</strong> {selectedScenarioForDetail.data?.scenario?.student_role || '-'}</p>
-                <p><strong>AI Role:</strong> {selectedScenarioForDetail.data?.scenario?.ai_role || '-'}</p>
-                <p><strong>Location Boundaries:</strong> {selectedScenarioForDetail.data?.boundaries?.location || '-'}</p>
-                <p><strong>Role Boundaries:</strong> {selectedScenarioForDetail.data?.boundaries?.role || '-'}</p>
+                <p><strong>Student Role:</strong> {getScenarioCore(selectedScenarioForDetail).student_role || '-'}</p>
+                <p><strong>AI Role:</strong> {getScenarioCore(selectedScenarioForDetail).ai_role || '-'}</p>
+                <p><strong>Location Boundaries:</strong> {getScenarioData(selectedScenarioForDetail).boundaries?.location || asArray(getScenarioData(selectedScenarioForDetail).context?.boundaries).join(', ') || '-'}</p>
+                <p><strong>Role Boundaries:</strong> {getScenarioData(selectedScenarioForDetail).boundaries?.role || '-'}</p>
               </div>
 
               <div className="detail-section full-width">
                 <h4>Scenario Context & Background</h4>
-                <p><strong>Setting Situation:</strong> {selectedScenarioForDetail.data?.context?.situation || '-'}</p>
-                <p><strong>Student Task Instruction:</strong> {selectedScenarioForDetail.data?.scenario?.task_instruction || '-'}</p>
-                <p><strong>AI Character Prompt:</strong> {selectedScenarioForDetail.data?.scenario?.ai_character_prompt || '-'}</p>
+                <p><strong>Setting Situation:</strong> {getScenarioData(selectedScenarioForDetail).context?.situation || '-'}</p>
+                <p><strong>Student Task Instruction:</strong> {getScenarioCore(selectedScenarioForDetail).task_instruction || '-'}</p>
+                <p><strong>AI Character Prompt:</strong> {getScenarioCore(selectedScenarioForDetail).ai_character_prompt || '-'}</p>
               </div>
 
               <div className="detail-section full-width">
                 <h4>Goals & Completion</h4>
-                <p><strong>Learning Goal:</strong> {selectedScenarioForDetail.data?.scenario?.learning_goal || '-'}</p>
+                <p><strong>Learning Goal:</strong> {getScenarioCore(selectedScenarioForDetail).learning_goal || getScenarioData(selectedScenarioForDetail).objectives?.learning_goal || '-'}</p>
                 <p><strong>Completion Conditions:</strong></p>
                 <ul>
-                  {(selectedScenarioForDetail.data?.objectives?.completion_conditions || []).map((item, idx) => (
+                  {asArray(getScenarioData(selectedScenarioForDetail).objectives?.completion_conditions).map((item, idx) => (
                     <li key={idx}>{item}</li>
                   ))}
+                  {!asArray(getScenarioData(selectedScenarioForDetail).objectives?.completion_conditions).length && <li>-</li>}
                 </ul>
               </div>
 
               <div className="detail-section full-width">
                 <h4>Objectives & Detection Cues</h4>
                 <ul>
-                  {(selectedScenarioForDetail.data?.conversation_objectives || []).map((obj, idx) => (
+                  {asArray(getScenarioData(selectedScenarioForDetail).conversation_objectives).map((obj, idx) => (
                     <li key={idx}>
-                      <strong>{obj.objective_id}</strong>: {obj.description}{" "}
-                      {obj.detection_cues?.length > 0 && (
+                      <strong>{obj?.objective_id || `Objective ${idx + 1}`}</strong>: {obj?.description || '-'}{" "}
+                      {asArray(obj?.detection_cues).length > 0 && (
                         <span className="text-slate-500 font-semibold italic text-xs">
-                          (Cues: {obj.detection_cues.join(", ")})
+                          (Cues: {asArray(obj?.detection_cues).join(", ")})
                         </span>
                       )}
                     </li>
                   ))}
+                  {!asArray(getScenarioData(selectedScenarioForDetail).conversation_objectives).length && <li>-</li>}
                 </ul>
               </div>
 
               <div className="detail-section full-width">
                 <h4>Assessment Rubric</h4>
                 <ul>
-                  {(selectedScenarioForDetail.data?.rubric || []).map((rub, idx) => (
+                  {asArray(getScenarioData(selectedScenarioForDetail).rubric).map((rub, idx) => (
                     <li key={idx}>
-                      <span className="capitalize font-semibold text-slate-900">{rub.criterion.replace('_', ' ')}</span>: {rub.description}
+                      <span className="capitalize font-semibold text-slate-900">
+                        {String(rub?.criterion || `Criterion ${idx + 1}`).replaceAll('_', ' ')}
+                      </span>: {rub?.description || '-'}
                     </li>
                   ))}
+                  {!asArray(getScenarioData(selectedScenarioForDetail).rubric).length && <li>-</li>}
                 </ul>
               </div>
             </div>
@@ -886,8 +906,8 @@ export default function App() {
                   type="button"
                   className="secondary-action"
                   onClick={() => {
-                    openEditScenario(selectedScenarioForDetail);
                     setSelectedScenarioForDetail(null);
+                    openEditScenario(selectedScenarioForDetail);
                   }}
                 >
                   <Edit2 size={14} /> Edit Scenario
@@ -897,8 +917,8 @@ export default function App() {
                   className="text-button"
                   style={{ color: '#ef4444', borderColor: '#fca5a5' }}
                   onClick={() => {
-                    handleDeleteScenario(selectedScenarioForDetail._id);
                     setSelectedScenarioForDetail(null);
+                    handleDeleteScenario(getScenarioDocumentId(selectedScenarioForDetail));
                   }}
                 >
                   <Trash2 size={14} /> Delete Scenario
