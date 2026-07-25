@@ -21,6 +21,22 @@ import {
   Users,
 } from 'lucide-react';
 import { LoginForm } from './components/login-form';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+} from './components/ui/sidebar';
 import './App.css';
 
 const DEFAULT_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
@@ -502,33 +518,66 @@ export default function App() {
       ];
 
   return (
-    <div className="dashboard-page">
-      <aside className="dashboard-sidebar">
-        <div className="brand-row">
-          <div className="brand-mark">{user.role === 'admin' ? <ShieldCheck size={20} /> : <GraduationCap size={20} />}</div>
-          <div>
-            <strong>ICC Research</strong>
-            <span>{user.role === 'admin' ? 'Admin Console' : 'Lecturer Dashboard'}</span>
+    <SidebarProvider>
+      <Sidebar collapsible="offcanvas" className="icc-sidebar">
+        <SidebarHeader>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton size="lg" className="icc-brand-button">
+                <span className="icc-brand-icon">{user.role === 'admin' ? <ShieldCheck size={18} /> : <GraduationCap size={18} />}</span>
+                <span className="icc-brand-copy">
+                  <strong>ICC Research</strong>
+                  <small>{user.role === 'admin' ? 'Admin Console' : 'Lecturer Dashboard'}</small>
+                </span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {navItems.map(([id, Icon, label]) => (
+                  <SidebarMenuItem key={id}>
+                    <SidebarMenuButton
+                      isActive={activeTab === id}
+                      tooltip={label}
+                      onClick={() => setActiveTab(id)}
+                      className="icc-nav-button"
+                    >
+                      <Icon size={18} />
+                      <span>{label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+        <SidebarFooter>
+          <div className="icc-sidebar-user">
+            <span>{user.name}</span>
+            <strong>{user.role}</strong>
+            {user.lecturerCode && <code>{user.lecturerCode}</code>}
           </div>
-        </div>
-        <div className="profile-card">
-          <span>{user.name}</span>
-          <strong>{user.role}</strong>
-          {user.lecturerCode && <code>{user.lecturerCode}</code>}
-        </div>
-        <nav className="side-nav">
-          {navItems.map(([id, Icon, label]) => (
-            <button key={id} className={activeTab === id ? 'active' : ''} onClick={() => setActiveTab(id)}>
-              <Icon size={18} /> {label}
-            </button>
-          ))}
-        </nav>
-        <button className="logout-button" onClick={handleLogout}><LogOut size={17} /> Keluar</button>
-      </aside>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton onClick={handleLogout} className="icc-logout-button">
+                <LogOut size={17} />
+                <span>Keluar</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarFooter>
+        <SidebarRail />
+      </Sidebar>
 
+      <SidebarInset className="dashboard-page">
       <main className="dashboard-main">
         <header className="dashboard-header">
           <div>
+            <SidebarTrigger className="sidebar-top-trigger" />
             <span>{new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
             <h1>{activeTab === 'scenarios' ? 'Scenario Builder' : activeTab === 'lecturers' ? 'Lecturer Accounts' : activeTab === 'overview' ? 'Research Overview' : activeTab === 'students' ? 'Registered Students' : 'Practice History'}</h1>
           </div>
@@ -658,6 +707,7 @@ export default function App() {
           </section>
         )}
       </main>
+      </SidebarInset>
 
       {scenarioModalOpen && (
         <div className="modal-backdrop">
@@ -721,6 +771,6 @@ export default function App() {
           </div>
         </div>
       )}
-    </div>
+    </SidebarProvider>
   );
 }
