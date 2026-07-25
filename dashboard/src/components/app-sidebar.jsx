@@ -1,178 +1,116 @@
 import * as React from "react"
 import {
-  IconCamera,
-  IconChartBar,
-  IconDashboard,
-  IconDatabase,
-  IconFileAi,
-  IconFileDescription,
-  IconFileWord,
-  IconFolder,
-  IconHelp,
-  IconInnerShadowTop,
-  IconListDetails,
-  IconReport,
-  IconSearch,
-  IconSettings,
-  IconUsers,
-} from "@tabler/icons-react"
+  Activity,
+  BookOpen,
+  ClipboardList,
+  GraduationCap,
+  LogOut,
+  ShieldCheck,
+  Users,
+} from "lucide-react"
 
-import { NavDocuments } from "@/components/nav-documents"
-import { NavMain } from "@/components/nav-main"
-import { NavSecondary } from "@/components/nav-secondary"
-import { NavUser } from "@/components/nav-user"
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
-const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
-  navMain: [
-    {
-      title: "Dashboard",
-      url: "#",
-      icon: IconDashboard,
-    },
-    {
-      title: "Lifecycle",
-      url: "#",
-      icon: IconListDetails,
-    },
-    {
-      title: "Analytics",
-      url: "#",
-      icon: IconChartBar,
-    },
-    {
-      title: "Projects",
-      url: "#",
-      icon: IconFolder,
-    },
-    {
-      title: "Team",
-      url: "#",
-      icon: IconUsers,
-    },
-  ],
-  navClouds: [
-    {
-      title: "Capture",
-      icon: IconCamera,
-      isActive: true,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Proposal",
-      icon: IconFileDescription,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Prompts",
-      icon: IconFileAi,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-  ],
-  navSecondary: [
-    {
-      title: "Settings",
-      url: "#",
-      icon: IconSettings,
-    },
-    {
-      title: "Get Help",
-      url: "#",
-      icon: IconHelp,
-    },
-    {
-      title: "Search",
-      url: "#",
-      icon: IconSearch,
-    },
-  ],
-  documents: [
-    {
-      name: "Data Library",
-      url: "#",
-      icon: IconDatabase,
-    },
-    {
-      name: "Reports",
-      url: "#",
-      icon: IconReport,
-    },
-    {
-      name: "Word Assistant",
-      url: "#",
-      icon: IconFileWord,
-    },
-  ],
-}
-
 export function AppSidebar({
+  user,
+  activeTab,
+  setActiveTab,
+  handleLogout,
   ...props
 }) {
+  const navItems = user.role === "admin"
+    ? [
+        { id: "scenarios", icon: BookOpen, label: "Scenario Builder" },
+        { id: "lecturers", icon: Users, label: "Lecturers" },
+      ]
+    : [
+        { id: "overview", icon: Activity, label: "Research Overview" },
+        { id: "students", icon: Users, label: "Students" },
+        { id: "history", icon: ClipboardList, label: "Practice History" },
+      ]
+
   return (
-    <Sidebar collapsible="offcanvas" {...props}>
-      <SidebarHeader>
+    <Sidebar variant="floating" collapsible="icon" {...props}>
+      <SidebarHeader className="border-b border-sidebar-border/50 pb-4">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:p-1.5!">
-              <a href="#">
-                <IconInnerShadowTop className="size-5!" />
-                <span className="text-base font-semibold">Acme Inc.</span>
-              </a>
+            <SidebarMenuButton size="lg" className="h-12 rounded-lg hover:bg-transparent cursor-default">
+              <div className="flex aspect-square size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                {user.role === "admin" ? <ShieldCheck className="size-5" /> : <GraduationCap className="size-5" />}
+              </div>
+              <div className="flex flex-col gap-0.5 leading-none pl-1">
+                <span className="font-semibold text-sm tracking-tight text-foreground">ICC Research</span>
+                <span className="text-xs text-muted-foreground">
+                  {user.role === "admin" ? "Admin Console" : "Lecturer Dashboard"}
+                </span>
+              </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavDocuments items={data.documents} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+
+      <SidebarContent className="pt-2">
+        <SidebarGroup>
+          <SidebarGroupLabel className="px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground/75">
+            Workspace
+          </SidebarGroupLabel>
+          <SidebarMenu className="gap-1 mt-1">
+            {navItems.map((item) => {
+              const Icon = item.icon
+              return (
+                <SidebarMenuItem key={item.id}>
+                  <SidebarMenuButton
+                    isActive={activeTab === item.id}
+                    tooltip={item.label}
+                    onClick={() => setActiveTab(item.id)}
+                    className="w-full transition-all duration-200"
+                  >
+                    <Icon className="size-4.5" />
+                    <span className="font-medium text-sm">{item.label}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )
+            })}
+          </SidebarMenu>
+        </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
-        <NavUser user={data.user} />
+
+      <SidebarFooter className="border-t border-sidebar-border/50 p-4">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-3 px-1 py-0.5">
+            <div className="flex size-9 items-center justify-center rounded-lg bg-secondary text-secondary-foreground border font-semibold text-sm shadow-sm select-none">
+              {user.name ? user.name.charAt(0).toUpperCase() : "U"}
+            </div>
+            <div className="flex flex-col min-w-0 leading-none">
+              <span className="font-semibold text-sm text-foreground truncate">{user.name}</span>
+              <span className="text-[11px] text-muted-foreground capitalize mt-1">
+                {user.role} {user.lecturerCode ? `(${user.lecturerCode})` : ""}
+              </span>
+            </div>
+          </div>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={handleLogout}
+                className="w-full justify-start text-destructive hover:bg-destructive/10 hover:text-destructive active:bg-destructive/15 transition-all duration-200 rounded-lg"
+              >
+                <LogOut className="size-4.5 mr-2" />
+                <span className="font-semibold text-sm">Keluar</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </div>
       </SidebarFooter>
     </Sidebar>
-  );
+  )
 }

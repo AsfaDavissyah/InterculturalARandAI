@@ -21,20 +21,10 @@ import {
   Users,
 } from 'lucide-react';
 import { LoginForm } from './components/login-form';
+import { AppSidebar } from './components/app-sidebar';
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
   SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarProvider,
-  SidebarRail,
   SidebarTrigger,
 } from './components/ui/sidebar';
 import './App.css';
@@ -506,72 +496,9 @@ export default function App() {
     );
   }
 
-  const navItems = user.role === 'admin'
-    ? [
-        ['scenarios', BookOpen, 'Scenario Builder'],
-        ['lecturers', Users, 'Lecturers'],
-      ]
-    : [
-        ['overview', Activity, 'Research Overview'],
-        ['students', Users, 'Students'],
-        ['history', ClipboardList, 'Practice History'],
-      ];
-
   return (
     <SidebarProvider>
-      <Sidebar collapsible="offcanvas" className="icc-sidebar">
-        <SidebarHeader>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton size="lg" className="icc-brand-button">
-                <span className="icc-brand-icon">{user.role === 'admin' ? <ShieldCheck size={18} /> : <GraduationCap size={18} />}</span>
-                <span className="icc-brand-copy">
-                  <strong>ICC Research</strong>
-                  <small>{user.role === 'admin' ? 'Admin Console' : 'Lecturer Dashboard'}</small>
-                </span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupLabel>Workspace</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {navItems.map(([id, Icon, label]) => (
-                  <SidebarMenuItem key={id}>
-                    <SidebarMenuButton
-                      isActive={activeTab === id}
-                      tooltip={label}
-                      onClick={() => setActiveTab(id)}
-                      className="icc-nav-button"
-                    >
-                      <Icon size={18} />
-                      <span>{label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </SidebarContent>
-        <SidebarFooter>
-          <div className="icc-sidebar-user">
-            <span>{user.name}</span>
-            <strong>{user.role}</strong>
-            {user.lecturerCode && <code>{user.lecturerCode}</code>}
-          </div>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton onClick={handleLogout} className="icc-logout-button">
-                <LogOut size={17} />
-                <span>Keluar</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarFooter>
-        <SidebarRail />
-      </Sidebar>
+      <AppSidebar user={user} activeTab={activeTab} setActiveTab={setActiveTab} handleLogout={handleLogout} />
 
       <SidebarInset className="dashboard-page">
       <main className="dashboard-main">
@@ -612,7 +539,14 @@ export default function App() {
                         <td>{scenario.data?.scenario?.student_role || '-'}</td>
                         <td>{scenario.data?.scenario?.ai_role || '-'}</td>
                         <td>{scenario.data?.scenario?.ar_scene || '-'}</td>
-                        <td><button className="text-button" onClick={() => handleToggleScenarioStatus(scenario._id, scenario.isActive)}>{scenario.isActive ? 'Aktif' : 'Nonaktif'}</button></td>
+                        <td>
+                          <button
+                            className={`status-pill ${scenario.isActive ? "active" : "inactive"}`}
+                            onClick={() => handleToggleScenarioStatus(scenario._id, scenario.isActive)}
+                          >
+                            {scenario.isActive ? "Aktif" : "Nonaktif"}
+                          </button>
+                        </td>
                         <td className="row-actions">
                           <button onClick={() => openEditScenario(scenario)}><Edit2 size={14} /></button>
                           <button onClick={() => handleDeleteScenario(scenario._id)}><Trash2 size={14} /></button>
@@ -689,7 +623,20 @@ export default function App() {
           <div className="data-panel">
             <div className="panel-heading"><h3>Mahasiswa Terdaftar</h3><span>{students.length} mahasiswa</span></div>
             <table className="custom-table"><thead><tr><th>NIM</th><th>Nama</th><th>Email</th><th>Gender</th><th>Consent</th><th>Terdaftar</th></tr></thead><tbody>
-              {students.map((student) => <tr key={student.id}><td><strong>{student.studentId || '-'}</strong></td><td>{student.name}</td><td>{student.email}</td><td>{student.gender === 'female' ? 'Perempuan' : 'Laki-laki'}</td><td>{student.consent ? 'Disetujui' : 'Tidak'}</td><td>{student.createdAt ? new Date(student.createdAt).toLocaleDateString('id-ID') : '-'}</td></tr>)}
+              {students.map((student) => (
+                <tr key={student.id}>
+                  <td><strong>{student.studentId || '-'}</strong></td>
+                  <td>{student.name}</td>
+                  <td>{student.email}</td>
+                  <td>{student.gender === 'female' ? 'Perempuan' : 'Laki-laki'}</td>
+                  <td>
+                    <span className={`status-badge ${student.consent ? "active" : "inactive"}`}>
+                      {student.consent ? "Disetujui" : "Tidak"}
+                    </span>
+                  </td>
+                  <td>{student.createdAt ? new Date(student.createdAt).toLocaleDateString('id-ID') : '-'}</td>
+                </tr>
+              ))}
               {!students.length && <tr><td colSpan="6" className="empty-cell">Belum ada mahasiswa.</td></tr>}
             </tbody></table>
           </div>
@@ -700,7 +647,22 @@ export default function App() {
             <div className="action-row"><p>Riwayat ini dapat diekspor sebagai data penelitian.</p><button className="primary-action" onClick={exportHistoryToCSV}><Download size={16} /> Ekspor CSV</button></div>
             <div className="data-panel">
               <table className="custom-table"><thead><tr><th>NIM</th><th>Mahasiswa</th><th>Skenario</th><th>Selesai</th><th>Durasi</th><th>Respons</th><th>Skor</th><th>Aksi</th></tr></thead><tbody>
-                {history.map((item, index) => <tr key={index}><td>{item.student_details?.student_id || '-'}</td><td>{item.student_details?.name || '-'}</td><td>{item.scenario?.scenario_id} - {item.scenario?.title}</td><td>{item.completed_at ? new Date(item.completed_at).toLocaleString('id-ID') : '-'}</td><td>{item.duration_seconds || 0}s</td><td>{item.student_response_count || 0}</td><td><strong>{Number(item.overall_score || 0).toFixed(2)}</strong></td><td><button className="text-button" onClick={() => setSelectedSession(item)}><Eye size={14} /> Transkrip</button></td></tr>)}
+                {history.map((item, index) => (
+                  <tr key={index}>
+                    <td>{item.student_details?.student_id || '-'}</td>
+                    <td>{item.student_details?.name || '-'}</td>
+                    <td>{item.scenario?.scenario_id} - {item.scenario?.title}</td>
+                    <td>{item.completed_at ? new Date(item.completed_at).toLocaleString('id-ID') : '-'}</td>
+                    <td>{item.duration_seconds || 0}s</td>
+                    <td>{item.student_response_count || 0}</td>
+                    <td><strong>{Number(item.overall_score || 0).toFixed(2)}</strong></td>
+                    <td>
+                      <button className="btn-table-action" onClick={() => setSelectedSession(item)}>
+                        <Eye size={14} /> Transkrip
+                      </button>
+                    </td>
+                  </tr>
+                ))}
                 {!history.length && <tr><td colSpan="8" className="empty-cell">Belum ada sesi latihan.</td></tr>}
               </tbody></table>
             </div>
