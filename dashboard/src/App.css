@@ -369,7 +369,7 @@
 }
 
 .clickable-row {
-  cursor: pointer;
+  cursor: default;
 }
 
 .scenario-field-button {
@@ -399,6 +399,12 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  position: relative;
+  z-index: 1;
+}
+
+.action-cell {
+  pointer-events: auto;
 }
 
 .row-actions > button:not(.btn-table-action) {
@@ -446,6 +452,17 @@
 .btn-table-action:hover {
   background: #f1f5f9;
   border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.btn-table-action.icon-action {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0;
+}
+
+.btn-table-action.edit-action {
   color: #0f172a;
 }
 

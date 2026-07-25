@@ -548,7 +548,6 @@ export default function App() {
                       <tr
                         key={getScenarioDocumentId(scenario)}
                         className="clickable-row"
-                        onClick={() => setSelectedScenarioForDetail(scenario)}
                       >
                         <td>
                           <button
@@ -585,12 +584,17 @@ export default function App() {
                             {scenario.isActive ? "Active" : "Inactive"}
                           </button>
                         </td>
-                        <td>
+                        <td
+                          className="action-cell"
+                          onClick={(event) => event.stopPropagation()}
+                          onPointerDown={(event) => event.stopPropagation()}
+                        >
                           <div className="row-actions">
                             <button
                               type="button"
                               className="btn-table-action"
                               onClick={(event) => {
+                                event.preventDefault();
                                 event.stopPropagation();
                                 setSelectedScenarioForDetail(scenario);
                               }}
@@ -601,27 +605,31 @@ export default function App() {
                             </button>
                             <button
                               type="button"
-                              className="btn-table-action"
+                              className="btn-table-action icon-action edit-action"
+                              onPointerDown={(event) => event.stopPropagation()}
                               onClick={(event) => {
+                                event.preventDefault();
                                 event.stopPropagation();
+                                setSelectedScenarioForDetail(null);
                                 openEditScenario(scenario);
                               }}
                               title="Edit scenario"
+                              aria-label={`Edit ${scenario.title}`}
                             >
                               <Edit2 size={14} />
-                              Edit
                             </button>
                             <button
                               type="button"
-                              className="btn-table-action danger"
+                              className="btn-table-action icon-action danger"
                               onClick={(event) => {
+                                event.preventDefault();
                                 event.stopPropagation();
                                 handleDeleteScenario(getScenarioDocumentId(scenario));
                               }}
                               title="Delete scenario"
+                              aria-label={`Delete ${scenario.title}`}
                             >
                               <Trash2 size={14} />
-                              Delete
                             </button>
                           </div>
                         </td>
@@ -906,8 +914,9 @@ export default function App() {
                   type="button"
                   className="secondary-action"
                   onClick={() => {
+                    const scenarioToEdit = selectedScenarioForDetail;
                     setSelectedScenarioForDetail(null);
-                    openEditScenario(selectedScenarioForDetail);
+                    openEditScenario(scenarioToEdit);
                   }}
                 >
                   <Edit2 size={14} /> Edit Scenario
@@ -917,8 +926,9 @@ export default function App() {
                   className="text-button"
                   style={{ color: '#ef4444', borderColor: '#fca5a5' }}
                   onClick={() => {
+                    const scenarioIdToDelete = getScenarioDocumentId(selectedScenarioForDetail);
                     setSelectedScenarioForDetail(null);
-                    handleDeleteScenario(getScenarioDocumentId(selectedScenarioForDetail));
+                    handleDeleteScenario(scenarioIdToDelete);
                   }}
                 >
                   <Trash2 size={14} /> Delete Scenario
