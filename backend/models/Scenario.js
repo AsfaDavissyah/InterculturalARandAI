@@ -37,10 +37,9 @@ const ScenarioSchema = new mongoose.Schema({
   },
 });
 
-// Pre-save hook to keep updatedAt updated
-ScenarioSchema.pre("save", function (next) {
+// Keep updatedAt compatible with modern Mongoose middleware.
+ScenarioSchema.pre("save", function () {
   this.updatedAt = new Date();
-  next();
 });
 
 module.exports = mongoose.model("Scenario", ScenarioSchema);
