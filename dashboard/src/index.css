@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -53,7 +52,7 @@
 }
 
 @theme inline {
-  --font-sans: Outfit, ui-sans-serif, system-ui, sans-serif;
+  --font-sans: Helvetica, Arial, ui-sans-serif, system-ui, sans-serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -100,7 +99,7 @@
 html {
   min-width: 320px;
   background: var(--background);
-  font-family: Outfit, ui-sans-serif, system-ui, sans-serif;
+  font-family: Helvetica, Arial, ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
@@ -108,7 +107,7 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: Outfit, ui-sans-serif, system-ui, sans-serif;
+  font-family: Helvetica, Arial, ui-sans-serif, system-ui, sans-serif;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
