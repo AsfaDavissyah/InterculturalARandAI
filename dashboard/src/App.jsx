@@ -1,174 +1,312 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  BookOpen, Users, Receipt, Flag, LogOut, CheckCircle, XCircle, 
-  Plus, Edit2, Trash2, Key, Download, ChevronRight, Settings, Database,
-  TrendingUp, Activity, Award, UserCheck, ShieldCheck
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Activity,
+  Award,
+  BookOpen,
+  CheckCircle2,
+  ChevronRight,
+  ClipboardList,
+  Download,
+  Edit2,
+  Eye,
+  FileText,
+  GraduationCap,
+  Key,
+  LogOut,
+  Plus,
+  Search,
+  Settings,
+  ShieldCheck,
+  Trash2,
+  Users,
 } from 'lucide-react';
 import { LoginForm } from './components/login-form';
+import './App.css';
 
 const DEFAULT_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
-// Format template JSON skenario default untuk admin agar mudah membuat skenario baru
-const DEFAULT_SCENARIO_JSON = {
-  "schema_version": "2.0",
-  "prototype_id": "scenario-custom-id",
-  "version": 1,
-  "scenario": {
-    "scenario_id": "CUSTOM-001",
-    "scenario_version": 1,
-    "title": "Judul Skenario Baru",
-    "scenario_type": "Intercultural English",
-    "level": "B1",
-    "ar_scene": "Classroom",
-    "student_role": "Indonesian Student",
-    "ai_role": "Foreign exchange student",
-    "icc_dimension": ["Knowledge", "Attitudes"],
-    "cultural_focus": ["General customs"],
-    "learning_goal": "Practice greeting and introduction.",
-    "task_instruction": "Introduce yourself to your new foreign classmate politely.",
-    "ai_character_prompt": "You are a friendly foreign exchange student on campus.",
-    "good_response_examples": ["Hello, nice to meet you."],
-    "poor_response_examples": ["Hey, who are you?"],
-    "cultural_note": "A friendly greeting helps build rapport."
-  },
-  "context": {
-    "scene_title": "Classroom Greeting",
-    "setting": "Campus Classroom",
-    "situation": "Meeting a classmate for the first time.",
-    "boundaries": ["Remain in classroom."],
-    "forbidden_terms": ["money", "family private"]
-  },
-  "characters": [
-    {
-      "name": "Student",
-      "role": "Student learner",
-      "profile": "Student practice partner"
-    },
-    {
-      "name": "AI Partner",
-      "role": "AI conversation partner",
-      "profile": "Foreign exchange student"
-    }
-  ],
-  "prototype_scope": {
-    "input_mode": "voice_with_text_fallback",
-    "voice_enabled": true,
-    "ar_enabled": true,
-    "avatar_enabled": true,
-    "scoring_enabled": true,
-    "feedback_enabled": true,
-    "max_turns": 8,
-    "prototype_focus": "Speaking practice"
-  },
-  "session_rules": {
-    "minimum_student_responses": 4,
-    "target_student_responses_min": 5,
-    "target_student_responses_max": 7,
-    "maximum_student_responses": 8,
-    "required_objective_ids": ["greet_politely"],
-    "natural_closing_message": "Great meeting you. See you in class!"
-  },
-  "conversation_objectives": [
-    {
-      "objective_id": "greet_politely",
-      "description": "Greet the classmate politely.",
-      "detection_cues": ["hello", "hi", "nice to meet", "introduce"],
-      "ai_follow_up": "Hello there! Nice to meet you too."
-    }
-  ],
-  "conversation_stages": [
-    {
-      "stage_order": 1,
-      "stage": "Opening",
-      "student_goal": "Respond politely to the AI character's opening.",
-      "expected_function": "Greeting trigger",
-      "success_indicator": "Student responds politely"
-    }
-  ],
-  "branching_rules": [
-    {
-      "rule_id": "BR-001",
-      "student_response_category": "GOOD",
-      "detection_cues": ["polite", "friendly"],
-      "ai_response_strategy": "Model positive interaction",
-      "example_ai_response": "Nice to meet you.",
-      "feedback_focus": "Good job",
-      "score_impact": "+1 politeness"
-    }
-  ],
-  "fallback_responses": {
-    "GOOD": "Thank you for the warm welcome. I look forward to working with you.",
-    "ACCEPTABLE": "Thanks. That sounds fine.",
-    "TOO_DIRECT": "Okay. Let's get started.",
-    "STEREOTYPING": "Please avoid generalizations.",
-    "TOO_PERSONAL": "I'd prefer not to discuss that.",
-    "DISMISSIVE": "Let's focus on class.",
-    "SILENCE_OR_UNCLEAR": "Sorry, I didn't catch that."
-  }
+const emptyScenarioBuilder = {
+  scenarioId: '',
+  title: '',
+  type: 'Global Intercultural Campus Conversation',
+  level: 'B1',
+  arScene: 'Campus',
+  sceneDescription: '',
+  studentRole: 'Local student volunteer',
+  studentTask: '',
+  aiRole: 'International student',
+  aiBackground: '',
+  aiPersonality: 'Friendly, curious, and respectful',
+  aiStyle: 'Natural spoken English, 1-2 short sentences per turn',
+  learningGoal: '',
+  objectivesText: 'greet_politely | Greet and respond politely | hello, hi, nice to meet\nask_information | Ask or answer relevant information | where, how, what, can',
+  minResponses: 5,
+  targetMin: 6,
+  targetMax: 8,
+  maxResponses: 10,
+  completionConditions: 'The student reaches the main speaking goal and responds at least 5 times.\nThe AI can close naturally after 6-8 student responses.',
+  closingInstruction: 'Close warmly and naturally without sounding like an evaluator.',
+  locationBoundaries: 'Stay in the selected setting. Do not move the conversation to another place unless the scenario says so.',
+  roleBoundaries: 'AI must stay as the assigned character. Do not use scripted names such as David, Rina, or Raka.',
+  forbiddenTopics: 'Private family questions, money, politics, sensitive identity questions',
+  rubricText: 'grammar | Accuracy and sentence clarity\nvocabulary | Word choice and range\nfluency | Natural flow and completeness\npoliteness | Respectful and appropriate tone\npragmatic_appropriateness | Suitable response for the situation\nintercultural_awareness | Awareness of cultural differences',
+  goodExamples: 'Hello, nice to meet you.\nThank you for helping me.',
+  poorExamples: 'Yes.\nHey bro.',
+  fallbackGood: 'That sounds good. Thank you for explaining it clearly.',
+  fallbackAcceptable: 'Thanks. Could you tell me a little more?',
+  fallbackUnclear: 'Sorry, I did not catch that. Could you say it again?',
+  isActive: true,
+  rawJson: '',
 };
+
+const scoreLabels = {
+  grammar: 'Grammar',
+  vocabulary: 'Vocabulary',
+  fluency: 'Fluency',
+  politeness: 'Politeness',
+  pragmatic_appropriateness: 'Pragmatic',
+  intercultural_awareness: 'ICC Awareness',
+};
+
+const parseLines = (value) => String(value || '').split('\n').map((line) => line.trim()).filter(Boolean);
+
+const parseObjectives = (value) =>
+  parseLines(value).map((line, index) => {
+    const [id, description, cues] = line.split('|').map((item) => item?.trim());
+    return {
+      objective_id: id || `objective_${index + 1}`,
+      description: description || line,
+      detection_cues: cues ? cues.split(',').map((cue) => cue.trim()).filter(Boolean) : [],
+      ai_follow_up: 'Respond naturally and continue the scenario.',
+    };
+  });
+
+const parseRubric = (value) =>
+  parseLines(value).map((line) => {
+    const [criterion, description] = line.split('|').map((item) => item?.trim());
+    return { criterion: criterion || line, description: description || 'Assess this speaking aspect from 1 to 5.' };
+  });
+
+const buildScenarioData = (form) => {
+  const scenarioId = form.scenarioId.trim().toUpperCase();
+  const objectives = parseObjectives(form.objectivesText);
+  return {
+    schema_version: '2.0',
+    version: 1,
+    scenario: {
+      scenario_id: scenarioId,
+      scenario_version: 1,
+      title: form.title.trim(),
+      scenario_type: form.type.trim(),
+      level: form.level.trim(),
+      ar_scene: form.arScene.trim(),
+      student_role: form.studentRole.trim(),
+      ai_role: form.aiRole.trim(),
+      learning_goal: form.learningGoal.trim(),
+      task_instruction: form.studentTask.trim(),
+      ai_character_prompt: `${form.aiRole}. ${form.aiBackground}. ${form.aiPersonality}. ${form.aiStyle}`,
+      good_response_examples: parseLines(form.goodExamples),
+      poor_response_examples: parseLines(form.poorExamples),
+      cultural_note: 'Use polite English and show intercultural awareness.',
+    },
+    context: {
+      scene_title: form.title.trim(),
+      setting: form.arScene.trim(),
+      situation: form.sceneDescription.trim(),
+      boundaries: parseLines(form.locationBoundaries),
+      forbidden_terms: parseLines(form.forbiddenTopics).flatMap((line) => line.split(',').map((item) => item.trim())).filter(Boolean),
+    },
+    characters: [
+      { name: 'Student', role: form.studentRole.trim(), profile: 'Logged-in learner from the mobile app.' },
+      { name: 'AI Partner', role: form.aiRole.trim(), profile: form.aiBackground.trim() },
+    ],
+    objectives: {
+      learning_goal: form.learningGoal.trim(),
+      completion_conditions: parseLines(form.completionConditions),
+    },
+    conversation_objectives: objectives,
+    conversation_stages: objectives.map((objective, index) => ({
+      stage_order: index + 1,
+      stage: objective.description,
+      student_goal: objective.description,
+      expected_function: objective.objective_id,
+      success_indicator: 'Student responds appropriately in spoken English.',
+    })),
+    session_rules: {
+      minimum_student_responses: Number(form.minResponses) || 5,
+      target_student_responses_min: Number(form.targetMin) || 6,
+      target_student_responses_max: Number(form.targetMax) || 8,
+      maximum_student_responses: Number(form.maxResponses) || 10,
+      required_objective_ids: objectives.map((item) => item.objective_id),
+      natural_closing_message: form.closingInstruction.trim(),
+    },
+    boundaries: {
+      location: form.locationBoundaries.trim(),
+      role: form.roleBoundaries.trim(),
+      forbidden_topics: parseLines(form.forbiddenTopics),
+    },
+    rubric: parseRubric(form.rubricText),
+    branching_rules: [
+      {
+        rule_id: 'GOOD',
+        student_response_category: 'GOOD',
+        detection_cues: ['polite', 'clear', 'appropriate'],
+        ai_response_strategy: 'Continue the role-play naturally.',
+        example_ai_response: form.fallbackGood,
+        feedback_focus: 'Appropriate response',
+        score_impact: '+1',
+      },
+    ],
+    fallback_responses: {
+      GOOD: form.fallbackGood,
+      ACCEPTABLE: form.fallbackAcceptable,
+      TOO_DIRECT: 'I understand. Could you say that a little more politely?',
+      STEREOTYPING: 'Let us avoid generalizations and focus on understanding each other.',
+      TOO_PERSONAL: 'I would rather keep that private for now.',
+      DISMISSIVE: 'Could we continue the conversation more respectfully?',
+      SILENCE_OR_UNCLEAR: form.fallbackUnclear,
+    },
+  };
+};
+
+const scenarioToBuilder = (item = {}) => {
+  const data = item.data || {};
+  const scenario = data.scenario || {};
+  const context = data.context || {};
+  const rules = data.session_rules || {};
+  return {
+    ...emptyScenarioBuilder,
+    scenarioId: item.scenarioId || scenario.scenario_id || '',
+    title: item.title || scenario.title || '',
+    type: scenario.scenario_type || emptyScenarioBuilder.type,
+    level: scenario.level || 'B1',
+    arScene: scenario.ar_scene || context.setting || 'Campus',
+    sceneDescription: context.situation || '',
+    studentRole: scenario.student_role || emptyScenarioBuilder.studentRole,
+    studentTask: scenario.task_instruction || '',
+    aiRole: scenario.ai_role || emptyScenarioBuilder.aiRole,
+    aiBackground: scenario.ai_character_prompt || '',
+    learningGoal: scenario.learning_goal || '',
+    objectivesText: (data.conversation_objectives || []).map((objective) =>
+      `${objective.objective_id} | ${objective.description} | ${(objective.detection_cues || []).join(', ')}`
+    ).join('\n') || emptyScenarioBuilder.objectivesText,
+    minResponses: rules.minimum_student_responses || 5,
+    targetMin: rules.target_student_responses_min || 6,
+    targetMax: rules.target_student_responses_max || 8,
+    maxResponses: rules.maximum_student_responses || 10,
+    completionConditions: parseLines(data.objectives?.completion_conditions?.join?.('\n') || '').join('\n') || emptyScenarioBuilder.completionConditions,
+    closingInstruction: rules.natural_closing_message || emptyScenarioBuilder.closingInstruction,
+    locationBoundaries: context.boundaries?.join?.('\n') || data.boundaries?.location || emptyScenarioBuilder.locationBoundaries,
+    roleBoundaries: data.boundaries?.role || emptyScenarioBuilder.roleBoundaries,
+    forbiddenTopics: context.forbidden_terms?.join?.(', ') || emptyScenarioBuilder.forbiddenTopics,
+    rubricText: (data.rubric || []).map((item) => `${item.criterion} | ${item.description}`).join('\n') || emptyScenarioBuilder.rubricText,
+    goodExamples: scenario.good_response_examples?.join?.('\n') || emptyScenarioBuilder.goodExamples,
+    poorExamples: scenario.poor_response_examples?.join?.('\n') || emptyScenarioBuilder.poorExamples,
+    fallbackGood: data.fallback_responses?.GOOD || emptyScenarioBuilder.fallbackGood,
+    fallbackAcceptable: data.fallback_responses?.ACCEPTABLE || emptyScenarioBuilder.fallbackAcceptable,
+    fallbackUnclear: data.fallback_responses?.SILENCE_OR_UNCLEAR || emptyScenarioBuilder.fallbackUnclear,
+    isActive: item.isActive ?? true,
+    rawJson: JSON.stringify(data, null, 2),
+  };
+};
+
+const average = (items, getter) => {
+  if (!items.length) return 0;
+  return items.reduce((sum, item) => sum + Number(getter(item) || 0), 0) / items.length;
+};
+
+function StatCard({ icon: Icon, label, value, detail }) {
+  return (
+    <section className="metric-card">
+      <div className="icon-cell"><Icon size={20} /></div>
+      <div>
+        <span>{label}</span>
+        <strong>{value}</strong>
+        {detail && <small>{detail}</small>}
+      </div>
+    </section>
+  );
+}
+
+function ProgressMetric({ label, value }) {
+  const percent = Math.min(100, Math.max(0, (Number(value || 0) / 5) * 100));
+  return (
+    <div className="progress-metric">
+      <div><span>{label}</span><strong>{Number(value || 0).toFixed(2)}</strong></div>
+      <div className="progress-track"><i style={{ width: `${percent}%` }} /></div>
+    </div>
+  );
+}
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('jwt_token') || '');
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user_profile') || 'null'));
   const [apiBaseUrl, setApiBaseUrl] = useState(localStorage.getItem('api_base_url') || DEFAULT_API_BASE_URL);
-  
-  // States
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showConfig, setShowConfig] = useState(false);
   const [activeTab, setActiveTab] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(false);
-
-  // Admin states
   const [scenarios, setScenarios] = useState([]);
   const [lecturers, setLecturers] = useState([]);
-  const [showScenarioModal, setShowScenarioModal] = useState(false);
-  const [scenarioFormId, setScenarioFormId] = useState(null); // null = tambah baru, String = edit
-  const [scenarioFormIdStr, setScenarioFormIdStr] = useState(''); // e.g. "L-ICC-003"
-  const [scenarioFormTitle, setScenarioFormTitle] = useState('');
-  const [scenarioFormIsActive, setScenarioFormIsActive] = useState(true);
-  const [scenarioFormJson, setScenarioFormJson] = useState('');
-  
-  const [lecturerFormName, setLecturerFormName] = useState('');
-  const [lecturerFormEmail, setLecturerFormEmail] = useState('');
-  const [lecturerFormPassword, setLecturerFormPassword] = useState('');
-  const [lecturerFormGender, setLecturerFormGender] = useState('female');
-  const [createdLecturerCode, setCreatedLecturerCode] = useState('');
-
-  // Lecturer states
   const [students, setStudents] = useState([]);
   const [history, setHistory] = useState([]);
-  const [selectedSession, setSelectedSession] = useState(null); // detail transkrip popup
+  const [selectedSession, setSelectedSession] = useState(null);
+  const [scenarioModalOpen, setScenarioModalOpen] = useState(false);
+  const [editingScenarioId, setEditingScenarioId] = useState(null);
+  const [builder, setBuilder] = useState(emptyScenarioBuilder);
+  const [advancedJsonOpen, setAdvancedJsonOpen] = useState(false);
+  const [lecturerForm, setLecturerForm] = useState({ name: '', email: '', password: '', gender: 'female' });
+  const [createdLecturerCode, setCreatedLecturerCode] = useState('');
 
-  // Auto route tab based on role
   useEffect(() => {
-    if (user) {
-      if (user.role === 'admin') {
-        setActiveTab('scenarios');
-      } else if (user.role === 'lecturer') {
-        setActiveTab('overview');
-      }
-    } else {
-      setActiveTab('');
-    }
+    if (!user) return setActiveTab('');
+    setActiveTab(user.role === 'admin' ? 'scenarios' : 'overview');
   }, [user]);
 
-  // Fetch initial data based on tab
   useEffect(() => {
     if (!token) return;
     if (activeTab === 'scenarios') fetchAdminScenarios();
     if (activeTab === 'lecturers') fetchAdminLecturers();
+    if (activeTab === 'overview') fetchOverviewData();
     if (activeTab === 'students') fetchLecturerStudents();
     if (activeTab === 'history') fetchLecturerHistory();
-    if (activeTab === 'overview') fetchOverviewData();
   }, [activeTab, token]);
 
-  const saveAuth = (newToken, newProfile) => {
+  const callApi = async (endpoint, method = 'GET', body = null) => {
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(`${apiBaseUrl}${endpoint}`, {
+      method,
+      headers,
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Server request failed');
+    return data;
+  };
+
+  const saveAuth = (newToken, profile) => {
     localStorage.setItem('jwt_token', newToken);
-    localStorage.setItem('user_profile', JSON.stringify(newProfile));
+    localStorage.setItem('user_profile', JSON.stringify(profile));
     setToken(newToken);
-    setUser(newProfile);
+    setUser(profile);
+  };
+
+  const handleLogin = async (event) => {
+    event.preventDefault();
+    setErrorMessage('');
+    setLoading(true);
+    try {
+      const data = await callApi('/api/auth/login', 'POST', { email, password });
+      if (data.user.role === 'student') throw new Error('Akses web hanya untuk admin dan dosen.');
+      saveAuth(data.token, data.user);
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLogout = () => {
@@ -178,443 +316,165 @@ export default function App() {
     setUser(null);
   };
 
-  const handleSaveConfig = (val) => {
-    const cleaned = val.trim();
+  const handleSaveConfig = (value) => {
+    const cleaned = value.trim();
     localStorage.setItem('api_base_url', cleaned);
     setApiBaseUrl(cleaned);
     setShowConfig(false);
   };
 
-  // Generic Fetch wrapper
-  const callApi = async (endpoint, method = 'GET', body = null) => {
-    const headers = {
-      'Content-Type': 'application/json'
-    };
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    const config = { method, headers };
-    if (body) {
-      config.body = JSON.stringify(body);
-    }
-    const response = await fetch(`${apiBaseUrl}${endpoint}`, config);
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || 'Server request failed');
-    }
-    return data;
-  };
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setErrorMessage('');
-    setLoading(true);
-    try {
-      const data = await callApi('/api/auth/login', 'POST', { email, password });
-      if (data.user.role === 'student') {
-        throw new Error('Akses ditolak. Aplikasi web ini hanya untuk dosen dan admin.');
-      }
-      saveAuth(data.token, data.user);
-    } catch (err) {
-      setErrorMessage(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // API Admin
   const fetchAdminScenarios = async () => {
-    try {
-      const data = await callApi('/api/admin/scenarios');
-      setScenarios(data);
-    } catch (err) {
-      console.error(err);
-    }
+    try { setScenarios(await callApi('/api/admin/scenarios')); } catch (error) { console.error(error); }
   };
 
   const fetchAdminLecturers = async () => {
-    try {
-      const data = await callApi('/api/admin/lecturers');
-      setLecturers(data);
-    } catch (err) {
-      console.error(err);
-    }
+    try { setLecturers(await callApi('/api/admin/lecturers')); } catch (error) { console.error(error); }
   };
 
-  const handleSaveScenario = async (e) => {
-    e.preventDefault();
-    setErrorMessage('');
-    
-    let parsedJson;
-    try {
-      parsedJson = JSON.parse(scenarioFormJson);
-      // Validasi kecil agar ID sync
-      parsedJson.scenario.scenario_id = scenarioFormIdStr.trim().toUpperCase();
-      parsedJson.scenario.title = scenarioFormTitle.trim();
-      const nextVersion = Number(parsedJson.scenario.scenario_version || parsedJson.scenario.version || parsedJson.version || 1);
-      parsedJson.version = nextVersion;
-      parsedJson.scenario.scenario_version = nextVersion;
-    } catch (err) {
-      setErrorMessage('Format data JSON salah. Pastikan sintaksis JSON Anda valid.');
-      return;
-    }
+  const fetchLecturerStudents = async () => {
+    try { setStudents(await callApi('/api/lecturer/students')); } catch (error) { console.error(error); }
+  };
 
+  const fetchLecturerHistory = async () => {
+    try { setHistory(await callApi('/api/lecturer/history')); } catch (error) { console.error(error); }
+  };
+
+  const fetchOverviewData = async () => {
+    await Promise.all([fetchLecturerStudents(), fetchLecturerHistory()]);
+  };
+
+  const dashboardMetrics = useMemo(() => {
+    const completed = history.filter((item) => item.status === 'completed' || item.status === 'ended_manually');
+    const avgScore = average(completed, (item) => item.overall_score);
+    const avgDuration = average(completed, (item) => item.duration_seconds);
+    const avgResponses = average(completed, (item) => item.student_response_count);
+    const byScenario = completed.reduce((acc, item) => {
+      const key = item.scenario?.scenario_id || 'Unknown';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    const topScenario = Object.entries(byScenario).sort((a, b) => b[1] - a[1])[0];
+    const scoreAverages = Object.keys(scoreLabels).reduce((acc, key) => {
+      acc[key] = average(completed, (item) => item.average_scores?.[key]);
+      return acc;
+    }, {});
+    return { completed, avgScore, avgDuration, avgResponses, topScenario, scoreAverages };
+  }, [history]);
+
+  const openNewScenario = () => {
+    setEditingScenarioId(null);
+    setBuilder(emptyScenarioBuilder);
+    setAdvancedJsonOpen(false);
+    setErrorMessage('');
+    setScenarioModalOpen(true);
+  };
+
+  const openEditScenario = (scenario) => {
+    setEditingScenarioId(scenario._id);
+    setBuilder(scenarioToBuilder(scenario));
+    setAdvancedJsonOpen(false);
+    setErrorMessage('');
+    setScenarioModalOpen(true);
+  };
+
+  const handleSaveScenario = async (event) => {
+    event.preventDefault();
+    setErrorMessage('');
     try {
-      if (scenarioFormId) {
-        // Edit
-        await callApi(`/api/admin/scenarios/${scenarioFormId}`, 'PUT', {
-          title: scenarioFormTitle.trim(),
-          isActive: scenarioFormIsActive,
-          data: parsedJson
-        });
-      } else {
-        // Tambah baru
-        await callApi('/api/admin/scenarios', 'POST', {
-          scenarioId: scenarioFormIdStr.trim().toUpperCase(),
-          title: scenarioFormTitle.trim(),
-          isActive: scenarioFormIsActive,
-          data: parsedJson
-        });
+      let data = buildScenarioData(builder);
+      if (advancedJsonOpen && builder.rawJson.trim()) {
+        data = JSON.parse(builder.rawJson);
+        data.scenario = data.scenario || {};
+        data.scenario.scenario_id = builder.scenarioId.trim().toUpperCase();
+        data.scenario.title = builder.title.trim();
       }
-      setShowScenarioModal(false);
+      const payload = {
+        scenarioId: builder.scenarioId.trim().toUpperCase(),
+        title: builder.title.trim(),
+        isActive: builder.isActive,
+        data,
+      };
+      if (!payload.scenarioId || !payload.title) throw new Error('Scenario ID dan judul wajib diisi.');
+      if (editingScenarioId) {
+        await callApi(`/api/admin/scenarios/${editingScenarioId}`, 'PUT', payload);
+      } else {
+        await callApi('/api/admin/scenarios', 'POST', payload);
+      }
+      setScenarioModalOpen(false);
       fetchAdminScenarios();
-    } catch (err) {
-      setErrorMessage(err.message);
+    } catch (error) {
+      setErrorMessage(error.message || 'Scenario tidak bisa disimpan.');
     }
   };
 
   const handleDeleteScenario = async (id) => {
-    if (!confirm('Apakah Anda yakin ingin menghapus skenario ini?')) return;
+    if (!confirm('Hapus skenario ini dari database?')) return;
     try {
       await callApi(`/api/admin/scenarios/${id}`, 'DELETE');
       fetchAdminScenarios();
-    } catch (err) {
-      alert(err.message);
+    } catch (error) {
+      alert(error.message);
     }
   };
 
   const handleToggleScenarioStatus = async (id, currentStatus) => {
     try {
-      await callApi(`/api/admin/scenarios/${id}`, 'PUT', {
-        isActive: !currentStatus
-      });
+      await callApi(`/api/admin/scenarios/${id}`, 'PUT', { isActive: !currentStatus });
       fetchAdminScenarios();
-    } catch (err) {
-      alert(err.message);
+    } catch (error) {
+      alert(error.message);
     }
   };
 
-  const handleCreateLecturer = async (e) => {
-    e.preventDefault();
+  const handleCreateLecturer = async (event) => {
+    event.preventDefault();
     setErrorMessage('');
     setCreatedLecturerCode('');
     try {
-      const data = await callApi('/api/admin/create-lecturer', 'POST', {
-        name: lecturerFormName.trim(),
-        email: lecturerFormEmail.trim(),
-        password: lecturerFormPassword,
-        gender: lecturerFormGender
-      });
+      const data = await callApi('/api/admin/create-lecturer', 'POST', lecturerForm);
       setCreatedLecturerCode(data.lecturer.lecturerCode);
-      setLecturerFormName('');
-      setLecturerFormEmail('');
-      setLecturerFormPassword('');
+      setLecturerForm({ name: '', email: '', password: '', gender: 'female' });
       fetchAdminLecturers();
-    } catch (err) {
-      setErrorMessage(err.message);
+    } catch (error) {
+      setErrorMessage(error.message);
     }
   };
 
-  // API Lecturer
-  const fetchLecturerStudents = async () => {
-    try {
-      const data = await callApi('/api/lecturer/students');
-      setStudents(data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const fetchLecturerHistory = async () => {
-    try {
-      const data = await callApi('/api/lecturer/history');
-      setHistory(data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const fetchOverviewData = async () => {
-    // Memanggil endpoints lecturer untuk overview
-    await fetchLecturerStudents();
-    await fetchLecturerHistory();
-  };
-
-  // Ekspor CSV dari history bimbingan
   const exportHistoryToCSV = () => {
-    if (history.length === 0) {
-      alert('Tidak ada data riwayat untuk diekspor.');
-      return;
-    }
-    
-    const headers = [
-      'NIM', 'Nama Mahasiswa', 'Consent Penelitian', 'Skenario ID', 'Judul Skenario', 
-      'Tanggal Selesai', 'Durasi (Detik)', 'Jumlah Respons', 'Status', 'Alasan Selesai', 'Skor Akhir',
-      'Rata-rata Grammar', 'Rata-rata Vocabulary', 'Rata-rata Fluency', 
-      'Rata-rata Politeness', 'Rata-rata Pragmatic', 'Rata-rata ICC'
-    ];
-
-    const rows = history.map(h => [
-      h.student_details?.student_id || '',
-      h.student_details?.name || '',
-      h.student_details?.consent ? 'YA' : 'TIDAK',
-      h.scenario?.scenario_id || '',
-      h.scenario?.title || '',
-      h.completed_at || '',
-      h.duration_seconds || 0,
-      h.student_response_count || 0,
-      h.status || '',
-      h.end_reason || '',
-      h.overall_score || 0,
-      h.average_scores?.grammar || 0,
-      h.average_scores?.vocabulary || 0,
-      h.average_scores?.fluency || 0,
-      h.average_scores?.politeness || 0,
-      h.average_scores?.pragmatic_appropriateness || 0,
-      h.average_scores?.intercultural_awareness || 0
+    if (!history.length) return alert('Tidak ada data riwayat untuk diekspor.');
+    const headers = ['NIM', 'Nama', 'Consent', 'Scenario ID', 'Judul', 'Selesai', 'Durasi', 'Respons', 'Status', 'Skor', ...Object.values(scoreLabels)];
+    const rows = history.map((item) => [
+      item.student_details?.student_id || '',
+      item.student_details?.name || '',
+      item.student_details?.consent ? 'YA' : 'TIDAK',
+      item.scenario?.scenario_id || '',
+      item.scenario?.title || '',
+      item.completed_at || '',
+      item.duration_seconds || 0,
+      item.student_response_count || 0,
+      item.status || '',
+      item.overall_score || 0,
+      ...Object.keys(scoreLabels).map((key) => item.average_scores?.[key] || 0),
     ]);
-
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
-    
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Data_Penelitian_ICC_${user.lecturerCode || 'Lecturer'}_${new Date().toISOString().substring(0, 10)}.csv`);
+    const csv = [headers, ...rows].map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const link = document.createElement('a');
+    link.href = `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`;
+    link.download = `Data_Penelitian_ICC_${user.lecturerCode || 'Lecturer'}_${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // Hitung rata-rata evaluasi global mahasiswa untuk Radar Chart
-  const getAverageMetrics = () => {
-    if (history.length === 0) return { grammar: 0, vocabulary: 0, fluency: 0, politeness: 0, pragmatic: 0, icc: 0 };
-    let g = 0, v = 0, f = 0, p = 0, pr = 0, ic = 0;
-    history.forEach(h => {
-      g += h.average_scores?.grammar || 0;
-      v += h.average_scores?.vocabulary || 0;
-      f += h.average_scores?.fluency || 0;
-      p += h.average_scores?.politeness || 0;
-      pr += h.average_scores?.pragmatic_appropriateness || 0;
-      ic += h.average_scores?.intercultural_awareness || 0;
-    });
-    const len = history.length;
-    return {
-      grammar: g / len,
-      vocabulary: v / len,
-      fluency: f / len,
-      politeness: p / len,
-      pragmatic: pr / len,
-      icc: ic / len
-    };
-  };
-
-  const avgMetrics = getAverageMetrics();
-
-  // Custom SVG Radar Chart generator
-  const renderRadarChart = () => {
-    const labels = [
-      { name: 'Grammar', key: 'grammar' },
-      { name: 'Vocabulary', key: 'vocabulary' },
-      { name: 'Fluency', key: 'fluency' },
-      { name: 'Politeness', key: 'politeness' },
-      { name: 'Pragmatic Appr.', key: 'pragmatic' },
-      { name: 'Intercultural Awareness', key: 'icc' }
-    ];
-
-    const cx = 200;
-    const cy = 180;
-    const maxVal = 5;
-    const rMax = 120; // Radius maksimum untuk nilai 5
-
-    // Fungsi menghitung koordinat x, y berdasarkan nilai (1-5) dan index sumbu (0-5)
-    const getCoordinates = (value, index) => {
-      const angle = (index * 60 - 90) * Math.PI / 180;
-      const r = (value / maxVal) * rMax;
-      return {
-        x: cx + r * Math.cos(angle),
-        y: cy + r * Math.sin(angle)
-      };
-    };
-
-    // Grid konsentris (skala 1 sampai 5)
-    const gridLines = [];
-    for (let currentScale = 1; currentScale <= 5; currentScale++) {
-      const points = [];
-      for (let i = 0; i < 6; i++) {
-        const coord = getCoordinates(currentScale, i);
-        points.push(`${coord.x},${coord.y}`);
-      }
-      gridLines.push(points.join(' '));
-    }
-
-    // Koordinat data mahasiswa
-    const dataPoints = [];
-    for (let i = 0; i < 6; i++) {
-      const val = avgMetrics[labels[i].key] || 0;
-      const coord = getCoordinates(val, i);
-      dataPoints.push(`${coord.x},${coord.y}`);
-    }
-    const dataPolyline = dataPoints.join(' ');
-
-    return (
-      <svg width="100%" height="340" viewBox="0 0 400 360" style={{ overflow: 'visible' }}>
-        {/* Lingkaran / Grid konsentris segi enam */}
-        {gridLines.map((poly, idx) => (
-          <polygon 
-            key={idx} 
-            points={poly} 
-            fill="none" 
-            stroke="rgba(255, 255, 255, 0.08)" 
-            strokeWidth="1"
-          />
-        ))}
-
-        {/* Skala Label */}
-        {[1, 2, 3, 4, 5].map((val) => {
-          const coord = getCoordinates(val, 0);
-          return (
-            <text 
-              key={val} 
-              x={coord.x + 6} 
-              y={coord.y + 4} 
-              fill="var(--text-muted)" 
-              fontSize="9"
-              fontWeight="600"
-            >
-              {val}
-            </text>
-          );
-        })}
-
-        {/* Garis Sumbu radial */}
-        {Array.from({ length: 6 }).map((_, i) => {
-          const outerCoord = getCoordinates(5, i);
-          return (
-            <line 
-              key={i} 
-              x1={cx} 
-              y1={cy} 
-              x2={outerCoord.x} 
-              y2={outerCoord.y} 
-              stroke="rgba(255, 255, 255, 0.08)" 
-              strokeWidth="1"
-            />
-          );
-        })}
-
-        {/* Polygon Data Nilai */}
-        {history.length > 0 && (
-          <>
-            <polygon 
-              points={dataPolyline} 
-              fill="rgba(16, 185, 129, 0.2)" 
-              stroke="var(--accent-teal)" 
-              strokeWidth="2.5"
-            />
-            {/* Titik-titik sudut nilai */}
-            {dataPoints.map((pt, index) => {
-              const [px, py] = pt.split(',');
-              return (
-                <circle 
-                  key={index} 
-                  cx={px} 
-                  cy={py} 
-                  r="5" 
-                  fill="#0b0f19" 
-                  stroke="var(--accent-teal)" 
-                  strokeWidth="2" 
-                />
-              );
-            })}
-          </>
-        )}
-
-        {/* Label Sumbu */}
-        {labels.map((lbl, i) => {
-          // Label diposisikan sedikit di luar grid 5
-          const outerCoord = getCoordinates(5.5, i);
-          let textAnchor = 'middle';
-          let dy = 4;
-          
-          if (i === 0) { dy = -6; }
-          else if (i === 3) { dy = 14; }
-          else if (i === 1 || i === 2) { textAnchor = 'start'; }
-          else if (i === 4 || i === 5) { textAnchor = 'end'; }
-
-          return (
-            <text 
-              key={i} 
-              x={outerCoord.x} 
-              y={outerCoord.y + dy} 
-              fill={avgMetrics[lbl.key] > 0 ? 'var(--text-primary)' : 'var(--text-secondary)'} 
-              fontSize="10.5" 
-              fontWeight="700" 
-              textAnchor={textAnchor}
-            >
-              {lbl.name}
-            </text>
-          );
-        })}
-      </svg>
-    );
-  };
-
-  // Login Page Rendering
   if (!token || !user) {
     return (
-      <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        minHeight: '100vh', padding: '24px', background: 'var(--background)'
-      }}>
-        {/* Setelan URL Server Pojok Kanan Atas */}
-        <div style={{ position: 'absolute', top: '24px', right: '24px' }}>
-          <button 
-            onClick={() => setShowConfig(!showConfig)}
-            className="glass-panel"
-            style={{ 
-              display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', 
-              color: 'var(--text-secondary)', cursor: 'pointer', border: '1px solid var(--border-color)' 
-            }}
-          >
-            <Settings size={16} />
-            <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>API Config</span>
-          </button>
-          {showConfig && (
-            <div className="glass-panel animate-fade-in" style={{
-              position: 'absolute', right: 0, top: '48px', width: '280px', padding: '16px', zIndex: 10,
-              boxShadow: '0 10px 25px -5px rgba(0,0,0,0.5)'
-            }}>
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>
-                Backend API Base URL
-              </label>
-              <input 
-                type="text" 
-                defaultValue={apiBaseUrl} 
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveConfig(e.target.value); }}
-                onBlur={(e) => handleSaveConfig(e.target.value)}
-                style={{
-                  width: '100%', padding: '8px 12px', background: '#030712', border: '1px solid var(--border-color)',
-                  borderRadius: '8px', color: 'white', fontSize: '0.9rem', outline: 'none'
-                }}
-              />
-              <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-                Tekan ENTER atau klik di luar untuk menyimpan.
-              </p>
-            </div>
-          )}
-        </div>
-
+      <div className="login-shell">
+        <button className="config-button" onClick={() => setShowConfig(!showConfig)}><Settings size={16} /> API Config</button>
+        {showConfig && (
+          <div className="config-popover">
+            <label>Backend API Base URL</label>
+            <input defaultValue={apiBaseUrl} onBlur={(event) => handleSaveConfig(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && handleSaveConfig(event.currentTarget.value)} />
+          </div>
+        )}
         <LoginForm
           className="animate-fade-in"
           email={email}
@@ -626,984 +486,241 @@ export default function App() {
           onPasswordChange={setPassword}
           onSubmit={handleLogin}
         />
-
-        {/* Legacy Login Form Panel */}
-        <div className="glass-panel animate-fade-in" style={{
-          display: 'none',
-          width: '100%', maxWidth: '420px', padding: '40px 32px', 
-          border: '1px solid rgba(255, 255, 255, 0.08)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)'
-        }}>
-          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-            <div style={{ 
-              display: 'inline-flex', padding: '14px', borderRadius: '16px', 
-              background: 'rgba(16, 185, 129, 0.06)', border: '1px solid rgba(16, 185, 129, 0.2)', marginBottom: '16px' 
-            }}>
-              <BookOpen size={36} color="var(--accent-teal)" />
-            </div>
-            <h1 style={{ fontSize: '1.6rem', fontWeight: 800, letterSpacing: '-0.5px' }}>ICC Speaking Portal</h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '6px' }}>
-              Web Dashboard Dosen & Administrator
-            </p>
-          </div>
-
-          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                Email Address
-              </label>
-              <input 
-                type="email" 
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="dosen@universitas.edu"
-                style={{
-                  width: '100%', padding: '12px 16px', background: '#070a13', border: '1px solid var(--border-color)',
-                  borderRadius: '12px', color: 'white', outline: 'none', transition: 'border-color 0.2s'
-                }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                Password
-              </label>
-              <input 
-                type="password" 
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                style={{
-                  width: '100%', padding: '12px 16px', background: '#070a13', border: '1px solid var(--border-color)',
-                  borderRadius: '12px', color: 'white', outline: 'none'
-                }}
-              />
-            </div>
-
-            {errorMessage && (
-              <div style={{
-                background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)',
-                borderRadius: '8px', padding: '12px', color: '#fca5a5', fontSize: '0.8rem', fontWeight: 500
-              }}>
-                {errorMessage}
-              </div>
-            )}
-
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="btn-teal"
-              style={{
-                width: '100%', padding: '14px', borderRadius: '12px', fontSize: '0.95rem',
-                marginTop: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center'
-              }}
-            >
-              {loading ? 'MENGHUBUNGKAN...' : 'MASUK KE PORTAL'}
-            </button>
-          </form>
-        </div>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '24px' }}>
-          Server Terhubung: <code style={{ color: 'var(--text-secondary)' }}>{apiBaseUrl}</code>
-        </p>
       </div>
     );
   }
 
-  // Helper theme values
-  const isTealTheme = user.role === 'lecturer';
-  const themeAccentColor = isTealTheme ? 'var(--accent-teal)' : 'var(--accent-orange)';
-  const themeCardBorderClass = isTealTheme ? 'glass-card-teal' : 'glass-card-orange';
-  const themeBtnClass = isTealTheme ? 'btn-teal' : 'btn-orange';
+  const navItems = user.role === 'admin'
+    ? [
+        ['scenarios', BookOpen, 'Scenario Builder'],
+        ['lecturers', Users, 'Lecturers'],
+      ]
+    : [
+        ['overview', Activity, 'Research Overview'],
+        ['students', Users, 'Students'],
+        ['history', ClipboardList, 'Practice History'],
+      ];
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
-      
-      {/* Sidebar Navigasi */}
-      <aside className="glass-panel" style={{
-        width: '260px', borderRight: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column',
-        borderRadius: 0, background: '#080c14'
-      }}>
-        {/* Header Profile */}
-        <div style={{ padding: '28px 24px', borderBottom: '1px solid var(--border-color)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '42px', height: '42px', borderRadius: '12px', background: isTealTheme ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-              border: `1px solid ${themeAccentColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
-              {user.role === 'admin' ? <ShieldCheck size={20} color="var(--accent-orange)" /> : <UserCheck size={20} color="var(--accent-teal)" />}
-            </div>
-            <div>
-              <h2 style={{ fontSize: '0.95rem', fontWeight: 800, maxLines: 1, overflow: 'ellipsis' }}>{user.name}</h2>
-              <span style={{ 
-                fontSize: '0.7rem', color: themeAccentColor, textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' 
-              }}>
-                {user.role}
-              </span>
-            </div>
+    <div className="dashboard-page">
+      <aside className="dashboard-sidebar">
+        <div className="brand-row">
+          <div className="brand-mark">{user.role === 'admin' ? <ShieldCheck size={20} /> : <GraduationCap size={20} />}</div>
+          <div>
+            <strong>ICC Research</strong>
+            <span>{user.role === 'admin' ? 'Admin Console' : 'Lecturer Dashboard'}</span>
           </div>
-          {user.role === 'lecturer' && (
-            <div className="glass-panel" style={{
-              marginTop: '16px', padding: '10px 12px', background: 'rgba(255,255,255,0.02)', textAlign: 'center'
-            }}>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block', fontWeight: 600 }}>Kode Penelitian Anda</span>
-              <span style={{ fontSize: '0.95rem', fontWeight: 800, color: 'white', letterSpacing: '0.5px' }}>{user.lecturerCode}</span>
-            </div>
-          )}
         </div>
-
-        {/* Nav Links */}
-        <nav style={{ flex: 1, padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {user.role === 'admin' && (
-            <>
-              <button 
-                onClick={() => setActiveTab('scenarios')}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '12px 16px',
-                  borderRadius: '10px', background: activeTab === 'scenarios' ? 'rgba(245, 158, 11, 0.08)' : 'transparent',
-                  color: activeTab === 'scenarios' ? 'var(--accent-orange)' : 'var(--text-secondary)',
-                  cursor: 'pointer', border: 'none', textAlign: 'left', fontWeight: 600, fontSize: '0.9rem'
-                }}
-              >
-                <BookOpen size={18} />
-                <span>Scenario CRUD</span>
-              </button>
-              <button 
-                onClick={() => setActiveTab('lecturers')}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '12px 16px',
-                  borderRadius: '10px', background: activeTab === 'lecturers' ? 'rgba(245, 158, 11, 0.08)' : 'transparent',
-                  color: activeTab === 'lecturers' ? 'var(--accent-orange)' : 'var(--text-secondary)',
-                  cursor: 'pointer', border: 'none', textAlign: 'left', fontWeight: 600, fontSize: '0.9rem'
-                }}
-              >
-                <Users size={18} />
-                <span>Lecturers</span>
-              </button>
-            </>
-          )}
-
-          {user.role === 'lecturer' && (
-            <>
-              <button 
-                onClick={() => setActiveTab('overview')}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '12px 16px',
-                  borderRadius: '10px', background: activeTab === 'overview' ? 'rgba(16, 185, 129, 0.08)' : 'transparent',
-                  color: activeTab === 'overview' ? 'var(--accent-teal)' : 'var(--text-secondary)',
-                  cursor: 'pointer', border: 'none', textAlign: 'left', fontWeight: 600, fontSize: '0.9rem'
-                }}
-              >
-                <Activity size={18} />
-                <span>Overview</span>
-              </button>
-              <button 
-                onClick={() => setActiveTab('students')}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '12px 16px',
-                  borderRadius: '10px', background: activeTab === 'students' ? 'rgba(16, 185, 129, 0.08)' : 'transparent',
-                  color: activeTab === 'students' ? 'var(--accent-teal)' : 'var(--text-secondary)',
-                  cursor: 'pointer', border: 'none', textAlign: 'left', fontWeight: 600, fontSize: '0.9rem'
-                }}
-              >
-                <Users size={18} />
-                <span>Students</span>
-              </button>
-              <button 
-                onClick={() => setActiveTab('history')}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '12px 16px',
-                  borderRadius: '10px', background: activeTab === 'history' ? 'rgba(16, 185, 129, 0.08)' : 'transparent',
-                  color: activeTab === 'history' ? 'var(--accent-teal)' : 'var(--text-secondary)',
-                  cursor: 'pointer', border: 'none', textAlign: 'left', fontWeight: 600, fontSize: '0.9rem'
-                }}
-              >
-                <Receipt size={18} />
-                <span>Practice History</span>
-              </button>
-            </>
-          )}
+        <div className="profile-card">
+          <span>{user.name}</span>
+          <strong>{user.role}</strong>
+          {user.lecturerCode && <code>{user.lecturerCode}</code>}
+        </div>
+        <nav className="side-nav">
+          {navItems.map(([id, Icon, label]) => (
+            <button key={id} className={activeTab === id ? 'active' : ''} onClick={() => setActiveTab(id)}>
+              <Icon size={18} /> {label}
+            </button>
+          ))}
         </nav>
-
-        {/* Footer Log Out */}
-        <div style={{ padding: '20px 16px', borderTop: '1px solid var(--border-color)' }}>
-          <button 
-            onClick={handleLogout}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '12px 16px',
-              borderRadius: '10px', color: '#f87171', background: 'rgba(239, 68, 68, 0.04)',
-              cursor: 'pointer', border: 'none', textAlign: 'left', fontWeight: 600, fontSize: '0.9rem'
-            }}
-          >
-            <LogOut size={18} />
-            <span>Keluar Portal</span>
-          </button>
-        </div>
+        <button className="logout-button" onClick={handleLogout}><LogOut size={17} /> Keluar</button>
       </aside>
 
-      {/* Main Content Area */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#0a0d16' }}>
-        
-        {/* Header Topbar */}
-        <header style={{ 
-          height: '70px', borderBottom: '1px solid var(--border-color)', display: 'flex', 
-          alignItems: 'center', justifyContent: 'space-between', padding: '0 40px', background: '#080c14' 
-        }}>
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 800 }}>
-            {activeTab === 'scenarios' && 'Scenario Management'}
-            {activeTab === 'lecturers' && 'Lecturer Accounts'}
-            {activeTab === 'overview' && 'Research Overview'}
-            {activeTab === 'students' && 'Registered Students'}
-            {activeTab === 'history' && 'Speaking Practice History'}
-          </h2>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600 }}>
-            Server API: <span style={{ color: 'white' }}>{apiBaseUrl}</span>
+      <main className="dashboard-main">
+        <header className="dashboard-header">
+          <div>
+            <span>{new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+            <h1>{activeTab === 'scenarios' ? 'Scenario Builder' : activeTab === 'lecturers' ? 'Lecturer Accounts' : activeTab === 'overview' ? 'Research Overview' : activeTab === 'students' ? 'Registered Students' : 'Practice History'}</h1>
           </div>
+          <div className="search-pill"><Search size={16} /><span>{apiBaseUrl.replace(/^https?:\/\//, '')}</span></div>
         </header>
 
-        {/* Content Screens */}
-        <div style={{ flex: 1, padding: '40px', overflowY: 'auto' }}>
-          
-          {/* TAB ADMIN: SCENARIO CRUD */}
-          {activeTab === 'scenarios' && (
-            <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                  Kelola daftar skenario interaktif yang aktif di aplikasi mobile mahasiswa.
-                </p>
-                <button 
-                  onClick={() => {
-                    setScenarioFormId(null);
-                    setScenarioFormIdStr('');
-                    setScenarioFormTitle('');
-                    setScenarioFormIsActive(true);
-                    setScenarioFormJson(JSON.stringify(DEFAULT_SCENARIO_JSON, null, 2));
-                    setErrorMessage('');
-                    setShowScenarioModal(true);
-                  }}
-                  className="btn-orange"
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '10px', fontSize: '0.85rem' }}
-                >
-                  <Plus size={16} />
-                  <span>Tambah Skenario</span>
-                </button>
+        {user.role === 'admin' && activeTab === 'scenarios' && (
+          <section className="screen-stack">
+            <div className="hero-panel">
+              <div>
+                <span className="eyebrow">Admin Scenario System</span>
+                <h2>Kelola skenario tanpa dialog nama tetap.</h2>
+                <p>Builder ini memisahkan konteks, peran, tujuan, batasan, dan rubrik agar AI tetap berada di lokasi dan karakter yang benar.</p>
               </div>
-
-              {/* Tabel Skenario */}
-              <div className="glass-panel" style={{ padding: '8px', overflow: 'hidden' }}>
-                <div className="custom-table-container">
-                  <table className="custom-table">
-                    <thead>
-                      <tr>
-                        <th>Scenario ID</th>
-                        <th>Judul Skenario</th>
-                        <th>Tipe / Kategori</th>
-                        <th>Level</th>
-                        <th>AR Scene</th>
-                        <th>Status</th>
-                        <th style={{ textAlign: 'right' }}>Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {scenarios.map(s => {
-                        const originalData = s.data || {};
-                        return (
-                          <tr key={s._id}>
-                            <td style={{ fontWeight: 800, color: 'var(--accent-orange)' }}>{s.scenarioId}</td>
-                            <td style={{ fontWeight: 700 }}>{s.title}</td>
-                            <td>{originalData.scenario?.scenario_type || '-'}</td>
-                            <td>
-                              <span style={{
-                                padding: '3px 8px', borderRadius: '6px', background: 'rgba(255,255,255,0.04)',
-                                border: '1px solid var(--border-color)', fontSize: '0.75rem', fontWeight: 700
-                              }}>
-                                {originalData.scenario?.level || '-'}
-                              </span>
-                            </td>
-                            <td style={{ color: 'var(--text-secondary)' }}>{originalData.scenario?.ar_scene || '-'}</td>
-                            <td>
-                              <button 
-                                onClick={() => handleToggleScenarioStatus(s._id, s.isActive)}
-                                style={{
-                                  background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center'
-                                }}
-                              >
-                                {s.isActive ? (
-                                  <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 700 }}>
-                                    <CheckCircle size={14} /> Aktif
-                                  </span>
-                                ) : (
-                                  <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 700 }}>
-                                    <XCircle size={14} /> Non-aktif
-                                  </span>
-                                )}
-                              </button>
-                            </td>
-                            <td>
-                              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                                <button 
-                                  onClick={() => {
-                                    setScenarioFormId(s._id);
-                                    setScenarioFormIdStr(s.scenarioId);
-                                    setScenarioFormTitle(s.title);
-                                    setScenarioFormIsActive(s.isActive);
-                                    setScenarioFormJson(JSON.stringify(s.data, null, 2));
-                                    setErrorMessage('');
-                                    setShowScenarioModal(true);
-                                  }}
-                                  style={{
-                                    background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-color)',
-                                    color: 'white', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer'
-                                  }}
-                                >
-                                  <Edit2 size={13} />
-                                </button>
-                                <button 
-                                  onClick={() => handleDeleteScenario(s._id)}
-                                  style={{
-                                    background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)',
-                                    color: '#f87171', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer'
-                                  }}
-                                >
-                                  <Trash2 size={13} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {scenarios.length === 0 && (
-                        <tr>
-                          <td colSpan="7" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
-                            Tidak ada skenario di database.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <button className="primary-action" onClick={openNewScenario}><Plus size={17} /> Buat Skenario</button>
             </div>
-          )}
-
-          {/* TAB ADMIN: LECTURERS */}
-          {activeTab === 'lecturers' && (
-            <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr', gap: '32px' }}>
-              
-              {/* Form Tambah Dosen */}
-              <div className="glass-panel" style={{ padding: '32px', height: 'fit-content' }}>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '20px' }}>Daftarkan Akun Dosen</h3>
-                
-                {createdLecturerCode && (
-                  <div className="glass-card-orange animate-fade-in" style={{ padding: '16px', borderRadius: '12px', marginBottom: '24px' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--accent-orange)', fontWeight: 800, display: 'block' }}>
-                      DOSEN BERHASIL DIBUAT!
-                    </span>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                      Lecturer Research Code berikut siap dibagikan ke mahasiswa:
-                    </p>
-                    <div style={{ 
-                      background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)',
-                      borderRadius: '8px', padding: '10px 14px', marginTop: '10px', display: 'flex', 
-                      alignItems: 'center', justifyContent: 'space-between'
-                    }}>
-                      <span style={{ fontWeight: 800, letterSpacing: '0.5px', color: 'white' }}>{createdLecturerCode}</span>
-                      <button 
-                        onClick={() => {
-                          navigator.clipboard.writeText(createdLecturerCode);
-                          alert('Kode dosen berhasil disalin!');
-                        }}
-                        style={{ background: 'none', border: 'none', color: 'var(--accent-orange)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 800 }}
-                      >
-                        SALIN
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <form onSubmit={handleCreateLecturer} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                      Nama Lengkap Dosen
-                    </label>
-                    <input 
-                      type="text" required
-                      value={lecturerFormName}
-                      onChange={(e) => setLecturerFormName(e.target.value)}
-                      placeholder="Dr. Ahmad Subarjo, M.Pd."
-                      style={{
-                        width: '100%', padding: '10px 14px', background: '#05070e', border: '1px solid var(--border-color)',
-                        borderRadius: '10px', color: 'white', outline: 'none'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                      Email
-                    </label>
-                    <input 
-                      type="email" required
-                      value={lecturerFormEmail}
-                      onChange={(e) => setLecturerFormEmail(e.target.value)}
-                      placeholder="ahmad@dosen.univ.ac.id"
-                      style={{
-                        width: '100%', padding: '10px 14px', background: '#05070e', border: '1px solid var(--border-color)',
-                        borderRadius: '10px', color: 'white', outline: 'none'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                      Password Akun
-                    </label>
-                    <input 
-                      type="password" required
-                      value={lecturerFormPassword}
-                      onChange={(e) => setLecturerFormPassword(e.target.value)}
-                      placeholder="Sandi dosen..."
-                      style={{
-                        width: '100%', padding: '10px 14px', background: '#05070e', border: '1px solid var(--border-color)',
-                        borderRadius: '10px', color: 'white', outline: 'none'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                      Gender
-                    </label>
-                    <select 
-                      value={lecturerFormGender} 
-                      onChange={(e) => setLecturerFormGender(e.target.value)}
-                      style={{
-                        width: '100%', padding: '10px 14px', background: '#05070e', border: '1px solid var(--border-color)',
-                        borderRadius: '10px', color: 'white', outline: 'none'
-                      }}
-                    >
-                      <option value="female">Perempuan</option>
-                      <option value="male">Laki-laki</option>
-                    </select>
-                  </div>
-
-                  {errorMessage && (
-                    <div style={{ color: '#f87171', fontSize: '0.8rem', padding: '8px 0' }}>{errorMessage}</div>
-                  )}
-
-                  <button type="submit" className="btn-orange" style={{ padding: '12px', borderRadius: '10px', marginTop: '8px' }}>
-                    BUAT AKUN DOSEN
-                  </button>
-                </form>
-              </div>
-
-              {/* Tabel Daftar Dosen */}
-              <div className="glass-panel" style={{ padding: '8px', overflow: 'hidden' }}>
-                <div className="custom-table-container">
-                  <table className="custom-table">
-                    <thead>
-                      <tr>
-                        <th>Nama Dosen</th>
-                        <th>Email</th>
-                        <th>Lecturer Code</th>
-                        <th>Tanggal Terdaftar</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lecturers.map(u => (
-                        <tr key={u.id}>
-                          <td style={{ fontWeight: 800 }}>{u.name}</td>
-                          <td>{u.email}</td>
-                          <td style={{ fontWeight: 800, color: 'var(--accent-orange)' }}>{u.lecturerCode}</td>
-                          <td style={{ color: 'var(--text-secondary)' }}>
-                            {u.createdAt ? new Date(u.createdAt).toLocaleDateString('id-ID') : '-'}
-                          </td>
-                        </tr>
-                      ))}
-                      {lecturers.length === 0 && (
-                        <tr>
-                          <td colSpan="4" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
-                            Belum ada dosen yang terdaftar.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
+            <div className="metric-grid">
+              <StatCard icon={BookOpen} label="Total skenario" value={scenarios.length} detail="tersimpan di database" />
+              <StatCard icon={CheckCircle2} label="Aktif" value={scenarios.filter((item) => item.isActive).length} detail="muncul di mobile" />
+              <StatCard icon={FileText} label="Format" value="V2" detail="builder plus JSON advanced" />
             </div>
-          )}
-
-          {/* TAB LECTURER: OVERVIEW */}
-          {activeTab === 'overview' && (
-            <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-              
-              {/* Statistik Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
-                <div className="glass-panel" style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '20px' }}>
-                  <div style={{ 
-                    padding: '16px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.06)',
-                    border: '1px solid rgba(16, 185, 129, 0.2)'
-                  }}>
-                    <Users size={28} color="var(--accent-teal)" />
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', fontWeight: 600 }}>Total Mahasiswa Bimbingan</span>
-                    <span style={{ fontSize: '1.8rem', fontWeight: 800 }}>{students.length}</span>
-                  </div>
-                </div>
-
-                <div className="glass-panel" style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '20px' }}>
-                  <div style={{ 
-                    padding: '16px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.06)',
-                    border: '1px solid rgba(16, 185, 129, 0.2)'
-                  }}>
-                    <TrendingUp size={28} color="var(--accent-teal)" />
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', fontWeight: 600 }}>Sesi Latihan Selesai</span>
-                    <span style={{ fontSize: '1.8rem', fontWeight: 800 }}>{history.length}</span>
-                  </div>
-                </div>
-
-                <div className="glass-panel" style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '20px' }}>
-                  <div style={{ 
-                    padding: '16px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.06)',
-                    border: '1px solid rgba(16, 185, 129, 0.2)'
-                  }}>
-                    <Award size={28} color="var(--accent-teal)" />
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', fontWeight: 600 }}>Rata-rata Skor Sesi</span>
-                    <span style={{ fontSize: '1.8rem', fontWeight: 800 }}>
-                      {history.length > 0 
-                        ? (history.reduce((acc, h) => acc + h.overall_score, 0) / history.length).toFixed(2) 
-                        : '0.00'
-                      }
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Radar Chart Visualisasi & Legend */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1.2fr', gap: '32px' }}>
-                <div className="glass-panel" style={{ padding: '32px', textAlign: 'center' }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 800, textAlign: 'left', marginBottom: '24px' }}>
-                    Radar Skor Rata-Rata Kemampuan Intercultural Mahasiswa
-                  </h3>
-                  {history.length > 0 ? (
-                    renderRadarChart()
-                  ) : (
-                    <div style={{ padding: '80px 0', color: 'var(--text-muted)' }}>
-                      Tidak ada data nilai untuk divisualisasikan.
-                    </div>
-                  )}
-                </div>
-
-                <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '8px' }}>Rincian Nilai Aspek</h3>
-                  
-                  {Object.entries(avgMetrics).map(([key, val]) => {
-                    const labelName = {
-                      grammar: 'Grammar',
-                      vocabulary: 'Vocabulary',
-                      fluency: 'Fluency',
-                      politeness: 'Politeness',
-                      pragmatic: 'Pragmatic Appropriateness',
-                      icc: 'Intercultural Awareness'
-                    }[key];
-                    return (
-                      <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 600 }}>
-                          <span style={{ color: 'var(--text-secondary)' }}>{labelName}</span>
-                          <span style={{ fontWeight: 800, color: 'var(--accent-teal)' }}>{val.toFixed(2)} / 5.00</span>
-                        </div>
-                        {/* Progress bar */}
-                        <div style={{ height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
-                          <div style={{ 
-                            height: '100%', background: 'var(--accent-teal)', width: `${(val / 5) * 100}%`,
-                            boxShadow: '0 0 10px rgba(16, 185, 129, 0.5)'
-                          }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-            </div>
-          )}
-
-          {/* TAB LECTURER: STUDENTS LIST */}
-          {activeTab === 'students' && (
-            <div className="glass-panel animate-fade-in" style={{ padding: '8px', overflow: 'hidden' }}>
+            <div className="data-panel">
+              <div className="panel-heading"><h3>Daftar Skenario</h3><span>{scenarios.length} item</span></div>
               <div className="custom-table-container">
                 <table className="custom-table">
-                  <thead>
-                    <tr>
-                      <th>Student ID / NIM</th>
-                      <th>Nama Mahasiswa</th>
-                      <th>Email</th>
-                      <th>Gender</th>
-                      <th>Consent Penelitian</th>
-                      <th>Tanggal Terdaftar</th>
-                    </tr>
-                  </thead>
+                  <thead><tr><th>ID</th><th>Judul</th><th>Peran Mahasiswa</th><th>AI Role</th><th>Scene</th><th>Status</th><th>Aksi</th></tr></thead>
                   <tbody>
-                    {students.map(s => (
-                      <tr key={s.id}>
-                        <td style={{ fontWeight: 800, color: 'var(--accent-teal)' }}>{s.studentId || '-'}</td>
-                        <td style={{ fontWeight: 700 }}>{s.name}</td>
-                        <td>{s.email}</td>
-                        <td style={{ textTransform: 'capitalize' }}>
-                          {s.gender === 'female' ? 'Perempuan' : 'Laki-laki'}
-                        </td>
-                        <td>
-                          {s.consent ? (
-                            <span style={{
-                              padding: '4px 10px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.08)',
-                              border: '1px solid rgba(16, 185, 129, 0.2)', fontSize: '0.75rem', color: '#10b981', fontWeight: 800
-                            }}>
-                              DISETUJUI
-                            </span>
-                          ) : (
-                            <span style={{
-                              padding: '4px 10px', borderRadius: '6px', background: 'rgba(239, 68, 68, 0.08)',
-                              border: '1px solid rgba(239, 68, 68, 0.2)', fontSize: '0.75rem', color: '#f87171', fontWeight: 800
-                            }}>
-                              MENOLAK
-                            </span>
-                          )}
-                        </td>
-                        <td style={{ color: 'var(--text-secondary)' }}>
-                          {s.createdAt ? new Date(s.createdAt).toLocaleDateString('id-ID') : '-'}
+                    {scenarios.map((scenario) => (
+                      <tr key={scenario._id}>
+                        <td><strong>{scenario.scenarioId}</strong></td>
+                        <td>{scenario.title}</td>
+                        <td>{scenario.data?.scenario?.student_role || '-'}</td>
+                        <td>{scenario.data?.scenario?.ai_role || '-'}</td>
+                        <td>{scenario.data?.scenario?.ar_scene || '-'}</td>
+                        <td><button className="text-button" onClick={() => handleToggleScenarioStatus(scenario._id, scenario.isActive)}>{scenario.isActive ? 'Aktif' : 'Nonaktif'}</button></td>
+                        <td className="row-actions">
+                          <button onClick={() => openEditScenario(scenario)}><Edit2 size={14} /></button>
+                          <button onClick={() => handleDeleteScenario(scenario._id)}><Trash2 size={14} /></button>
                         </td>
                       </tr>
                     ))}
-                    {students.length === 0 && (
-                      <tr>
-                        <td colSpan="6" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
-                          Belum ada mahasiswa bimbingan yang terdaftar.
-                        </td>
-                      </tr>
-                    )}
+                    {!scenarios.length && <tr><td colSpan="7" className="empty-cell">Belum ada skenario.</td></tr>}
                   </tbody>
                 </table>
               </div>
             </div>
-          )}
+          </section>
+        )}
 
-          {/* TAB LECTURER: HISTORY LIST */}
-          {activeTab === 'history' && (
-            <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                  Pantau seluruh riwayat latihan dan ekspor transkrip chat untuk bahan data penelitian.
-                </p>
-                <button 
-                  onClick={exportHistoryToCSV}
-                  className="btn-teal"
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '10px', fontSize: '0.85rem' }}
-                >
-                  <Download size={16} />
-                  <span>Ekspor Data CSV</span>
-                </button>
+        {user.role === 'admin' && activeTab === 'lecturers' && (
+          <section className="two-column">
+            <form className="data-panel form-panel" onSubmit={handleCreateLecturer}>
+              <div className="panel-heading"><h3>Buat Akun Dosen</h3><Key size={18} /></div>
+              {createdLecturerCode && <div className="success-box">Kode dosen baru: <strong>{createdLecturerCode}</strong></div>}
+              {errorMessage && <div className="error-box">{errorMessage}</div>}
+              <label>Nama dosen<input required value={lecturerForm.name} onChange={(event) => setLecturerForm({ ...lecturerForm, name: event.target.value })} /></label>
+              <label>Email<input required type="email" value={lecturerForm.email} onChange={(event) => setLecturerForm({ ...lecturerForm, email: event.target.value })} /></label>
+              <label>Password<input required type="password" value={lecturerForm.password} onChange={(event) => setLecturerForm({ ...lecturerForm, password: event.target.value })} /></label>
+              <label>Gender<select value={lecturerForm.gender} onChange={(event) => setLecturerForm({ ...lecturerForm, gender: event.target.value })}><option value="female">Perempuan</option><option value="male">Laki-laki</option></select></label>
+              <button className="primary-action">Buat Akun</button>
+            </form>
+            <div className="data-panel">
+              <div className="panel-heading"><h3>Daftar Dosen</h3><span>{lecturers.length} akun</span></div>
+              <table className="custom-table"><thead><tr><th>Nama</th><th>Email</th><th>Kode</th><th>Terdaftar</th></tr></thead><tbody>
+                {lecturers.map((lecturer) => <tr key={lecturer.id}><td>{lecturer.name}</td><td>{lecturer.email}</td><td><strong>{lecturer.lecturerCode}</strong></td><td>{lecturer.createdAt ? new Date(lecturer.createdAt).toLocaleDateString('id-ID') : '-'}</td></tr>)}
+              </tbody></table>
+            </div>
+          </section>
+        )}
+
+        {user.role === 'lecturer' && activeTab === 'overview' && (
+          <section className="screen-stack">
+            <div className="hero-panel lecturer-hero">
+              <div>
+                <span className="eyebrow">Lecturer Research Monitor</span>
+                <h2>Pengamatan latihan speaking mahasiswa.</h2>
+                <p>Kode dosen menghubungkan data mahasiswa, riwayat sesi, transkrip, durasi, dan skor untuk kebutuhan penelitian.</p>
               </div>
-
-              {/* Tabel Riwayat Latihan */}
-              <div className="glass-panel" style={{ padding: '8px', overflow: 'hidden' }}>
-                <div className="custom-table-container">
-                  <table className="custom-table">
-                    <thead>
-                      <tr>
-                        <th>NIM</th>
-                        <th>Nama Mahasiswa</th>
-                        <th>Judul Skenario</th>
-                        <th>Tanggal Selesai</th>
-                        <th>Durasi</th>
-                        <th>Respons</th>
-                        <th>Skor Akhir</th>
-                        <th style={{ textAlign: 'right' }}>Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {history.map((h, index) => (
-                        <tr key={index}>
-                          <td style={{ fontWeight: 800 }}>{h.student_details?.student_id || '-'}</td>
-                          <td style={{ fontWeight: 700 }}>{h.student_details?.name || '-'}</td>
-                          <td style={{ color: 'var(--text-secondary)' }}>
-                            <span style={{ fontWeight: 700, color: 'var(--text-primary)', marginRight: '6px' }}>
-                              [{h.scenario?.scenario_id}]
-                            </span>
-                            {h.scenario?.title}
-                          </td>
-                          <td>
-                            {h.completed_at ? new Date(h.completed_at).toLocaleString('id-ID') : '-'}
-                          </td>
-                          <td>{h.duration_seconds || 0}s</td>
-                          <td style={{ fontWeight: 700 }}>{h.student_response_count || 0}x</td>
-                          <td style={{ fontWeight: 800, color: 'var(--accent-teal)' }}>
-                            {h.overall_score ? h.overall_score.toFixed(2) : '0.00'}
-                          </td>
-                          <td style={{ textAlign: 'right' }}>
-                            <button 
-                              onClick={() => setSelectedSession(h)}
-                              style={{
-                                background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)',
-                                color: '#10b981', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer',
-                                fontSize: '0.75rem', fontWeight: 800
-                              }}
-                            >
-                              Lihat Transkrip
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                      {history.length === 0 && (
-                        <tr>
-                          <td colSpan="8" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
-                            Belum ada sesi latihan mahasiswa yang tercatat.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+              <div className="code-badge"><span>Kode Dosen</span><strong>{user.lecturerCode}</strong></div>
+            </div>
+            <div className="metric-grid">
+              <StatCard icon={Users} label="Mahasiswa" value={students.length} detail="terhubung ke kode dosen" />
+              <StatCard icon={Activity} label="Sesi selesai" value={dashboardMetrics.completed.length} detail={`${dashboardMetrics.avgResponses.toFixed(1)} respons/sesi`} />
+              <StatCard icon={Award} label="Rata-rata skor" value={dashboardMetrics.avgScore.toFixed(2)} detail={`${Math.round(dashboardMetrics.avgDuration)} detik/sesi`} />
+              <StatCard icon={BookOpen} label="Skenario aktif" value={dashboardMetrics.topScenario?.[0] || '-'} detail={dashboardMetrics.topScenario ? `${dashboardMetrics.topScenario[1]} sesi` : 'belum ada data'} />
+            </div>
+            <div className="research-grid">
+              <div className="data-panel">
+                <div className="panel-heading"><h3>Skor Kemampuan</h3><span>rata-rata / 5</span></div>
+                {Object.entries(scoreLabels).map(([key, label]) => <ProgressMetric key={key} label={label} value={dashboardMetrics.scoreAverages[key]} />)}
+              </div>
+              <div className="data-panel">
+                <div className="panel-heading"><h3>Sesi Terbaru</h3><button className="text-button" onClick={() => setActiveTab('history')}>Lihat semua <ChevronRight size={14} /></button></div>
+                <div className="session-list">
+                  {history.slice(0, 5).map((item, index) => (
+                    <button key={index} onClick={() => setSelectedSession(item)}>
+                      <div><strong>{item.student_details?.name || '-'}</strong><span>{item.scenario?.scenario_id} - {item.scenario?.title}</span></div>
+                      <b>{Number(item.overall_score || 0).toFixed(2)}</b>
+                    </button>
+                  ))}
+                  {!history.length && <p className="empty-note">Belum ada riwayat latihan.</p>}
                 </div>
               </div>
             </div>
-          )}
+          </section>
+        )}
 
-        </div>
+        {user.role === 'lecturer' && activeTab === 'students' && (
+          <div className="data-panel">
+            <div className="panel-heading"><h3>Mahasiswa Terdaftar</h3><span>{students.length} mahasiswa</span></div>
+            <table className="custom-table"><thead><tr><th>NIM</th><th>Nama</th><th>Email</th><th>Gender</th><th>Consent</th><th>Terdaftar</th></tr></thead><tbody>
+              {students.map((student) => <tr key={student.id}><td><strong>{student.studentId || '-'}</strong></td><td>{student.name}</td><td>{student.email}</td><td>{student.gender === 'female' ? 'Perempuan' : 'Laki-laki'}</td><td>{student.consent ? 'Disetujui' : 'Tidak'}</td><td>{student.createdAt ? new Date(student.createdAt).toLocaleDateString('id-ID') : '-'}</td></tr>)}
+              {!students.length && <tr><td colSpan="6" className="empty-cell">Belum ada mahasiswa.</td></tr>}
+            </tbody></table>
+          </div>
+        )}
+
+        {user.role === 'lecturer' && activeTab === 'history' && (
+          <section className="screen-stack">
+            <div className="action-row"><p>Riwayat ini dapat diekspor sebagai data penelitian.</p><button className="primary-action" onClick={exportHistoryToCSV}><Download size={16} /> Ekspor CSV</button></div>
+            <div className="data-panel">
+              <table className="custom-table"><thead><tr><th>NIM</th><th>Mahasiswa</th><th>Skenario</th><th>Selesai</th><th>Durasi</th><th>Respons</th><th>Skor</th><th>Aksi</th></tr></thead><tbody>
+                {history.map((item, index) => <tr key={index}><td>{item.student_details?.student_id || '-'}</td><td>{item.student_details?.name || '-'}</td><td>{item.scenario?.scenario_id} - {item.scenario?.title}</td><td>{item.completed_at ? new Date(item.completed_at).toLocaleString('id-ID') : '-'}</td><td>{item.duration_seconds || 0}s</td><td>{item.student_response_count || 0}</td><td><strong>{Number(item.overall_score || 0).toFixed(2)}</strong></td><td><button className="text-button" onClick={() => setSelectedSession(item)}><Eye size={14} /> Transkrip</button></td></tr>)}
+                {!history.length && <tr><td colSpan="8" className="empty-cell">Belum ada sesi latihan.</td></tr>}
+              </tbody></table>
+            </div>
+          </section>
+        )}
       </main>
 
-      {/* MODAL EDIT/TAMBAH SCENARIO (ADMIN) */}
-      {showScenarioModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)',
-          backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
-        }}>
-          <div className="glass-panel animate-fade-in" style={{
-            width: '100%', maxWidth: '800px', padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px',
-            maxHeight: '90vh', overflowY: 'auto'
-          }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>
-              {scenarioFormId ? 'Edit Skenario' : 'Tambah Skenario Baru'}
-            </h3>
-
-            <form onSubmit={handleSaveScenario} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                    Scenario ID
-                  </label>
-                  <input 
-                    type="text" required
-                    disabled={!!scenarioFormId}
-                    value={scenarioFormIdStr}
-                    onChange={(e) => setScenarioFormIdStr(e.target.value)}
-                    placeholder="G-ICC-008"
-                    style={{
-                      width: '100%', padding: '10px 14px', background: '#05070e', border: '1px solid var(--border-color)',
-                      borderRadius: '10px', color: 'white', outline: 'none'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                    Judul Skenario
-                  </label>
-                  <input 
-                    type="text" required
-                    value={scenarioFormTitle}
-                    onChange={(e) => setScenarioFormTitle(e.target.value)}
-                    placeholder="Meeting an International Student..."
-                    style={{
-                      width: '100%', padding: '10px 14px', background: '#05070e', border: '1px solid var(--border-color)',
-                      borderRadius: '10px', color: 'white', outline: 'none'
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Status Skenario Aktif</span>
-                <label className="switch">
-                  <input 
-                    type="checkbox" 
-                    checked={scenarioFormIsActive}
-                    onChange={(e) => setScenarioFormIsActive(e.target.checked)}
-                  />
-                  <span className="slider"></span>
-                </label>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                  Struktur JSON Skenario Lengkap (ICC Config)
-                </label>
-                <textarea 
-                  required
-                  rows="14"
-                  value={scenarioFormJson}
-                  onChange={(e) => setScenarioFormJson(e.target.value)}
-                  style={{
-                    width: '100%', padding: '12px', background: '#03050a', border: '1px solid var(--border-color)',
-                    borderRadius: '10px', color: '#34d399', fontFamily: 'monospace', fontSize: '0.8rem', outline: 'none',
-                    resize: 'vertical'
-                  }}
-                />
-              </div>
-
-              {errorMessage && (
-                <div style={{ color: '#f87171', fontSize: '0.8rem' }}>{errorMessage}</div>
-              )}
-
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '10px' }}>
-                <button 
-                  type="button"
-                  onClick={() => setShowScenarioModal(false)}
-                  style={{
-                    background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-color)',
-                    color: 'white', padding: '10px 20px', borderRadius: '10px', cursor: 'pointer', fontWeight: 600
-                  }}
-                >
-                  BATAL
-                </button>
-                <button type="submit" className="btn-orange" style={{ padding: '10px 24px', borderRadius: '10px' }}>
-                  SIMPAN SKENARIO
-                </button>
-              </div>
-            </form>
-          </div>
+      {scenarioModalOpen && (
+        <div className="modal-backdrop">
+          <form className="scenario-modal" onSubmit={handleSaveScenario}>
+            <div className="panel-heading">
+              <div><h3>{editingScenarioId ? 'Edit Scenario Builder' : 'Buat Scenario Builder'}</h3><span>Nama orang tidak digunakan sebagai subject tetap.</span></div>
+              <button type="button" className="text-button" onClick={() => setScenarioModalOpen(false)}>Tutup</button>
+            </div>
+            {errorMessage && <div className="error-box">{errorMessage}</div>}
+            <div className="builder-grid">
+              <label>Scenario ID<input required disabled={!!editingScenarioId} value={builder.scenarioId} onChange={(event) => setBuilder({ ...builder, scenarioId: event.target.value })} placeholder="G-ICC-011" /></label>
+              <label>Judul<input required value={builder.title} onChange={(event) => setBuilder({ ...builder, title: event.target.value })} placeholder="Meeting an International Student on Campus" /></label>
+              <label>Tipe<input value={builder.type} onChange={(event) => setBuilder({ ...builder, type: event.target.value })} /></label>
+              <label>Level<input value={builder.level} onChange={(event) => setBuilder({ ...builder, level: event.target.value })} /></label>
+              <label>AR Scene<input value={builder.arScene} onChange={(event) => setBuilder({ ...builder, arScene: event.target.value })} placeholder="International Office" /></label>
+              <label>Student Role<input value={builder.studentRole} onChange={(event) => setBuilder({ ...builder, studentRole: event.target.value })} /></label>
+              <label>AI Role<input value={builder.aiRole} onChange={(event) => setBuilder({ ...builder, aiRole: event.target.value })} /></label>
+              <label>AI Personality<input value={builder.aiPersonality} onChange={(event) => setBuilder({ ...builder, aiPersonality: event.target.value })} /></label>
+            </div>
+            <label>Deskripsi setting<textarea rows="2" value={builder.sceneDescription} onChange={(event) => setBuilder({ ...builder, sceneDescription: event.target.value })} /></label>
+            <label>Tujuan pembelajaran<textarea rows="2" value={builder.learningGoal} onChange={(event) => setBuilder({ ...builder, learningGoal: event.target.value })} /></label>
+            <label>Tugas mahasiswa<textarea rows="2" value={builder.studentTask} onChange={(event) => setBuilder({ ...builder, studentTask: event.target.value })} /></label>
+            <label>Objectives, satu baris per item: id | deskripsi | cues<textarea rows="4" value={builder.objectivesText} onChange={(event) => setBuilder({ ...builder, objectivesText: event.target.value })} /></label>
+            <div className="builder-grid compact">
+              <label>Minimum respons<input type="number" min="1" value={builder.minResponses} onChange={(event) => setBuilder({ ...builder, minResponses: event.target.value })} /></label>
+              <label>Target min<input type="number" min="1" value={builder.targetMin} onChange={(event) => setBuilder({ ...builder, targetMin: event.target.value })} /></label>
+              <label>Target max<input type="number" min="1" value={builder.targetMax} onChange={(event) => setBuilder({ ...builder, targetMax: event.target.value })} /></label>
+              <label>Maksimum<input type="number" min="1" value={builder.maxResponses} onChange={(event) => setBuilder({ ...builder, maxResponses: event.target.value })} /></label>
+            </div>
+            <label>Kondisi selesai<textarea rows="3" value={builder.completionConditions} onChange={(event) => setBuilder({ ...builder, completionConditions: event.target.value })} /></label>
+            <label>Batasan lokasi<textarea rows="2" value={builder.locationBoundaries} onChange={(event) => setBuilder({ ...builder, locationBoundaries: event.target.value })} /></label>
+            <label>Batasan peran<textarea rows="2" value={builder.roleBoundaries} onChange={(event) => setBuilder({ ...builder, roleBoundaries: event.target.value })} /></label>
+            <label>Rubric: criterion | description<textarea rows="4" value={builder.rubricText} onChange={(event) => setBuilder({ ...builder, rubricText: event.target.value })} /></label>
+            <div className="modal-options">
+              <label className="switch-row"><input type="checkbox" checked={builder.isActive} onChange={(event) => setBuilder({ ...builder, isActive: event.target.checked })} /> Aktif di mobile</label>
+              <button type="button" className="text-button" onClick={() => setAdvancedJsonOpen(!advancedJsonOpen)}>Advanced JSON</button>
+            </div>
+            {advancedJsonOpen && <label>Raw JSON override<textarea rows="8" value={builder.rawJson || JSON.stringify(buildScenarioData(builder), null, 2)} onChange={(event) => setBuilder({ ...builder, rawJson: event.target.value })} /></label>}
+            <div className="modal-actions"><button type="button" className="secondary-action" onClick={() => setScenarioModalOpen(false)}>Batal</button><button className="primary-action">Simpan Skenario</button></div>
+          </form>
         </div>
       )}
 
-      {/* MODAL TRANSCRIPT DETAIL (LECTURER) */}
       {selectedSession && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)',
-          backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
-        }}>
-          <div className="glass-panel animate-fade-in" style={{
-            width: '100%', maxWidth: '850px', padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px',
-            maxHeight: '90vh', overflowY: 'auto'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>Transkrip & Analisis Percakapan</h3>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  Mahasiswa: <span style={{ color: 'white', fontWeight: 700 }}>{selectedSession.student_details?.name} ({selectedSession.student_details?.student_id})</span>
-                </span>
-              </div>
-              <button 
-                onClick={() => setSelectedSession(null)}
-                style={{
-                  background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-color)',
-                  color: 'white', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600
-                }}
-              >
-                Tutup
-              </button>
+        <div className="modal-backdrop">
+          <div className="transcript-modal">
+            <div className="panel-heading">
+              <div><h3>Transkrip & Analisis</h3><span>{selectedSession.student_details?.name} - {selectedSession.scenario?.title}</span></div>
+              <button className="text-button" onClick={() => setSelectedSession(null)}>Tutup</button>
             </div>
-
-            {/* Layout Box */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1.2fr', gap: '24px', flex: 1, minHeight: 0 }}>
-              
-              {/* Bubble Dialog Panel */}
-              <div className="glass-panel" style={{ 
-                padding: '20px', background: '#05070c', display: 'flex', flexDirection: 'column', 
-                gap: '14px', maxHeight: '50vh', overflowY: 'auto', borderRadius: '12px' 
-              }}>
-                {(selectedSession.transcript || []).map((chat, idx) => {
-                  const isAi = chat.speaker === 'AI';
-                  return (
-                    <div 
-                      key={idx} 
-                      style={{ 
-                        alignSelf: isAi ? 'flex-start' : 'flex-end',
-                        maxWidth: '85%',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '4px'
-                      }}
-                    >
-                      <span style={{ 
-                        fontSize: '0.7rem', color: isAi ? 'var(--accent-teal)' : 'var(--text-secondary)', 
-                        fontWeight: 700, alignSelf: isAi ? 'flex-start' : 'flex-end'
-                      }}>
-                        {isAi ? selectedSession.scenario?.ai_role : 'Mahasiswa'}
-                      </span>
-                      <div style={{
-                        padding: '12px 16px',
-                        borderRadius: '12px',
-                        background: isAi ? 'rgba(255,255,255,0.03)' : 'rgba(16, 185, 129, 0.1)',
-                        border: isAi ? '1px solid var(--border-color)' : '1px solid rgba(16, 185, 129, 0.2)',
-                        color: 'white',
-                        fontSize: '0.85rem',
-                        lineHeight: 1.4
-                      }}>
-                        {chat.message}
-                      </div>
-                    </div>
-                  );
-                })}
+            <div className="transcript-grid">
+              <div className="chat-log">
+                {(selectedSession.transcript || []).map((chat, index) => <div key={index} className={chat.speaker === 'AI' ? 'bubble ai' : 'bubble student'}><span>{chat.speaker === 'AI' ? selectedSession.scenario?.ai_role || 'AI' : 'Mahasiswa'}</span><p>{chat.message}</p></div>)}
               </div>
-
-              {/* Detail Evaluasi Panel */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                
-                {/* Ringkasan Nilai Sesi */}
-                <div className="glass-panel" style={{ padding: '20px', border: '1px solid rgba(16, 185, 129, 0.15)' }}>
-                  <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--accent-teal)', marginBottom: '12px' }}>
-                    RINGKASAN SKOR AKHIR
-                  </h4>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                    <span style={{ fontSize: '2.2rem', fontWeight: 800 }}>{selectedSession.overall_score?.toFixed(2)}</span>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>/ 5.00</span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '16px' }}>
-                    {Object.entries(selectedSession.average_scores || {}).map(([key, val]) => (
-                      <div key={key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        <span style={{ textTransform: 'capitalize' }}>{key.replace('_', ' ')}</span>
-                        <span style={{ fontWeight: 800, color: 'white' }}>{Number(val).toFixed(1)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Info Sesi */}
-                <div className="glass-panel" style={{ padding: '20px', fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-secondary)', marginBottom: '2px' }}>
-                    Informasi Sesi Latihan
-                  </h4>
-                  <div>
-                    <span style={{ color: 'var(--text-muted)', display: 'block' }}>Skenario Latihan</span>
-                    <span>[{selectedSession.scenario?.scenario_id}] {selectedSession.scenario?.title}</span>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--text-muted)', display: 'block' }}>Durasi Latihan</span>
-                    <span>{selectedSession.duration_seconds} Detik</span>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--text-muted)', display: 'block' }}>Jumlah Percakapan</span>
-                    <span>{selectedSession.student_response_count} Kali Respons</span>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--text-muted)', display: 'block' }}>Status Penyelesaian</span>
-                    <span style={{ textTransform: 'uppercase', fontWeight: 700, color: 'var(--accent-teal)' }}>
-                      {selectedSession.status} ({selectedSession.end_reason})
-                    </span>
-                  </div>
-                </div>
-
+              <div className="score-panel">
+                <strong className="big-score">{Number(selectedSession.overall_score || 0).toFixed(2)}</strong>
+                <span>Skor akhir / 5</span>
+                {Object.entries(scoreLabels).map(([key, label]) => <ProgressMetric key={key} label={label} value={selectedSession.average_scores?.[key]} />)}
               </div>
-
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }
