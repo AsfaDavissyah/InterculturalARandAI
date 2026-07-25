@@ -89,6 +89,19 @@ const parseRubric = (value) =>
     return { criterion: criterion || line, description: description || 'Assess this speaking aspect from 1 to 5.' };
   });
 
+const joinTextList = (value, separator = '\n') => {
+  if (Array.isArray(value)) return value.filter(Boolean).join(separator);
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object') return Object.values(value).filter(Boolean).join(separator);
+  return '';
+};
+
+const normalizeCollection = (value) => {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value === 'object') return Object.values(value);
+  return [];
+};
+
 const buildScenarioData = (form) => {
   const scenarioId = form.scenarioId.trim().toUpperCase();
   const objectives = parseObjectives(form.objectivesText);
@@ -189,21 +202,23 @@ const scenarioToBuilder = (item = {}) => {
     aiRole: scenario.ai_role || emptyScenarioBuilder.aiRole,
     aiBackground: scenario.ai_character_prompt || '',
     learningGoal: scenario.learning_goal || '',
-    objectivesText: (data.conversation_objectives || []).map((objective) =>
-      `${objective.objective_id} | ${objective.description} | ${(objective.detection_cues || []).join(', ')}`
+    objectivesText: normalizeCollection(data.conversation_objectives).map((objective, index) =>
+      `${objective?.objective_id || `objective_${index + 1}`} | ${objective?.description || ''} | ${joinTextList(objective?.detection_cues, ', ')}`
     ).join('\n') || emptyScenarioBuilder.objectivesText,
     minResponses: rules.minimum_student_responses || 5,
     targetMin: rules.target_student_responses_min || 6,
     targetMax: rules.target_student_responses_max || 8,
     maxResponses: rules.maximum_student_responses || 10,
-    completionConditions: parseLines(data.objectives?.completion_conditions?.join?.('\n') || '').join('\n') || emptyScenarioBuilder.completionConditions,
+    completionConditions: joinTextList(data.objectives?.completion_conditions) || emptyScenarioBuilder.completionConditions,
     closingInstruction: rules.natural_closing_message || emptyScenarioBuilder.closingInstruction,
-    locationBoundaries: context.boundaries?.join?.('\n') || data.boundaries?.location || emptyScenarioBuilder.locationBoundaries,
+    locationBoundaries: joinTextList(context.boundaries) || data.boundaries?.location || emptyScenarioBuilder.locationBoundaries,
     roleBoundaries: data.boundaries?.role || emptyScenarioBuilder.roleBoundaries,
-    forbiddenTopics: context.forbidden_terms?.join?.(', ') || emptyScenarioBuilder.forbiddenTopics,
-    rubricText: (data.rubric || []).map((item) => `${item.criterion} | ${item.description}`).join('\n') || emptyScenarioBuilder.rubricText,
-    goodExamples: scenario.good_response_examples?.join?.('\n') || emptyScenarioBuilder.goodExamples,
-    poorExamples: scenario.poor_response_examples?.join?.('\n') || emptyScenarioBuilder.poorExamples,
+    forbiddenTopics: joinTextList(context.forbidden_terms, ', ') || emptyScenarioBuilder.forbiddenTopics,
+    rubricText: normalizeCollection(data.rubric).map((item, index) =>
+      `${item?.criterion || `criterion_${index + 1}`} | ${item?.description || ''}`
+    ).join('\n') || emptyScenarioBuilder.rubricText,
+    goodExamples: joinTextList(scenario.good_response_examples) || emptyScenarioBuilder.goodExamples,
+    poorExamples: joinTextList(scenario.poor_response_examples) || emptyScenarioBuilder.poorExamples,
     fallbackGood: data.fallback_responses?.GOOD || emptyScenarioBuilder.fallbackGood,
     fallbackAcceptable: data.fallback_responses?.ACCEPTABLE || emptyScenarioBuilder.fallbackAcceptable,
     fallbackUnclear: data.fallback_responses?.SILENCE_OR_UNCLEAR || emptyScenarioBuilder.fallbackUnclear,
@@ -381,16 +396,32 @@ export default function App() {
   };
 
   const openEditScenario = (scenario) => {
-    const documentId = getScenarioDocumentId(scenario);
-    if (!documentId) {
-      setErrorMessage('Scenario document ID tidak ditemukan. Muat ulang dashboard lalu coba lagi.');
-      return;
+    try {
+      const documentId = getScenarioDocumentId(scenario);
+      if (!documentId) {
+        setErrorMessage('Scenario document ID tidak ditemukan. Muat ulang dashboard lalu coba lagi.');
+        setScenarioModalOpen(true);
+        return;
+      }
+      setEditingScenarioId(documentId);
+      setBuilder(scenarioToBuilder(scenario));
+      setAdvancedJsonOpen(false);
+      setErrorMessage('');
+      setScenarioModalOpen(true);
+    } catch (error) {
+      console.error('Failed to open scenario editor:', error);
+      setEditingScenarioId(getScenarioDocumentId(scenario) || null);
+      setBuilder({
+        ...emptyScenarioBuilder,
+        scenarioId: scenario?.scenarioId || scenario?.data?.scenario?.scenario_id || '',
+        title: scenario?.title || scenario?.data?.scenario?.title || '',
+        isActive: scenario?.isActive ?? true,
+        rawJson: JSON.stringify(scenario?.data || {}, null, 2),
+      });
+      setAdvancedJsonOpen(true);
+      setErrorMessage(`Scenario editor dibuka dalam mode JSON karena format data tidak standar: ${error.message}`);
+      setScenarioModalOpen(true);
     }
-    setEditingScenarioId(documentId);
-    setBuilder(scenarioToBuilder(scenario));
-    setAdvancedJsonOpen(false);
-    setErrorMessage('');
-    setScenarioModalOpen(true);
   };
 
   const handleSaveScenario = async (event) => {
