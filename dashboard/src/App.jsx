@@ -26,6 +26,7 @@ import {
 import './App.css';
 
 const DEFAULT_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+const PAGE_SIZE = 8;
 
 const emptyScenarioBuilder = {
   scenarioId: '',
@@ -100,6 +101,18 @@ const normalizeCollection = (value) => {
   if (Array.isArray(value)) return value;
   if (value && typeof value === 'object') return Object.values(value);
   return [];
+};
+
+const includesText = (value, query) => String(value || '').toLowerCase().includes(String(query || '').toLowerCase());
+
+const paginate = (items, page, pageSize = PAGE_SIZE) => {
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  return {
+    page: safePage,
+    totalPages,
+    items: items.slice((safePage - 1) * pageSize, safePage * pageSize),
+  };
 };
 
 const buildScenarioData = (form) => {
@@ -263,6 +276,29 @@ function ProgressMetric({ label, value }) {
   );
 }
 
+function TableStatusRow({ colSpan, loading, emptyText }) {
+  return (
+    <tr>
+      <td colSpan={colSpan} className="empty-cell">
+        {loading ? 'Loading data...' : emptyText}
+      </td>
+    </tr>
+  );
+}
+
+function PaginationBar({ page, totalPages, totalItems, onPageChange }) {
+  if (totalItems <= PAGE_SIZE) return null;
+  return (
+    <div className="pagination-bar">
+      <span>Showing page {page} of {totalPages} - {totalItems} records</span>
+      <div>
+        <button type="button" className="text-button" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Previous</button>
+        <button type="button" className="text-button" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>Next</button>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('jwt_token') || '');
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user_profile') || 'null'));
@@ -285,6 +321,18 @@ export default function App() {
   const [advancedJsonOpen, setAdvancedJsonOpen] = useState(false);
   const [lecturerForm, setLecturerForm] = useState({ name: '', email: '', password: '', gender: 'female' });
   const [createdLecturerCode, setCreatedLecturerCode] = useState('');
+  const [loadingSections, setLoadingSections] = useState({});
+  const [scenarioSearch, setScenarioSearch] = useState('');
+  const [scenarioStatusFilter, setScenarioStatusFilter] = useState('all');
+  const [scenarioPage, setScenarioPage] = useState(1);
+  const [lecturerSearch, setLecturerSearch] = useState('');
+  const [lecturerPage, setLecturerPage] = useState(1);
+  const [studentSearch, setStudentSearch] = useState('');
+  const [studentPage, setStudentPage] = useState(1);
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyScenarioFilter, setHistoryScenarioFilter] = useState('all');
+  const [historyStatusFilter, setHistoryStatusFilter] = useState('all');
+  const [historyPage, setHistoryPage] = useState(1);
 
   useEffect(() => {
     if (!user) return setActiveTab('');
@@ -299,6 +347,11 @@ export default function App() {
     if (activeTab === 'students') fetchLecturerStudents();
     if (activeTab === 'history') fetchLecturerHistory();
   }, [activeTab, token]);
+
+  useEffect(() => { setScenarioPage(1); }, [scenarioSearch, scenarioStatusFilter]);
+  useEffect(() => { setLecturerPage(1); }, [lecturerSearch]);
+  useEffect(() => { setStudentPage(1); }, [studentSearch]);
+  useEffect(() => { setHistoryPage(1); }, [historySearch, historyScenarioFilter, historyStatusFilter]);
 
   const callApi = async (endpoint, method = 'GET', body = null) => {
     const headers = { 'Content-Type': 'application/json' };
@@ -349,20 +402,28 @@ export default function App() {
     setShowConfig(false);
   };
 
+  const setSectionLoading = (key, value) => {
+    setLoadingSections((current) => ({ ...current, [key]: value }));
+  };
+
   const fetchAdminScenarios = async () => {
-    try { setScenarios(await callApi('/api/admin/scenarios')); } catch (error) { console.error(error); }
+    setSectionLoading('scenarios', true);
+    try { setScenarios(await callApi('/api/admin/scenarios')); } catch (error) { console.error(error); } finally { setSectionLoading('scenarios', false); }
   };
 
   const fetchAdminLecturers = async () => {
-    try { setLecturers(await callApi('/api/admin/lecturers')); } catch (error) { console.error(error); }
+    setSectionLoading('lecturers', true);
+    try { setLecturers(await callApi('/api/admin/lecturers')); } catch (error) { console.error(error); } finally { setSectionLoading('lecturers', false); }
   };
 
   const fetchLecturerStudents = async () => {
-    try { setStudents(await callApi('/api/lecturer/students')); } catch (error) { console.error(error); }
+    setSectionLoading('students', true);
+    try { setStudents(await callApi('/api/lecturer/students')); } catch (error) { console.error(error); } finally { setSectionLoading('students', false); }
   };
 
   const fetchLecturerHistory = async () => {
-    try { setHistory(await callApi('/api/lecturer/history')); } catch (error) { console.error(error); }
+    setSectionLoading('history', true);
+    try { setHistory(await callApi('/api/lecturer/history')); } catch (error) { console.error(error); } finally { setSectionLoading('history', false); }
   };
 
   const fetchOverviewData = async () => {
@@ -386,6 +447,51 @@ export default function App() {
     }, {});
     return { completed, avgScore, avgDuration, avgResponses, topScenario, scoreAverages };
   }, [history]);
+
+  const filteredScenarios = useMemo(() => scenarios.filter((item) => {
+    const scenario = getScenarioCore(item);
+    const matchesSearch = !scenarioSearch
+      || includesText(item.scenarioId, scenarioSearch)
+      || includesText(item.title, scenarioSearch)
+      || includesText(scenario.ai_role, scenarioSearch)
+      || includesText(scenario.student_role, scenarioSearch);
+    const matchesStatus = scenarioStatusFilter === 'all'
+      || (scenarioStatusFilter === 'active' ? item.isActive : !item.isActive);
+    return matchesSearch && matchesStatus;
+  }), [scenarios, scenarioSearch, scenarioStatusFilter]);
+  const scenarioPagination = paginate(filteredScenarios, scenarioPage);
+
+  const filteredLecturers = useMemo(() => lecturers.filter((item) =>
+    !lecturerSearch
+    || includesText(item.name, lecturerSearch)
+    || includesText(item.email, lecturerSearch)
+    || includesText(item.lecturerCode, lecturerSearch)
+  ), [lecturers, lecturerSearch]);
+  const lecturerPagination = paginate(filteredLecturers, lecturerPage);
+
+  const filteredStudents = useMemo(() => students.filter((item) =>
+    !studentSearch
+    || includesText(item.name, studentSearch)
+    || includesText(item.email, studentSearch)
+    || includesText(item.studentId, studentSearch)
+  ), [students, studentSearch]);
+  const studentPagination = paginate(filteredStudents, studentPage);
+
+  const historyScenarioOptions = useMemo(() => Array.from(new Set(
+    history.map((item) => item.scenario?.scenario_id).filter(Boolean)
+  )).sort(), [history]);
+
+  const filteredHistory = useMemo(() => history.filter((item) => {
+    const matchesSearch = !historySearch
+      || includesText(item.student_details?.student_id, historySearch)
+      || includesText(item.student_details?.name, historySearch)
+      || includesText(item.scenario?.scenario_id, historySearch)
+      || includesText(item.scenario?.title, historySearch);
+    const matchesScenario = historyScenarioFilter === 'all' || item.scenario?.scenario_id === historyScenarioFilter;
+    const matchesStatus = historyStatusFilter === 'all' || item.status === historyStatusFilter;
+    return matchesSearch && matchesScenario && matchesStatus;
+  }), [history, historySearch, historyScenarioFilter, historyStatusFilter]);
+  const historyPagination = paginate(filteredHistory, historyPage);
 
   const openNewScenario = () => {
     setEditingScenarioId(null);
@@ -490,9 +596,10 @@ export default function App() {
   };
 
   const exportHistoryToCSV = () => {
-    if (!history.length) return alert('Tidak ada data riwayat untuk diekspor.');
+    const exportRows = filteredHistory.length ? filteredHistory : history;
+    if (!exportRows.length) return alert('Tidak ada data riwayat untuk diekspor.');
     const headers = ['NIM', 'Nama', 'Consent', 'Scenario ID', 'Judul', 'Selesai', 'Durasi', 'Respons', 'Status', 'Skor', ...Object.values(scoreLabels)];
-    const rows = history.map((item) => [
+    const rows = exportRows.map((item) => [
       item.student_details?.student_id || '',
       item.student_details?.name || '',
       item.student_details?.consent ? 'YA' : 'TIDAK',
@@ -570,12 +677,23 @@ export default function App() {
               <StatCard icon={FileText} label="Format" value="V2" detail="builder + advanced JSON" />
             </div>
             <div className="data-panel">
-              <div className="panel-heading"><h3>Scenarios List</h3><span>{scenarios.length} {scenarios.length === 1 ? 'item' : 'items'}</span></div>
+              <div className="panel-heading"><h3>Scenarios List</h3><span>{filteredScenarios.length} of {scenarios.length} items</span></div>
+              <div className="table-toolbar">
+                <label className="toolbar-field">
+                  <Search size={15} />
+                  <input value={scenarioSearch} onChange={(event) => setScenarioSearch(event.target.value)} placeholder="Search ID, title, or role..." />
+                </label>
+                <select value={scenarioStatusFilter} onChange={(event) => setScenarioStatusFilter(event.target.value)}>
+                  <option value="all">All status</option>
+                  <option value="active">Active only</option>
+                  <option value="inactive">Inactive only</option>
+                </select>
+              </div>
               <div className="custom-table-container">
                 <table className="custom-table scenario-list-table">
                   <thead><tr><th>ID</th><th>Title</th><th>Status</th><th>Action</th></tr></thead>
                   <tbody>
-                    {scenarios.map((scenario) => (
+                    {scenarioPagination.items.map((scenario) => (
                       <tr
                         key={getScenarioDocumentId(scenario)}
                         className="clickable-row"
@@ -666,10 +784,13 @@ export default function App() {
                         </td>
                       </tr>
                     ))}
-                    {!scenarios.length && <tr><td colSpan="4" className="empty-cell">No scenarios found.</td></tr>}
+                    {!scenarioPagination.items.length && (
+                      <TableStatusRow colSpan={4} loading={loadingSections.scenarios} emptyText="No scenarios match the current filter." />
+                    )}
                   </tbody>
                 </table>
               </div>
+              <PaginationBar page={scenarioPagination.page} totalPages={scenarioPagination.totalPages} totalItems={filteredScenarios.length} onPageChange={setScenarioPage} />
             </div>
           </section>
         )}
@@ -687,10 +808,20 @@ export default function App() {
               <button className="primary-action">Create Account</button>
             </form>
             <div className="data-panel">
-              <div className="panel-heading"><h3>Lecturer List</h3><span>{lecturers.length} {lecturers.length === 1 ? 'account' : 'accounts'}</span></div>
+              <div className="panel-heading"><h3>Lecturer List</h3><span>{filteredLecturers.length} of {lecturers.length} accounts</span></div>
+              <div className="table-toolbar">
+                <label className="toolbar-field">
+                  <Search size={15} />
+                  <input value={lecturerSearch} onChange={(event) => setLecturerSearch(event.target.value)} placeholder="Search lecturer, email, or code..." />
+                </label>
+              </div>
               <table className="custom-table"><thead><tr><th>Name</th><th>Email</th><th>Code</th><th>Registered</th></tr></thead><tbody>
-                {lecturers.map((lecturer) => <tr key={lecturer.id}><td>{lecturer.name}</td><td>{lecturer.email}</td><td><strong>{lecturer.lecturerCode}</strong></td><td>{lecturer.createdAt ? new Date(lecturer.createdAt).toLocaleDateString('en-US') : '-'}</td></tr>)}
+                {lecturerPagination.items.map((lecturer) => <tr key={lecturer.id}><td>{lecturer.name}</td><td>{lecturer.email}</td><td><strong>{lecturer.lecturerCode}</strong></td><td>{lecturer.createdAt ? new Date(lecturer.createdAt).toLocaleDateString('en-US') : '-'}</td></tr>)}
+                {!lecturerPagination.items.length && (
+                  <TableStatusRow colSpan={4} loading={loadingSections.lecturers} emptyText="No lecturer accounts match the current search." />
+                )}
               </tbody></table>
+              <PaginationBar page={lecturerPagination.page} totalPages={lecturerPagination.totalPages} totalItems={filteredLecturers.length} onPageChange={setLecturerPage} />
             </div>
           </section>
         )}
@@ -734,11 +865,17 @@ export default function App() {
 
         {user.role === 'lecturer' && activeTab === 'students' && (
           <div className="data-panel">
-            <div className="panel-heading"><h3>Registered Students</h3><span>{students.length} {students.length === 1 ? 'student' : 'students'}</span></div>
+            <div className="panel-heading"><h3>Registered Students</h3><span>{filteredStudents.length} of {students.length} students</span></div>
+            <div className="table-toolbar">
+              <label className="toolbar-field">
+                <Search size={15} />
+                <input value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} placeholder="Search student ID, name, or email..." />
+              </label>
+            </div>
             <table className="custom-table">
               <thead><tr><th>Student ID</th><th>Name</th><th>Email</th><th>Consent</th><th>Registered</th></tr></thead>
               <tbody>
-                {students.map((student) => (
+                {studentPagination.items.map((student) => (
                   <tr key={student.id}>
                     <td><strong>{student.studentId || '-'}</strong></td>
                     <td>{student.name}</td>
@@ -751,9 +888,12 @@ export default function App() {
                     <td>{student.createdAt ? new Date(student.createdAt).toLocaleDateString('en-US') : '-'}</td>
                   </tr>
                 ))}
-                {!students.length && <tr><td colSpan="5" className="empty-cell">No students registered yet.</td></tr>}
+                {!studentPagination.items.length && (
+                  <TableStatusRow colSpan={5} loading={loadingSections.students} emptyText="No students match the current search." />
+                )}
               </tbody>
             </table>
+            <PaginationBar page={studentPagination.page} totalPages={studentPagination.totalPages} totalItems={filteredStudents.length} onPageChange={setStudentPage} />
           </div>
         )}
 
@@ -761,10 +901,28 @@ export default function App() {
           <section className="screen-stack">
             <div className="action-row"><p>This history can be exported as research data.</p><button className="primary-action" onClick={exportHistoryToCSV}><Download size={16} /> Export CSV</button></div>
             <div className="data-panel">
+              <div className="panel-heading"><h3>Practice Sessions</h3><span>{filteredHistory.length} of {history.length} sessions</span></div>
+              <div className="table-toolbar multi">
+                <label className="toolbar-field">
+                  <Search size={15} />
+                  <input value={historySearch} onChange={(event) => setHistorySearch(event.target.value)} placeholder="Search student or scenario..." />
+                </label>
+                <select value={historyScenarioFilter} onChange={(event) => setHistoryScenarioFilter(event.target.value)}>
+                  <option value="all">All scenarios</option>
+                  {historyScenarioOptions.map((id) => <option key={id} value={id}>{id}</option>)}
+                </select>
+                <select value={historyStatusFilter} onChange={(event) => setHistoryStatusFilter(event.target.value)}>
+                  <option value="all">All status</option>
+                  <option value="completed">Completed</option>
+                  <option value="ended_manually">Ended manually</option>
+                  <option value="abandoned">Abandoned</option>
+                  <option value="active">Active</option>
+                </select>
+              </div>
               <table className="custom-table">
                 <thead><tr><th>Student ID</th><th>Student</th><th>Scenario</th><th>Completed At</th><th>Duration</th><th>Responses</th><th>Score</th><th>Action</th></tr></thead>
                 <tbody>
-                  {history.map((item, index) => (
+                  {historyPagination.items.map((item, index) => (
                     <tr key={index}>
                       <td>{item.student_details?.student_id || '-'}</td>
                       <td>{item.student_details?.name || '-'}</td>
@@ -780,9 +938,12 @@ export default function App() {
                       </td>
                     </tr>
                   ))}
-                  {!history.length && <tr><td colSpan="8" className="empty-cell">No practice sessions yet.</td></tr>}
+                  {!historyPagination.items.length && (
+                    <TableStatusRow colSpan={8} loading={loadingSections.history} emptyText="No practice sessions match the current filters." />
+                  )}
                 </tbody>
               </table>
+              <PaginationBar page={historyPagination.page} totalPages={historyPagination.totalPages} totalItems={filteredHistory.length} onPageChange={setHistoryPage} />
             </div>
           </section>
         )}
@@ -797,30 +958,44 @@ export default function App() {
               <button type="button" className="text-button" onClick={() => setScenarioModalOpen(false)}>Close</button>
             </div>
             {errorMessage && <div className="error-box">{errorMessage}</div>}
-            <div className="builder-grid">
-              <label>Scenario ID<input required disabled={!!editingScenarioId} value={builder.scenarioId} onChange={(event) => setBuilder({ ...builder, scenarioId: event.target.value })} placeholder="G-ICC-011" /></label>
-              <label>Title<input required value={builder.title} onChange={(event) => setBuilder({ ...builder, title: event.target.value })} placeholder="Meeting an International Student on Campus" /></label>
-              <label>Type<input value={builder.type} onChange={(event) => setBuilder({ ...builder, type: event.target.value })} /></label>
-              <label>Level<input value={builder.level} onChange={(event) => setBuilder({ ...builder, level: event.target.value })} /></label>
-              <label>AR Scene<input value={builder.arScene} onChange={(event) => setBuilder({ ...builder, arScene: event.target.value })} placeholder="International Office" /></label>
-              <label>Student Role<input value={builder.studentRole} onChange={(event) => setBuilder({ ...builder, studentRole: event.target.value })} /></label>
-              <label>AI Role<input value={builder.aiRole} onChange={(event) => setBuilder({ ...builder, aiRole: event.target.value })} /></label>
-              <label>AI Personality<input value={builder.aiPersonality} onChange={(event) => setBuilder({ ...builder, aiPersonality: event.target.value })} /></label>
+            <div className="builder-section">
+              <h4>Basic Information</h4>
+              <div className="builder-grid">
+                <label>Scenario ID<input required disabled={!!editingScenarioId} value={builder.scenarioId} onChange={(event) => setBuilder({ ...builder, scenarioId: event.target.value })} placeholder="G-ICC-011" /></label>
+                <label>Title<input required value={builder.title} onChange={(event) => setBuilder({ ...builder, title: event.target.value })} placeholder="Meeting an International Student on Campus" /></label>
+                <label>Type<input value={builder.type} onChange={(event) => setBuilder({ ...builder, type: event.target.value })} /></label>
+                <label>Level<input value={builder.level} onChange={(event) => setBuilder({ ...builder, level: event.target.value })} /></label>
+              </div>
             </div>
-            <label>Setting description<textarea rows="2" value={builder.sceneDescription} onChange={(event) => setBuilder({ ...builder, sceneDescription: event.target.value })} /></label>
-            <label>Learning goal<textarea rows="2" value={builder.learningGoal} onChange={(event) => setBuilder({ ...builder, learningGoal: event.target.value })} /></label>
-            <label>Student task<textarea rows="2" value={builder.studentTask} onChange={(event) => setBuilder({ ...builder, studentTask: event.target.value })} /></label>
-            <label>Objectives, one line per item: id | description | detection_cues<textarea rows="4" value={builder.objectivesText} onChange={(event) => setBuilder({ ...builder, objectivesText: event.target.value })} /></label>
-            <div className="builder-grid compact">
-              <label>Minimum responses<input type="number" min="1" value={builder.minResponses} onChange={(event) => setBuilder({ ...builder, minResponses: event.target.value })} /></label>
-              <label>Target min<input type="number" min="1" value={builder.targetMin} onChange={(event) => setBuilder({ ...builder, targetMin: event.target.value })} /></label>
-              <label>Target max<input type="number" min="1" value={builder.targetMax} onChange={(event) => setBuilder({ ...builder, targetMax: event.target.value })} /></label>
-              <label>Maximum<input type="number" min="1" value={builder.maxResponses} onChange={(event) => setBuilder({ ...builder, maxResponses: event.target.value })} /></label>
+            <div className="builder-section">
+              <h4>Context & Roles</h4>
+              <div className="builder-grid">
+                <label>AR Scene<input value={builder.arScene} onChange={(event) => setBuilder({ ...builder, arScene: event.target.value })} placeholder="International Office" /></label>
+                <label>Student Role<input value={builder.studentRole} onChange={(event) => setBuilder({ ...builder, studentRole: event.target.value })} /></label>
+                <label>AI Role<input value={builder.aiRole} onChange={(event) => setBuilder({ ...builder, aiRole: event.target.value })} /></label>
+                <label>AI Personality<input value={builder.aiPersonality} onChange={(event) => setBuilder({ ...builder, aiPersonality: event.target.value })} /></label>
+              </div>
+              <label>Setting description<textarea rows="2" value={builder.sceneDescription} onChange={(event) => setBuilder({ ...builder, sceneDescription: event.target.value })} /></label>
+              <label>Student task<textarea rows="2" value={builder.studentTask} onChange={(event) => setBuilder({ ...builder, studentTask: event.target.value })} /></label>
             </div>
-            <label>Completion conditions<textarea rows="3" value={builder.completionConditions} onChange={(event) => setBuilder({ ...builder, completionConditions: event.target.value })} /></label>
-            <label>Location boundaries<textarea rows="2" value={builder.locationBoundaries} onChange={(event) => setBuilder({ ...builder, locationBoundaries: event.target.value })} /></label>
-            <label>Role boundaries<textarea rows="2" value={builder.roleBoundaries} onChange={(event) => setBuilder({ ...builder, roleBoundaries: event.target.value })} /></label>
-            <label>Rubric: criterion | description<textarea rows="4" value={builder.rubricText} onChange={(event) => setBuilder({ ...builder, rubricText: event.target.value })} /></label>
+            <div className="builder-section">
+              <h4>Conversation Flow</h4>
+              <label>Learning goal<textarea rows="2" value={builder.learningGoal} onChange={(event) => setBuilder({ ...builder, learningGoal: event.target.value })} /></label>
+              <label>Objectives, one line per item: id | description | detection_cues<textarea rows="4" value={builder.objectivesText} onChange={(event) => setBuilder({ ...builder, objectivesText: event.target.value })} /></label>
+              <div className="builder-grid compact">
+                <label>Minimum responses<input type="number" min="1" value={builder.minResponses} onChange={(event) => setBuilder({ ...builder, minResponses: event.target.value })} /></label>
+                <label>Target min<input type="number" min="1" value={builder.targetMin} onChange={(event) => setBuilder({ ...builder, targetMin: event.target.value })} /></label>
+                <label>Target max<input type="number" min="1" value={builder.targetMax} onChange={(event) => setBuilder({ ...builder, targetMax: event.target.value })} /></label>
+                <label>Maximum<input type="number" min="1" value={builder.maxResponses} onChange={(event) => setBuilder({ ...builder, maxResponses: event.target.value })} /></label>
+              </div>
+              <label>Completion conditions<textarea rows="3" value={builder.completionConditions} onChange={(event) => setBuilder({ ...builder, completionConditions: event.target.value })} /></label>
+            </div>
+            <div className="builder-section">
+              <h4>Boundaries & Rubric</h4>
+              <label>Location boundaries<textarea rows="2" value={builder.locationBoundaries} onChange={(event) => setBuilder({ ...builder, locationBoundaries: event.target.value })} /></label>
+              <label>Role boundaries<textarea rows="2" value={builder.roleBoundaries} onChange={(event) => setBuilder({ ...builder, roleBoundaries: event.target.value })} /></label>
+              <label>Rubric: criterion | description<textarea rows="4" value={builder.rubricText} onChange={(event) => setBuilder({ ...builder, rubricText: event.target.value })} /></label>
+            </div>
             <div className="modal-options">
               <label className="switch-row"><input type="checkbox" checked={builder.isActive} onChange={(event) => setBuilder({ ...builder, isActive: event.target.checked })} /> Active on mobile</label>
               <button type="button" className="text-button" onClick={() => setAdvancedJsonOpen(!advancedJsonOpen)}>Advanced JSON</button>
