@@ -236,6 +236,23 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       await _tts.setPitch(1.0);
       await _tts.setVolume(1.0);
       await _tts.awaitSpeakCompletion(true);
+
+      _tts.setStartHandler(() {
+        if (!mounted) return;
+        setState(() {
+          _activity = AvatarActivity.speaking;
+          if (_messages.isNotEmpty && _messages.last.speaker == 'AI') {
+            _activeSubtitle = _messages.last;
+          }
+        });
+      });
+
+      _tts.setCompletionHandler(() {
+        if (!mounted) return;
+        setState(() {
+          _activity = AvatarActivity.idle;
+        });
+      });
     } catch (_) {}
   }
 

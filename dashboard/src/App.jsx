@@ -299,6 +299,92 @@ function PaginationBar({ page, totalPages, totalItems, onPageChange }) {
   );
 }
 
+function StudentLongitudinalChart({ history }) {
+  const completedSessions = useMemo(() => {
+    return (history || [])
+      .filter((s) => s.status === 'completed' || s.status === 'ended_manually')
+      .sort((a, b) => new Date(a.completed_at || a.createdAt || 0) - new Date(b.completed_at || b.createdAt || 0));
+  }, [history]);
+
+  if (!completedSessions.length) {
+    return (
+      <div className="data-panel longitudinal-panel">
+        <div className="panel-heading">
+          <h3>Longitudinal Student Progress</h3>
+          <span>Score trends per practice session</span>
+        </div>
+        <p className="empty-note">Belum ada data sesi selesai untuk menampilkan grafik longitudinal.</p>
+      </div>
+    );
+  }
+
+  const width = 600;
+  const height = 180;
+  const padding = 35;
+
+  const points = completedSessions.map((session, index) => {
+    const x = completedSessions.length === 1
+      ? width / 2
+      : padding + (index / (completedSessions.length - 1)) * (width - padding * 2);
+    const score = Number(session.overall_score || 0);
+    const y = height - padding - ((score / 5) * (height - padding * 2));
+    return { x, y, score, session };
+  });
+
+  const pathD = points.length === 1
+    ? `M ${padding} ${points[0].y} L ${width - padding} ${points[0].y}`
+    : points.reduce((acc, pt, i) => `${acc} ${i === 0 ? 'M' : 'L'} ${pt.x} ${pt.y}`, '');
+
+  return (
+    <div className="data-panel longitudinal-panel">
+      <div className="panel-heading">
+        <h3>Longitudinal Student Progress</h3>
+        <span>{completedSessions.length} sessions tracked</span>
+      </div>
+      <div className="longitudinal-chart-container">
+        <svg viewBox={`0 0 ${width} ${height}`} className="longitudinal-svg">
+          {[1, 2, 3, 4, 5].map((val) => {
+            const y = height - padding - ((val / 5) * (height - padding * 2));
+            return (
+              <g key={val}>
+                <line x1={padding} y1={y} x2={width - padding} y2={y} stroke="#e2e8f0" strokeDasharray="3 3" />
+                <text x={padding - 8} y={y + 4} textAnchor="end" fontSize="10" fill="#64748b">{val}.0</text>
+              </g>
+            );
+          })}
+          {points.length > 1 && (
+            <>
+              <path
+                d={`${pathD} L ${points[points.length - 1].x} ${height - padding} L ${points[0].x} ${height - padding} Z`}
+                fill="url(#scoreGrad)"
+                opacity="0.15"
+              />
+              <path d={pathD} fill="none" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </>
+          )}
+          <defs>
+            <linearGradient id="scoreGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#f97316" />
+              <stop offset="100%" stopColor="#f97316" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {points.map((pt, i) => (
+            <g key={i} className="chart-point-group">
+              <circle cx={pt.x} cy={pt.y} r="5" fill="#ffffff" stroke="#f97316" strokeWidth="2.5" />
+              <text x={pt.x} y={pt.y - 10} textAnchor="middle" fontSize="11" fontWeight="700" fill="#0f172a">
+                {pt.score.toFixed(1)}
+              </text>
+              <text x={pt.x} y={height - 8} textAnchor="middle" fontSize="9" fill="#94a3b8">
+                Sesi {i + 1}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('jwt_token') || '');
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user_profile') || 'null'));
@@ -314,9 +400,11 @@ export default function App() {
   const [students, setStudents] = useState([]);
   const [history, setHistory] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
+  const [sessionTab, setSessionTab] = useState('turns');
   const [selectedScenarioForDetail, setSelectedScenarioForDetail] = useState(null);
   const [scenarioModalOpen, setScenarioModalOpen] = useState(false);
   const [editingScenarioId, setEditingScenarioId] = useState(null);
+  const [builderStep, setBuilderStep] = useState(1);
   const [builder, setBuilder] = useState(emptyScenarioBuilder);
   const [advancedJsonOpen, setAdvancedJsonOpen] = useState(false);
   const [lecturerForm, setLecturerForm] = useState({ name: '', email: '', password: '', gender: 'female' });
@@ -496,6 +584,7 @@ export default function App() {
   const openNewScenario = () => {
     setEditingScenarioId(null);
     setBuilder(emptyScenarioBuilder);
+    setBuilderStep(1);
     setAdvancedJsonOpen(false);
     setErrorMessage('');
     setScenarioModalOpen(true);
@@ -511,6 +600,7 @@ export default function App() {
       }
       setEditingScenarioId(documentId);
       setBuilder(scenarioToBuilder(scenario));
+      setBuilderStep(1);
       setAdvancedJsonOpen(false);
       setErrorMessage('');
       setScenarioModalOpen(true);
@@ -842,6 +932,7 @@ export default function App() {
               <StatCard icon={Award} label="Average score" value={dashboardMetrics.avgScore.toFixed(2)} detail={`${Math.round(dashboardMetrics.avgDuration)} seconds/session`} />
               <StatCard icon={BookOpen} label="Most Active" value={dashboardMetrics.topScenario?.[0] || '-'} detail={dashboardMetrics.topScenario ? `${dashboardMetrics.topScenario[1]} sessions` : 'no data available'} />
             </div>
+            <StudentLongitudinalChart history={history} />
             <div className="research-grid">
               <div className="data-panel">
                 <div className="panel-heading"><h3>Skill Performance</h3><span>average / 5</span></div>
@@ -952,77 +1043,188 @@ export default function App() {
 
       {scenarioModalOpen && (
         <div className="modal-backdrop">
-          <form className="scenario-modal" onSubmit={handleSaveScenario}>
+          <form className="scenario-modal wizard-modal" onSubmit={handleSaveScenario}>
             <div className="panel-heading">
-              <div><h3>{editingScenarioId ? 'Edit Scenario Builder' : 'Create Scenario Builder'}</h3><span>Do not use specific names as fixed characters.</span></div>
+              <div>
+                <h3>{editingScenarioId ? 'Edit Scenario Builder' : 'Create Scenario Builder'}</h3>
+                <span>Configure scenario metadata, roles, objectives, and rubrics in structured steps.</span>
+              </div>
               <button type="button" className="text-button" onClick={() => setScenarioModalOpen(false)}>Close</button>
             </div>
+
+            <div className="wizard-stepper">
+              {[
+                { step: 1, label: '1. Basic & AR Scene' },
+                { step: 2, label: '2. Roles & Prompts' },
+                { step: 3, label: '3. Flow & Objectives' },
+                { step: 4, label: '4. Boundaries & Rubric' },
+              ].map((item) => (
+                <button
+                  key={item.step}
+                  type="button"
+                  className={`stepper-item ${builderStep === item.step ? 'active' : ''} ${builderStep > item.step ? 'completed' : ''}`}
+                  onClick={() => setBuilderStep(item.step)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+
             {errorMessage && <div className="error-box">{errorMessage}</div>}
-            <div className="builder-section">
-              <h4>Basic Information</h4>
-              <div className="builder-grid">
-                <label>Scenario ID<input required disabled={!!editingScenarioId} value={builder.scenarioId} onChange={(event) => setBuilder({ ...builder, scenarioId: event.target.value })} placeholder="G-ICC-011" /></label>
-                <label>Title<input required value={builder.title} onChange={(event) => setBuilder({ ...builder, title: event.target.value })} placeholder="Meeting an International Student on Campus" /></label>
-                <label>Type<input value={builder.type} onChange={(event) => setBuilder({ ...builder, type: event.target.value })} /></label>
-                <label>Level<input value={builder.level} onChange={(event) => setBuilder({ ...builder, level: event.target.value })} /></label>
+
+            {builderStep === 1 && (
+              <div className="builder-section">
+                <h4>Step 1: Basic Information & AR Setting</h4>
+                <div className="builder-grid">
+                  <label>Scenario ID<input required disabled={!!editingScenarioId} value={builder.scenarioId} onChange={(event) => setBuilder({ ...builder, scenarioId: event.target.value })} placeholder="G-ICC-011" /></label>
+                  <label>Title<input required value={builder.title} onChange={(event) => setBuilder({ ...builder, title: event.target.value })} placeholder="Meeting an International Student on Campus" /></label>
+                  <label>Type<input value={builder.type} onChange={(event) => setBuilder({ ...builder, type: event.target.value })} /></label>
+                  <label>Level<input value={builder.level} onChange={(event) => setBuilder({ ...builder, level: event.target.value })} /></label>
+                  <label>AR Scene<input value={builder.arScene} onChange={(event) => setBuilder({ ...builder, arScene: event.target.value })} placeholder="International Office" /></label>
+                </div>
+                <label>Setting description<textarea rows="3" value={builder.sceneDescription} onChange={(event) => setBuilder({ ...builder, sceneDescription: event.target.value })} /></label>
+              </div>
+            )}
+
+            {builderStep === 2 && (
+              <div className="builder-section">
+                <h4>Step 2: Character Roles & Prompts</h4>
+                <div className="builder-grid">
+                  <label>Student Role<input value={builder.studentRole} onChange={(event) => setBuilder({ ...builder, studentRole: event.target.value })} /></label>
+                  <label>AI Role<input value={builder.aiRole} onChange={(event) => setBuilder({ ...builder, aiRole: event.target.value })} /></label>
+                  <label>AI Personality<input value={builder.aiPersonality} onChange={(event) => setBuilder({ ...builder, aiPersonality: event.target.value })} /></label>
+                  <label>AI Style & Background<input value={builder.aiBackground} onChange={(event) => setBuilder({ ...builder, aiBackground: event.target.value })} /></label>
+                </div>
+                <label>Student Task Instruction<textarea rows="3" value={builder.studentTask} onChange={(event) => setBuilder({ ...builder, studentTask: event.target.value })} /></label>
+              </div>
+            )}
+
+            {builderStep === 3 && (
+              <div className="builder-section">
+                <h4>Step 3: Conversation Flow & Learning Goals</h4>
+                <label>Learning goal<textarea rows="2" value={builder.learningGoal} onChange={(event) => setBuilder({ ...builder, learningGoal: event.target.value })} /></label>
+                <label>Objectives, one line per item: id | description | detection_cues<textarea rows="4" value={builder.objectivesText} onChange={(event) => setBuilder({ ...builder, objectivesText: event.target.value })} /></label>
+                <div className="builder-grid compact">
+                  <label>Minimum responses<input type="number" min="1" value={builder.minResponses} onChange={(event) => setBuilder({ ...builder, minResponses: event.target.value })} /></label>
+                  <label>Target min<input type="number" min="1" value={builder.targetMin} onChange={(event) => setBuilder({ ...builder, targetMin: event.target.value })} /></label>
+                  <label>Target max<input type="number" min="1" value={builder.targetMax} onChange={(event) => setBuilder({ ...builder, targetMax: event.target.value })} /></label>
+                  <label>Maximum<input type="number" min="1" value={builder.maxResponses} onChange={(event) => setBuilder({ ...builder, maxResponses: event.target.value })} /></label>
+                </div>
+                <label>Completion conditions<textarea rows="3" value={builder.completionConditions} onChange={(event) => setBuilder({ ...builder, completionConditions: event.target.value })} /></label>
+              </div>
+            )}
+
+            {builderStep === 4 && (
+              <div className="builder-section">
+                <h4>Step 4: Boundaries, Rubric & Status</h4>
+                <label>Location boundaries<textarea rows="2" value={builder.locationBoundaries} onChange={(event) => setBuilder({ ...builder, locationBoundaries: event.target.value })} /></label>
+                <label>Role boundaries<textarea rows="2" value={builder.roleBoundaries} onChange={(event) => setBuilder({ ...builder, roleBoundaries: event.target.value })} /></label>
+                <label>Forbidden Topics (comma separated)<textarea rows="2" value={builder.forbiddenTopics} onChange={(event) => setBuilder({ ...builder, forbiddenTopics: event.target.value })} /></label>
+                <label>Rubric: criterion | description<textarea rows="4" value={builder.rubricText} onChange={(event) => setBuilder({ ...builder, rubricText: event.target.value })} /></label>
+
+                <div className="modal-options">
+                  <label className="switch-row"><input type="checkbox" checked={builder.isActive} onChange={(event) => setBuilder({ ...builder, isActive: event.target.checked })} /> Active on mobile</label>
+                  <button type="button" className="text-button" onClick={() => setAdvancedJsonOpen(!advancedJsonOpen)}>Advanced JSON</button>
+                </div>
+                {advancedJsonOpen && <label>Raw JSON override<textarea rows="6" value={builder.rawJson || JSON.stringify(buildScenarioData(builder), null, 2)} onChange={(event) => setBuilder({ ...builder, rawJson: event.target.value })} /></label>}
+              </div>
+            )}
+
+            <div className="wizard-footer">
+              <span className="step-indicator">Step {builderStep} of 4</span>
+              <div className="wizard-actions">
+                {builderStep > 1 && (
+                  <button type="button" className="secondary-action" onClick={() => setBuilderStep(builderStep - 1)}>Previous</button>
+                )}
+                {builderStep < 4 ? (
+                  <button type="button" className="primary-action" onClick={() => setBuilderStep(builderStep + 1)}>Next Step</button>
+                ) : (
+                  <button type="submit" className="primary-action">Save Scenario</button>
+                )}
+                {builderStep < 4 && (
+                  <button type="submit" className="text-button" style={{ color: '#ea580c' }}>Save Draft</button>
+                )}
               </div>
             </div>
-            <div className="builder-section">
-              <h4>Context & Roles</h4>
-              <div className="builder-grid">
-                <label>AR Scene<input value={builder.arScene} onChange={(event) => setBuilder({ ...builder, arScene: event.target.value })} placeholder="International Office" /></label>
-                <label>Student Role<input value={builder.studentRole} onChange={(event) => setBuilder({ ...builder, studentRole: event.target.value })} /></label>
-                <label>AI Role<input value={builder.aiRole} onChange={(event) => setBuilder({ ...builder, aiRole: event.target.value })} /></label>
-                <label>AI Personality<input value={builder.aiPersonality} onChange={(event) => setBuilder({ ...builder, aiPersonality: event.target.value })} /></label>
-              </div>
-              <label>Setting description<textarea rows="2" value={builder.sceneDescription} onChange={(event) => setBuilder({ ...builder, sceneDescription: event.target.value })} /></label>
-              <label>Student task<textarea rows="2" value={builder.studentTask} onChange={(event) => setBuilder({ ...builder, studentTask: event.target.value })} /></label>
-            </div>
-            <div className="builder-section">
-              <h4>Conversation Flow</h4>
-              <label>Learning goal<textarea rows="2" value={builder.learningGoal} onChange={(event) => setBuilder({ ...builder, learningGoal: event.target.value })} /></label>
-              <label>Objectives, one line per item: id | description | detection_cues<textarea rows="4" value={builder.objectivesText} onChange={(event) => setBuilder({ ...builder, objectivesText: event.target.value })} /></label>
-              <div className="builder-grid compact">
-                <label>Minimum responses<input type="number" min="1" value={builder.minResponses} onChange={(event) => setBuilder({ ...builder, minResponses: event.target.value })} /></label>
-                <label>Target min<input type="number" min="1" value={builder.targetMin} onChange={(event) => setBuilder({ ...builder, targetMin: event.target.value })} /></label>
-                <label>Target max<input type="number" min="1" value={builder.targetMax} onChange={(event) => setBuilder({ ...builder, targetMax: event.target.value })} /></label>
-                <label>Maximum<input type="number" min="1" value={builder.maxResponses} onChange={(event) => setBuilder({ ...builder, maxResponses: event.target.value })} /></label>
-              </div>
-              <label>Completion conditions<textarea rows="3" value={builder.completionConditions} onChange={(event) => setBuilder({ ...builder, completionConditions: event.target.value })} /></label>
-            </div>
-            <div className="builder-section">
-              <h4>Boundaries & Rubric</h4>
-              <label>Location boundaries<textarea rows="2" value={builder.locationBoundaries} onChange={(event) => setBuilder({ ...builder, locationBoundaries: event.target.value })} /></label>
-              <label>Role boundaries<textarea rows="2" value={builder.roleBoundaries} onChange={(event) => setBuilder({ ...builder, roleBoundaries: event.target.value })} /></label>
-              <label>Rubric: criterion | description<textarea rows="4" value={builder.rubricText} onChange={(event) => setBuilder({ ...builder, rubricText: event.target.value })} /></label>
-            </div>
-            <div className="modal-options">
-              <label className="switch-row"><input type="checkbox" checked={builder.isActive} onChange={(event) => setBuilder({ ...builder, isActive: event.target.checked })} /> Active on mobile</label>
-              <button type="button" className="text-button" onClick={() => setAdvancedJsonOpen(!advancedJsonOpen)}>Advanced JSON</button>
-            </div>
-            {advancedJsonOpen && <label>Raw JSON override<textarea rows="8" value={builder.rawJson || JSON.stringify(buildScenarioData(builder), null, 2)} onChange={(event) => setBuilder({ ...builder, rawJson: event.target.value })} /></label>}
-            <div className="modal-actions"><button type="button" className="secondary-action" onClick={() => setScenarioModalOpen(false)}>Cancel</button><button className="primary-action">Save Scenario</button></div>
           </form>
         </div>
       )}
 
       {selectedSession && (
         <div className="modal-backdrop">
-          <div className="transcript-modal">
+          <div className="transcript-modal detailed-session-modal">
             <div className="panel-heading">
-              <div><h3>Transcript & Analysis</h3><span>{selectedSession.student_details?.name} - {selectedSession.scenario?.title}</span></div>
+              <div>
+                <h3>Turn-by-Turn Evaluation & Transcript</h3>
+                <span>{selectedSession.student_details?.name || 'Student'} • {selectedSession.scenario?.title || selectedSession.scenario?.scenario_id}</span>
+              </div>
               <button className="text-button" onClick={() => setSelectedSession(null)}>Close</button>
             </div>
-            <div className="transcript-grid">
-              <div className="chat-log">
-                {(selectedSession.transcript || []).map((chat, index) => <div key={index} className={chat.speaker === 'AI' ? 'bubble ai' : 'bubble student'}><span>{chat.speaker === 'AI' ? selectedSession.scenario?.ai_role || 'AI' : 'Student'}</span><p>{chat.message}</p></div>)}
-              </div>
-              <div className="score-panel">
-                <strong className="big-score">{Number(selectedSession.overall_score || 0).toFixed(2)}</strong>
-                <span>Overall Score / 5</span>
-                {Object.entries(scoreLabels).map(([key, label]) => <ProgressMetric key={key} label={label} value={selectedSession.average_scores?.[key]} />)}
-              </div>
+
+            <div className="modal-tab-bar">
+              <button
+                type="button"
+                className={`tab-btn ${sessionTab === 'turns' ? 'active' : ''}`}
+                onClick={() => setSessionTab('turns')}
+              >
+                <FileText size={15} /> Turn-by-Turn Transcript ({selectedSession.transcript?.length || 0})
+              </button>
+              <button
+                type="button"
+                className={`tab-btn ${sessionTab === 'rubric' ? 'active' : ''}`}
+                onClick={() => setSessionTab('rubric')}
+              >
+                <Award size={15} /> Rubric & Score Breakdown
+              </button>
             </div>
+
+            {sessionTab === 'turns' ? (
+              <div className="turns-container">
+                {(selectedSession.transcript || []).map((chat, index) => {
+                  const isAI = chat.speaker === 'AI';
+                  return (
+                    <div key={index} className={`turn-card ${isAI ? 'ai-turn' : 'student-turn'}`}>
+                      <div className="turn-card-header">
+                        <span className={`turn-speaker-badge ${isAI ? 'ai' : 'student'}`}>
+                          {isAI ? (selectedSession.scenario?.ai_role || 'AI Partner') : 'Mahasiswa'}
+                        </span>
+                        <span className="turn-number-tag">Turn #{index + 1}</span>
+                      </div>
+                      <p className="turn-message-body">{chat.message}</p>
+                      {chat.feedback && (
+                        <div className="turn-feedback-box">
+                          <small>💡 Feedback: {chat.feedback}</small>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {!selectedSession.transcript?.length && (
+                  <p className="empty-note">Tidak ada item transkrip dalam sesi ini.</p>
+                )}
+              </div>
+            ) : (
+              <div className="transcript-grid">
+                <div className="session-summary-box">
+                  <div className="score-hero-card">
+                    <strong className="big-score">{Number(selectedSession.overall_score || 0).toFixed(2)}</strong>
+                    <span>Overall Score / 5.0</span>
+                  </div>
+                  <div className="meta-list">
+                    <p><strong>Status:</strong> <span className="status-pill active">{selectedSession.status || 'completed'}</span></p>
+                    <p><strong>Duration:</strong> {selectedSession.duration_seconds || 0} seconds</p>
+                    <p><strong>Student Responses:</strong> {selectedSession.student_response_count || 0}</p>
+                    <p><strong>Completed At:</strong> {selectedSession.completed_at ? new Date(selectedSession.completed_at).toLocaleString('en-US') : '-'}</p>
+                  </div>
+                </div>
+                <div className="score-panel">
+                  <h4>Assessment Rubric Metrics</h4>
+                  {Object.entries(scoreLabels).map(([key, label]) => (
+                    <ProgressMetric key={key} label={label} value={selectedSession.average_scores?.[key]} />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

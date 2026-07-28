@@ -9,6 +9,7 @@ import '../services/chat_service.dart';
 import '../services/auth_service.dart';
 import 'ar_speaking_screen.dart';
 import 'login_screen.dart';
+import 'onboarding_screen.dart';
 import '../main.dart';
 import '../services/page_transitions.dart';
 
@@ -579,6 +580,27 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
                           setSheetState(() {});
                         },
                       ),
+                    ),
+
+                    // Onboarding & Guide option
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.help_outline_rounded, color: currentIsDark ? Colors.white : Colors.black),
+                      title: Text(
+                        'Panduan & Onboarding',
+                        style: TextStyle(
+                          color: currentIsDark ? Colors.white : Colors.black,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      subtitle: const Text('Petunjuk izin kamera, mic, & cara latihan'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+                        );
+                      },
                     ),
 
                     // Settings option

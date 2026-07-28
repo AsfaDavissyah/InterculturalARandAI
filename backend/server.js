@@ -1063,6 +1063,111 @@ function serializePracticeSession(session) {
   };
 }
 
+// ─── Rate Limiters ───
+const rateLimit = require("express-rate-limit");
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Terlalu banyak percakapan auth. Coba lagi dalam 15 menit." },
+});
+
+const openAILimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Batas permintaan OpenAI tercapai. Harap tunggu beberapa saat." },
+});
+
+app.use("/api/auth", authLimiter);
+app.use("/api/openai", openAILimiter);
+
+// ─── Analytics Endpoints ───
+
+app.get("/api/analytics/summary", authenticateToken, requireRole(["admin", "lecturer"]), async (req, res) => {
+  try {
+    let studentQuery = { role: "student" };
+    let sessionQuery = {};
+
+    if (req.user.role === "lecturer") {
+      studentQuery.studentLecturerCode = req.user.lecturerCode;
+      const linkedStudents = await User.find(studentQuery).select("_id");
+      const studentUserIds = linkedStudents.map(s => s._id);
+      sessionQuery.userId = { $in: studentUserIds };
+    }
+
+    const [totalStudents, sessions] = await Promise.all([
+      User.countDocuments(studentQuery),
+      PracticeSession.find(sessionQuery).lean(),
+    ]);
+
+    const completed = sessions.filter(s => s.status === "completed" || s.status === "ended_manually");
+    const totalSessions = sessions.length;
+    const completedCount = completed.length;
+
+    const avgScore = completed.length
+      ? completed.reduce((sum, s) => sum + Number(s.overallScore || 0), 0) / completed.length
+      : 0;
+
+    const avgDuration = completed.length
+      ? completed.reduce((sum, s) => sum + Number(s.durationSeconds || 0), 0) / completed.length
+      : 0;
+
+    res.json({
+      success: true,
+      data: {
+        totalStudents,
+        totalSessions,
+        completedCount,
+        averageScore: Number(avgScore.toFixed(2)),
+        averageDurationSeconds: Math.round(avgDuration),
+      },
+    });
+  } catch (error) {
+    console.error("Analytics summary error:", error);
+    res.status(500).json({ error: "Gagal mengambil data ringkasan analitik." });
+  }
+});
+
+app.get("/api/analytics/longitudinal", authenticateToken, requireRole(["admin", "lecturer"]), async (req, res) => {
+  try {
+    let sessionQuery = {};
+    if (req.user.role === "lecturer") {
+      const linkedStudents = await User.find({ role: "student", studentLecturerCode: req.user.lecturerCode }).select("_id");
+      sessionQuery.userId = { $in: linkedStudents.map(s => s._id) };
+    }
+
+    const sessions = await PracticeSession.find(sessionQuery)
+      .populate("userId", "name studentId email")
+      .sort({ completedAt: 1, createdAt: 1 })
+      .lean();
+
+    const timeline = sessions.map((s, index) => ({
+      sessionId: s.sessionId,
+      sessionIndex: index + 1,
+      studentName: s.userId?.name || "Mahasiswa",
+      studentId: s.userId?.studentId || "-",
+      scenarioId: s.scenario?.scenario_id || "G-ICC-001",
+      scenarioTitle: s.scenario?.title || "-",
+      overallScore: Number((s.overallScore || 0).toFixed(2)),
+      completedAt: s.completedAt || s.createdAt,
+      averageScores: s.averageScores || {},
+    }));
+
+    res.json({
+      success: true,
+      count: timeline.length,
+      timeline,
+    });
+  } catch (error) {
+    console.error("Analytics longitudinal error:", error);
+    res.status(500).json({ error: "Gagal mengambil data tren longitudinal." });
+  }
+});
+
 // ─── Authentication Endpoints ───
 
 app.post("/api/auth/signup", async (req, res) => {
