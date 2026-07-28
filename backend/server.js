@@ -1087,7 +1087,7 @@ app.use("/api/openai", openAILimiter);
 
 // ─── Analytics Endpoints ───
 
-app.get("/api/analytics/summary", authenticateToken, requireRole(["admin", "lecturer"]), async (req, res) => {
+app.get("/api/analytics/summary", authenticateJWT, requireRole(["admin", "lecturer"]), async (req, res) => {
   try {
     let studentQuery = { role: "student" };
     let sessionQuery = {};
@@ -1132,7 +1132,7 @@ app.get("/api/analytics/summary", authenticateToken, requireRole(["admin", "lect
   }
 });
 
-app.get("/api/analytics/longitudinal", authenticateToken, requireRole(["admin", "lecturer"]), async (req, res) => {
+app.get("/api/analytics/longitudinal", authenticateJWT, requireRole(["admin", "lecturer"]), async (req, res) => {
   try {
     let sessionQuery = {};
     if (req.user.role === "lecturer") {
