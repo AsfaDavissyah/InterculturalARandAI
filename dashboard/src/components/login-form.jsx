@@ -34,7 +34,7 @@ export function LoginForm({
                   <BookOpen className="size-5" />
                 </div>
                 <div className="space-y-1">
-                  <h1 className="text-2xl font-bold">ICC Speaking Portal</h1>
+                  <h1 className="text-2xl font-bold">Orbis Portal</h1>
                   <p className="text-sm text-muted-foreground">
                     Log in as a lecturer or administrator to manage scenarios and practice data.
                   </p>
@@ -89,7 +89,7 @@ export function LoginForm({
           <div className="hidden border-l bg-muted/40 p-8 md:flex md:flex-col md:justify-between">
             <div className="space-y-2">
               <p className="text-sm font-semibold uppercase tracking-normal text-muted-foreground">
-                Intercultural AR and AI
+                Orbis AR and AI
               </p>
               <h2 className="max-w-sm text-3xl font-bold leading-tight">
                 Research dashboard for scenario-based speaking practice.

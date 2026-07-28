@@ -267,7 +267,7 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Text(
-                'Welcome to\nIntercultural',
+                'Welcome to\nOrbis',
                 style: TextStyle(
                   color: primaryColor,
                   fontSize: 34,

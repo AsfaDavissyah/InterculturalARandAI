@@ -49,7 +49,7 @@ export function AppSidebar({
                 {user.role === "admin" ? <ShieldCheck className="size-5" /> : <GraduationCap className="size-5" />}
               </div>
               <div className="flex flex-col gap-0.5 leading-none pl-1">
-                <span className="font-semibold text-sm tracking-tight text-foreground">ICC Research</span>
+                <span className="font-semibold text-sm tracking-tight text-foreground">Orbis Research</span>
                 <span className="text-xs text-muted-foreground">
                   {user.role === "admin" ? "Admin Console" : "Lecturer Dashboard"}
                 </span>

@@ -19,7 +19,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   final List<Map<String, String>> _slides = const [
     {
-      'title': 'Intercultural AI Partner',
+      'title': 'Orbis Partner',
       'subtitle': 'Latihan Pembelajaran Bahasa Inggris Lintas Budaya',
       'description':
           'Berinteraksi langsung dengan mitra percakapan AI 3D berbasis skenario kehidupan nyata kampus & dunia internasional.',
@@ -88,7 +88,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'ICC AR & AI',
+                    'Orbis',
                     style: TextStyle(
                       color: Colors.orangeAccent,
                       fontWeight: FontWeight.bold,
