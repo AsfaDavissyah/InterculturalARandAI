@@ -4,7 +4,7 @@ class AppSettings {
   static const _baseUrlKey = 'api_base_url';
   static const defaultBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:3000',
+    defaultValue: 'https://interculturalarandai-production.up.railway.app',
   );
 
   static Future<String> getBaseUrl() async {

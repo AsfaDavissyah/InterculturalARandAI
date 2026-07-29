@@ -110,10 +110,22 @@ class AuthService {
 
         await _saveAuth(token, profile);
         return true;
+      } else {
+        Map<String, dynamic>? data;
+        try {
+          if (response.body.isNotEmpty) {
+            data = jsonDecode(response.body) as Map<String, dynamic>;
+          }
+        } catch (_) {}
+        final serverError = data?['error'] ?? data?['message'];
+        if (serverError != null && serverError.toString().isNotEmpty) {
+          throw Exception(serverError.toString());
+        }
+        throw Exception('Login gagal. Periksa kembali email dan password.');
       }
-      return false;
-    } catch (_) {
-      return false;
+    } catch (e) {
+      if (e.toString().contains('Exception:')) rethrow;
+      throw Exception('Gagal terhubung ke server. Periksa alamat server backend.');
     }
   }
 
@@ -155,13 +167,28 @@ class AuthService {
         await _saveAuth(token, profile);
         return true;
       } else {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        throw Exception(data['error'] ?? 'Registrasi gagal.');
+        Map<String, dynamic>? data;
+        try {
+          if (response.body.isNotEmpty) {
+            data = jsonDecode(response.body) as Map<String, dynamic>;
+          }
+        } catch (_) {}
+        final serverError = data?['error'] ?? data?['message'];
+        if (serverError != null && serverError.toString().isNotEmpty) {
+          throw Exception(serverError.toString());
+        }
+        if (response.statusCode == 400) {
+          throw Exception('Pendaftaran gagal. Periksa kembali Kode Dosen dan email yang Anda gunakan.');
+        }
+        if (response.statusCode == 429) {
+          throw Exception('Batas pendaftaran tercapai. Silakan coba lagi dalam 15 menit.');
+        }
+        throw Exception('Terjadi kesalahan server (HTTP ${response.statusCode}). Coba beberapa saat lagi.');
       }
     } catch (e) {
       if (e.toString().contains('Exception:')) rethrow;
       throw Exception(
-        'Connection error. Check your backend server connection.',
+        'Gagal terhubung ke server backend. Periksa koneksi internet atau alamat server.',
       );
     }
   }
