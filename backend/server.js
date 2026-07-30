@@ -384,9 +384,7 @@ function buildSessionProgress(
   const objectivesCompleted = remainingObjectiveIds.length === 0;
   const reachedMaximum =
     studentResponseCount >= rules.maximumStudentResponses;
-  const reachedTarget =
-    studentResponseCount >= rules.targetStudentResponsesMin;
-  const sessionComplete = reachedMaximum || (reachedTarget && objectivesCompleted);
+  const sessionComplete = reachedMaximum;
 
   return {
     student_response_count: studentResponseCount,
