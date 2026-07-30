@@ -374,11 +374,11 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       onResult: _onSpeechResult,
       listenOptions: SpeechListenOptions(
         localeId: 'en_US',
-        listenMode: ListenMode.confirmation,
+        listenMode: ListenMode.dictation,
         partialResults: true,
         cancelOnError: true,
-        pauseFor: const Duration(milliseconds: 1200),
-        listenFor: const Duration(seconds: 30),
+        pauseFor: const Duration(seconds: 10),
+        listenFor: const Duration(seconds: 60),
       ),
     );
   }
@@ -386,13 +386,6 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   void _onSpeechResult(SpeechRecognitionResult result) {
     if (!mounted) return;
     setState(() => _recognizedWords = result.recognizedWords);
-    if (result.finalResult &&
-        result.recognizedWords.trim().isNotEmpty &&
-        !_submissionStarted) {
-      _pulsingController.stop();
-      _submissionStarted = true;
-      unawaited(_submitResponse(result.recognizedWords.trim()));
-    }
   }
 
   void _onSpeechStatus(String status) {
@@ -416,9 +409,18 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     _pulsingController.stop();
     setState(() => _activity = AvatarActivity.idle);
     if (error.permanent) {
+      String userFriendlyMessage;
+      if (error.errorMsg == 'error_speech_timeout' ||
+          error.errorMsg == 'error_no_match') {
+        userFriendlyMessage =
+            'Tidak ada suara terdeteksi. Silakan tekan tombol mic dan coba bicara lagi.';
+      } else {
+        userFriendlyMessage = 'Microphone: ${error.errorMsg}';
+      }
+
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Microphone: ${error.errorMsg}')));
+      ).showSnackBar(SnackBar(content: Text(userFriendlyMessage)));
     }
   }
 
