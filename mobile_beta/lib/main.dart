@@ -63,7 +63,7 @@ class InterculturalAISpeakingBetaAppState
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Orbis',
+      title: 'Orbit',
       debugShowCheckedModeBanner: false,
       themeMode: _themeMode,
       theme: ThemeData(

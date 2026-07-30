@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/app_settings.dart';
 import '../services/chat_service.dart';
+import '../widgets/orbit_logo.dart';
 import 'home_shell.dart';
 import 'signup_screen.dart';
 
@@ -159,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   FilledButton(
                     onPressed: checking
                         ? null
-                        : () => Navigator.pop(context, controller.text),
+                        : () => Navigator.pop(context, controller.text.trim()),
                     style: FilledButton.styleFrom(
                       backgroundColor: _orange,
                       foregroundColor: Colors.white,
@@ -202,7 +203,27 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 40),
+                const SizedBox(height: 20),
+                const Row(
+                  children: [
+                    OrbitLogo(
+                      size: 42,
+                      showBackground: true,
+                      borderRadius: 10,
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      'Orbit',
+                      style: TextStyle(
+                        color: _black,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
                 const Text(
                   'Welcome back,\nSign in to practice',
                   style: TextStyle(

@@ -12,6 +12,7 @@ import 'login_screen.dart';
 import 'onboarding_screen.dart';
 import '../main.dart';
 import '../services/page_transitions.dart';
+import '../widgets/orbit_logo.dart';
 
 class ScenarioSelectionScreen extends StatefulWidget {
   const ScenarioSelectionScreen({super.key});
@@ -221,7 +222,8 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final primaryColor = theme.brightness == Brightness.dark ? Colors.white : Colors.black;
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = isDark ? Colors.white : Colors.black;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -266,15 +268,28 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
             // ─── Headline ───
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Text(
-                'Welcome to\nOrbis',
-                style: TextStyle(
-                  color: primaryColor,
-                  fontSize: 34,
-                  fontWeight: FontWeight.w800,
-                  height: 1.15,
-                  letterSpacing: -0.5,
-                ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  OrbitLogo(
+                    size: 46,
+                    showBackground: true,
+                    backgroundColor: primaryColor,
+                    color: isDark ? Colors.black : Colors.white,
+                    borderRadius: 12,
+                  ),
+                  const SizedBox(width: 14),
+                  Text(
+                    'Welcome to\nOrbit',
+                    style: TextStyle(
+                      color: primaryColor,
+                      fontSize: 34,
+                      fontWeight: FontWeight.w800,
+                      height: 1.15,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                ],
               ),
             ),
 

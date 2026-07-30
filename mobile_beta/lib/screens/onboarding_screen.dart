@@ -2,6 +2,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
+import '../widgets/orbit_logo.dart';
 import 'scenario_selection_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -19,7 +20,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   final List<Map<String, String>> _slides = const [
     {
-      'title': 'Orbis Partner',
+      'title': 'Orbit',
       'subtitle': 'Latihan Pembelajaran Bahasa Inggris Lintas Budaya',
       'description':
           'Berinteraksi langsung dengan mitra percakapan AI 3D berbasis skenario kehidupan nyata kampus & dunia internasional.',
@@ -87,13 +88,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Orbis',
-                    style: TextStyle(
-                      color: Colors.orangeAccent,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
+                  const Row(
+                    children: [
+                      OrbitLogo(size: 24, color: Colors.orangeAccent),
+                      SizedBox(width: 8),
+                      Text(
+                        'Orbit',
+                        style: TextStyle(
+                          color: Colors.orangeAccent,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ],
                   ),
                   TextButton(
                     onPressed: _finishOnboarding,
@@ -112,11 +119,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 itemCount: _slides.length,
                 itemBuilder: (context, index) {
                   final slide = _slides[index];
-                  final iconData = index == 0
-                      ? Icons.record_voice_over_rounded
-                      : index == 1
-                          ? Icons.camera_front_rounded
-                          : Icons.insights_rounded;
+                  final iconData = index == 1
+                      ? Icons.camera_front_rounded
+                      : Icons.insights_rounded;
 
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 28),
@@ -133,11 +138,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               width: 2,
                             ),
                           ),
-                          child: Icon(
-                            iconData,
-                            size: 80,
-                            color: Colors.orangeAccent,
-                          ),
+                          child: index == 0
+                              ? const OrbitLogo(
+                                  size: 70,
+                                  color: Colors.orangeAccent,
+                                )
+                              : Icon(
+                                  iconData,
+                                  size: 80,
+                                  color: Colors.orangeAccent,
+                                ),
                         ),
                         const SizedBox(height: 36),
                         Text(
