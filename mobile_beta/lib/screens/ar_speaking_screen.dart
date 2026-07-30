@@ -80,6 +80,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   bool _navigatingToResult = false;
   AppLifecycleState _lifecycleState = AppLifecycleState.resumed;
   String _recognizedWords = '';
+  String _accumulatedWords = '';
+  String _currentSegmentWords = '';
   String? _cameraError;
   String? _sessionError;
 
@@ -363,6 +365,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     }
 
     _submissionStarted = false;
+    _accumulatedWords = '';
+    _currentSegmentWords = '';
     setState(() {
       _recognizedWords = '';
       _activity = AvatarActivity.listening;
@@ -385,7 +389,30 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
   void _onSpeechResult(SpeechRecognitionResult result) {
     if (!mounted) return;
-    setState(() => _recognizedWords = result.recognizedWords);
+    final current = result.recognizedWords.trim();
+    if (current.isEmpty) return;
+
+    final lowerCurrent = current.toLowerCase();
+    final lowerPrevSegment = _currentSegmentWords.trim().toLowerCase();
+
+    if (lowerPrevSegment.isNotEmpty &&
+        !lowerCurrent.startsWith(lowerPrevSegment) &&
+        !lowerCurrent.contains(lowerPrevSegment)) {
+      if (_accumulatedWords.isNotEmpty) {
+        _accumulatedWords = '$_accumulatedWords $_currentSegmentWords'.trim();
+      } else {
+        _accumulatedWords = _currentSegmentWords.trim();
+      }
+      _currentSegmentWords = current;
+    } else {
+      _currentSegmentWords = current;
+    }
+
+    final fullWords = _accumulatedWords.isEmpty
+        ? _currentSegmentWords
+        : '$_accumulatedWords $_currentSegmentWords'.trim();
+
+    setState(() => _recognizedWords = fullWords);
   }
 
   void _onSpeechStatus(String status) {

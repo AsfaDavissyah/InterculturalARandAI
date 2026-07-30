@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 
 /// Widget icon logo Orbit yang dirender menggunakan CustomPainter
 /// sesuai dengan desain logo resmi (huruf O/Orbit dengan garis iris diagonal).
-class OrbitLogo extends StatelessWidget {
+class OrbisLogo extends StatelessWidget {
   final double size;
   final Color color;
   final bool showBackground;
   final Color backgroundColor;
   final double borderRadius;
 
-  const OrbitLogo({
+  const OrbisLogo({
     super.key,
     this.size = 48.0,
     this.color = Colors.white,
@@ -24,7 +24,7 @@ class OrbitLogo extends StatelessWidget {
       width: size,
       height: size,
       child: CustomPaint(
-        painter: OrbitLogoPainter(color: color),
+        painter: OrbisLogoPainter(color: color),
       ),
     );
 
@@ -46,16 +46,16 @@ class OrbitLogo extends StatelessWidget {
         ],
       ),
       child: CustomPaint(
-        painter: OrbitLogoPainter(color: color),
+        painter: OrbisLogoPainter(color: color),
       ),
     );
   }
 }
 
-class OrbitLogoPainter extends CustomPainter {
+class OrbisLogoPainter extends CustomPainter {
   final Color color;
 
-  OrbitLogoPainter({required this.color});
+  OrbisLogoPainter({required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -119,6 +119,6 @@ class OrbitLogoPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant OrbitLogoPainter oldDelegate) =>
+  bool shouldRepaint(covariant OrbisLogoPainter oldDelegate) =>
       oldDelegate.color != color;
 }

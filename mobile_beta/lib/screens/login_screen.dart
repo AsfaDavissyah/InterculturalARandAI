@@ -206,14 +206,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 20),
                 const Row(
                   children: [
-                    OrbitLogo(
+                    OrbisLogo(
                       size: 42,
                       showBackground: true,
                       borderRadius: 10,
                     ),
                     SizedBox(width: 12),
                     Text(
-                      'Orbit',
+                      'Orbis',
                       style: TextStyle(
                         color: _black,
                         fontSize: 26,

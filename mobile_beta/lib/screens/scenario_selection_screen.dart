@@ -271,7 +271,7 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  OrbitLogo(
+                  OrbisLogo(
                     size: 46,
                     showBackground: true,
                     backgroundColor: primaryColor,
@@ -280,7 +280,7 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
                   ),
                   const SizedBox(width: 14),
                   Text(
-                    'Welcome to\nOrbit',
+                    'Welcome to\nOrbis',
                     style: TextStyle(
                       color: primaryColor,
                       fontSize: 34,

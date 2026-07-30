@@ -19,7 +19,7 @@
     </queries>
 
     <application
-        android:label="Orbit"
+        android:label="Orbis"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">

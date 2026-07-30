@@ -20,7 +20,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   final List<Map<String, String>> _slides = const [
     {
-      'title': 'Orbit',
+      'title': 'Orbis Partner',
       'subtitle': 'Latihan Pembelajaran Bahasa Inggris Lintas Budaya',
       'description':
           'Berinteraksi langsung dengan mitra percakapan AI 3D berbasis skenario kehidupan nyata kampus & dunia internasional.',
@@ -90,10 +90,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 children: [
                   const Row(
                     children: [
-                      OrbitLogo(size: 24, color: Colors.orangeAccent),
+                      OrbisLogo(size: 24, color: Colors.orangeAccent),
                       SizedBox(width: 8),
                       Text(
-                        'Orbit',
+                        'Orbis',
                         style: TextStyle(
                           color: Colors.orangeAccent,
                           fontWeight: FontWeight.bold,
@@ -139,7 +139,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             ),
                           ),
                           child: index == 0
-                              ? const OrbitLogo(
+                              ? const OrbisLogo(
                                   size: 70,
                                   color: Colors.orangeAccent,
                                 )
