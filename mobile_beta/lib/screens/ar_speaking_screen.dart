@@ -1147,23 +1147,27 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                                   animation: _pulsingController,
                                   builder: (context, child) {
                                     final pulse = _pulsingController.value;
-                                    return Stack(
-                                      alignment: Alignment.center,
-                                      children: [
-                                        if (_speech.isListening)
-                                          Container(
-                                            width: 68 + (pulse * 24),
-                                            height: 68 + (pulse * 24),
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              color: const Color(0xFFD54343)
-                                                  .withValues(
-                                                    alpha: 0.45 * (1.0 - pulse),
-                                                  ),
+                                    return SizedBox(
+                                      width: 92,
+                                      height: 92,
+                                      child: Stack(
+                                        alignment: Alignment.center,
+                                        children: [
+                                          if (_speech.isListening)
+                                            Container(
+                                              width: 68 + (pulse * 24),
+                                              height: 68 + (pulse * 24),
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: const Color(0xFFD54343)
+                                                    .withValues(
+                                                      alpha: 0.45 * (1.0 - pulse),
+                                                    ),
+                                              ),
                                             ),
-                                          ),
-                                        child!,
-                                      ],
+                                          child!,
+                                        ],
+                                      ),
                                     );
                                   },
                                   child: IconButton.filled(
