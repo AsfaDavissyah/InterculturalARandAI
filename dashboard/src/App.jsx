@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   Award,
@@ -16,8 +16,15 @@ import {
   Trash2,
   Users,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { LoginForm } from './components/login-form';
 import { AppSidebar } from './components/app-sidebar';
+import { requestJson } from './lib/api-client';
+import {
+  clearAuthSession,
+  getAuthSession,
+  setAuthSession,
+} from './lib/auth-session';
 import {
   SidebarInset,
   SidebarProvider,
@@ -386,8 +393,9 @@ function StudentLongitudinalChart({ history }) {
 }
 
 export default function App() {
-  const [token, setToken] = useState(localStorage.getItem('jwt_token') || '');
-  const [user, setUser] = useState(JSON.parse(localStorage.getItem('user_profile') || 'null'));
+  const initialAuth = getAuthSession();
+  const [token, setToken] = useState(initialAuth.token);
+  const [user, setUser] = useState(initialAuth.user);
   const [apiBaseUrl, setApiBaseUrl] = useState(localStorage.getItem('api_base_url') || DEFAULT_API_BASE_URL);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -422,41 +430,23 @@ export default function App() {
   const [historyStatusFilter, setHistoryStatusFilter] = useState('all');
   const [historyPage, setHistoryPage] = useState(1);
 
-  useEffect(() => {
-    if (!user) return setActiveTab('');
-    setActiveTab(user.role === 'admin' ? 'scenarios' : 'overview');
-  }, [user]);
-
-  useEffect(() => {
-    if (!token) return;
-    if (activeTab === 'scenarios') fetchAdminScenarios();
-    if (activeTab === 'lecturers') fetchAdminLecturers();
-    if (activeTab === 'overview') fetchOverviewData();
-    if (activeTab === 'students') fetchLecturerStudents();
-    if (activeTab === 'history') fetchLecturerHistory();
-  }, [activeTab, token]);
-
-  useEffect(() => { setScenarioPage(1); }, [scenarioSearch, scenarioStatusFilter]);
-  useEffect(() => { setLecturerPage(1); }, [lecturerSearch]);
-  useEffect(() => { setStudentPage(1); }, [studentSearch]);
-  useEffect(() => { setHistoryPage(1); }, [historySearch, historyScenarioFilter, historyStatusFilter]);
-
-  const callApi = async (endpoint, method = 'GET', body = null) => {
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) headers.Authorization = `Bearer ${token}`;
-    const response = await fetch(`${apiBaseUrl}${endpoint}`, {
+  const callApi = useCallback((endpoint, method = 'GET', body = null, options = {}) =>
+    requestJson({
+      baseUrl: apiBaseUrl,
+      endpoint,
       method,
-      headers,
-      ...(body ? { body: JSON.stringify(body) } : {}),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Server request failed');
-    return data;
-  };
+      body,
+      token,
+      signal: options.signal,
+    }), [apiBaseUrl, token]);
+
+  const notifyRequestError = useCallback((error, fallbackMessage = 'Permintaan gagal diproses.') => {
+    if (error?.name === 'AbortError') return;
+    toast.error(error?.message || fallbackMessage);
+  }, []);
 
   const saveAuth = (newToken, profile) => {
-    localStorage.setItem('jwt_token', newToken);
-    localStorage.setItem('user_profile', JSON.stringify(profile));
+    setAuthSession(newToken, profile);
     setToken(newToken);
     setUser(profile);
   };
@@ -471,12 +461,14 @@ export default function App() {
       saveAuth(data.token, data.user);
     } catch (error) {
       setErrorMessage(error.message);
+      notifyRequestError(error, 'Login gagal.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleLogout = () => {
+    clearAuthSession();
     localStorage.removeItem('jwt_token');
     localStorage.removeItem('user_profile');
     setToken('');
@@ -494,29 +486,95 @@ export default function App() {
     setLoadingSections((current) => ({ ...current, [key]: value }));
   };
 
-  const fetchAdminScenarios = async () => {
+  const fetchAdminScenarios = useCallback(async (signal) => {
     setSectionLoading('scenarios', true);
-    try { setScenarios(await callApi('/api/admin/scenarios')); } catch (error) { console.error(error); } finally { setSectionLoading('scenarios', false); }
-  };
+    try {
+      setScenarios(await callApi('/api/admin/scenarios', 'GET', null, { signal }));
+    } catch (error) {
+      notifyRequestError(error, 'Skenario tidak dapat dimuat.');
+    } finally {
+      if (!signal?.aborted) setSectionLoading('scenarios', false);
+    }
+  }, [callApi, notifyRequestError]);
 
-  const fetchAdminLecturers = async () => {
+  const fetchAdminLecturers = useCallback(async (signal) => {
     setSectionLoading('lecturers', true);
-    try { setLecturers(await callApi('/api/admin/lecturers')); } catch (error) { console.error(error); } finally { setSectionLoading('lecturers', false); }
-  };
+    try {
+      setLecturers(await callApi('/api/admin/lecturers', 'GET', null, { signal }));
+    } catch (error) {
+      notifyRequestError(error, 'Daftar dosen tidak dapat dimuat.');
+    } finally {
+      if (!signal?.aborted) setSectionLoading('lecturers', false);
+    }
+  }, [callApi, notifyRequestError]);
 
-  const fetchLecturerStudents = async () => {
+  const fetchLecturerStudents = useCallback(async (signal) => {
     setSectionLoading('students', true);
-    try { setStudents(await callApi('/api/lecturer/students')); } catch (error) { console.error(error); } finally { setSectionLoading('students', false); }
-  };
+    try {
+      setStudents(await callApi('/api/lecturer/students', 'GET', null, { signal }));
+    } catch (error) {
+      notifyRequestError(error, 'Daftar mahasiswa tidak dapat dimuat.');
+    } finally {
+      if (!signal?.aborted) setSectionLoading('students', false);
+    }
+  }, [callApi, notifyRequestError]);
 
-  const fetchLecturerHistory = async () => {
+  const fetchLecturerHistory = useCallback(async (signal) => {
     setSectionLoading('history', true);
-    try { setHistory(await callApi('/api/lecturer/history')); } catch (error) { console.error(error); } finally { setSectionLoading('history', false); }
-  };
+    try {
+      setHistory(await callApi('/api/lecturer/history', 'GET', null, { signal }));
+    } catch (error) {
+      notifyRequestError(error, 'Riwayat latihan tidak dapat dimuat.');
+    } finally {
+      if (!signal?.aborted) setSectionLoading('history', false);
+    }
+  }, [callApi, notifyRequestError]);
 
-  const fetchOverviewData = async () => {
-    await Promise.all([fetchLecturerStudents(), fetchLecturerHistory()]);
-  };
+  const fetchOverviewData = useCallback(async (signal) => {
+    await Promise.all([
+      fetchLecturerStudents(signal),
+      fetchLecturerHistory(signal),
+    ]);
+  }, [fetchLecturerHistory, fetchLecturerStudents]);
+
+  useEffect(() => {
+    localStorage.removeItem('jwt_token');
+    localStorage.removeItem('user_profile');
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setActiveTab('');
+      return;
+    }
+    setActiveTab(user.role === 'admin' ? 'scenarios' : 'overview');
+  }, [user]);
+
+  useEffect(() => {
+    if (!token || !activeTab) return undefined;
+    const controller = new AbortController();
+
+    if (activeTab === 'scenarios') void fetchAdminScenarios(controller.signal);
+    if (activeTab === 'lecturers') void fetchAdminLecturers(controller.signal);
+    if (activeTab === 'overview') void fetchOverviewData(controller.signal);
+    if (activeTab === 'students') void fetchLecturerStudents(controller.signal);
+    if (activeTab === 'history') void fetchLecturerHistory(controller.signal);
+
+    return () => controller.abort();
+  }, [
+    activeTab,
+    fetchAdminLecturers,
+    fetchAdminScenarios,
+    fetchLecturerHistory,
+    fetchLecturerStudents,
+    fetchOverviewData,
+    token,
+  ]);
+
+  useEffect(() => { setScenarioPage(1); }, [scenarioSearch, scenarioStatusFilter]);
+  useEffect(() => { setLecturerPage(1); }, [lecturerSearch]);
+  useEffect(() => { setStudentPage(1); }, [studentSearch]);
+  useEffect(() => { setHistoryPage(1); }, [historySearch, historyScenarioFilter, historyStatusFilter]);
 
   const dashboardMetrics = useMemo(() => {
     const completed = history.filter((item) => item.status === 'completed' || item.status === 'ended_manually');
@@ -644,9 +702,11 @@ export default function App() {
         await callApi('/api/admin/scenarios', 'POST', payload);
       }
       setScenarioModalOpen(false);
-      fetchAdminScenarios();
+      toast.success(editingScenarioId ? 'Skenario berhasil diperbarui.' : 'Skenario berhasil dibuat.');
+      void fetchAdminScenarios();
     } catch (error) {
       setErrorMessage(error.message || 'Scenario tidak bisa disimpan.');
+      notifyRequestError(error, 'Skenario tidak bisa disimpan.');
     }
   };
 
@@ -655,9 +715,10 @@ export default function App() {
     if (!confirm('Hapus skenario ini dari database?')) return;
     try {
       await callApi(`/api/admin/scenarios/${id}`, 'DELETE');
-      fetchAdminScenarios();
+      toast.success('Skenario berhasil dihapus.');
+      void fetchAdminScenarios();
     } catch (error) {
-      alert(error.message);
+      notifyRequestError(error, 'Skenario tidak dapat dihapus.');
     }
   };
 
@@ -665,9 +726,10 @@ export default function App() {
     if (!id) return alert('Scenario document ID tidak ditemukan. Muat ulang dashboard lalu coba lagi.');
     try {
       await callApi(`/api/admin/scenarios/${id}`, 'PUT', { isActive: !currentStatus });
-      fetchAdminScenarios();
+      toast.success(!currentStatus ? 'Skenario diaktifkan.' : 'Skenario dinonaktifkan.');
+      void fetchAdminScenarios();
     } catch (error) {
-      alert(error.message);
+      notifyRequestError(error, 'Status skenario tidak dapat diubah.');
     }
   };
 
@@ -679,9 +741,11 @@ export default function App() {
       const data = await callApi('/api/admin/create-lecturer', 'POST', lecturerForm);
       setCreatedLecturerCode(data.lecturer.lecturerCode);
       setLecturerForm({ name: '', email: '', password: '', gender: 'female' });
-      fetchAdminLecturers();
+      toast.success('Akun dosen berhasil dibuat.');
+      void fetchAdminLecturers();
     } catch (error) {
       setErrorMessage(error.message);
+      notifyRequestError(error, 'Akun dosen tidak dapat dibuat.');
     }
   };
 
