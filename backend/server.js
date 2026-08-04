@@ -11,6 +11,8 @@ const bcrypt = require("bcryptjs");
 const User = require("./models/User");
 const PracticeSession = require("./models/PracticeSession");
 const Scenario = require("./models/Scenario");
+const Topic = require("./models/Topic");
+const Setting = require("./models/Setting");
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET || "intercultural_ai_secret_key_2026";
@@ -384,7 +386,10 @@ function buildSessionProgress(
   const objectivesCompleted = remainingObjectiveIds.length === 0;
   const reachedMaximum =
     studentResponseCount >= rules.maximumStudentResponses;
-  const sessionComplete = reachedMaximum;
+  const reachedTarget =
+    objectivesCompleted &&
+    studentResponseCount >= rules.targetStudentResponsesMin;
+  const sessionComplete = reachedMaximum || reachedTarget;
 
   return {
     student_response_count: studentResponseCount,
@@ -397,10 +402,108 @@ function buildSessionProgress(
     objectives_completed: objectivesCompleted,
     session_complete: sessionComplete,
     end_reason: sessionComplete
-      ? reachedMaximum
+      ? reachedMaximum && !reachedTarget
         ? "maximum_student_responses_reached"
         : "objectives_completed"
       : null,
+  };
+}
+
+function normalizeRuntimeContext(input, topicInput = null) {
+  if (!input) return null;
+
+  const isGuidedSetting = Boolean(
+    input.settingId || input.setting_id || input.aiCharacter || input.studentRole
+  );
+
+  if (isGuidedSetting) {
+    const settingId = String(input.settingId || input.setting_id || "").toUpperCase();
+    const topicId = String(
+      input.topicId || input.topic_id || topicInput?.topicId || ""
+    ).toLowerCase();
+    const aiChar = input.aiCharacter || input.ai_character || {};
+    const rules = input.sessionRules || input.session_rules || {};
+
+    return {
+      experience_type: "guided_topic",
+      scenario_id: settingId,
+      topic_id: topicId,
+      setting_id: settingId,
+      title: input.title || "",
+      location: input.location || "",
+      student_role: input.studentRole || input.student_role || "Student",
+      ai_character: {
+        display_name: aiChar.display_name || aiChar.displayName || "AI Character",
+        role: aiChar.role || "AI Character",
+        culture: aiChar.culture || "",
+        avatar_key:
+          aiChar.avatar_key ||
+          aiChar.avatarKey ||
+          input.avatarKey ||
+          input.avatar_key ||
+          "default_avatar",
+      },
+      language_objectives:
+        topicInput?.languageObjectives || input.languageObjectives || [],
+      icc_objectives:
+        topicInput?.iccObjectives || input.iccObjectives || [],
+      conversation_stages:
+        input.conversationStages || input.conversation_stages || [],
+      constraints: input.constraints || [],
+      rubric: input.rubric || {},
+      session_rules: {
+        minimum_student_responses:
+          Number(rules.minimumStudentResponses || rules.minimum_student_responses) || 5,
+        target_student_responses_min:
+          Number(rules.targetStudentResponsesMin || rules.target_student_responses_min) || 6,
+        target_student_responses_max:
+          Number(rules.targetStudentResponsesMax || rules.target_student_responses_max) || 8,
+        maximum_student_responses:
+          Number(rules.maximumStudentResponses || rules.maximum_student_responses) || 10,
+      },
+    };
+  }
+
+  const rules = getSessionRules(input);
+  const scenarioObj = input.scenario || {};
+  const contextObj = input.context || {};
+  const aiChar =
+    (input.characters || []).find((c) =>
+      String(c.role || "").toLowerCase().includes("ai")
+    ) || {};
+
+  return {
+    experience_type: input.experience_type || "legacy_scenario",
+    scenario_id: String(
+      scenarioObj.scenario_id || input.scenarioId || ""
+    ).toUpperCase(),
+    topic_id: input.topic_id || input.topicId || null,
+    setting_id: input.setting_id || input.settingId || null,
+    title: scenarioObj.title || "",
+    location: contextObj.setting || scenarioObj.ar_scene || "",
+    student_role: scenarioObj.student_role || scenarioObj.user_role || "Student",
+    ai_character: {
+      display_name: scenarioObj.ai_role || aiChar.name || "AI Character",
+      role: scenarioObj.ai_role || aiChar.role || "AI Character",
+      culture: scenarioObj.culture || aiChar.culture || "International",
+      avatar_key:
+        scenarioObj.avatar_key || input.avatar_key || "default_avatar",
+    },
+    language_objectives: input.language_objectives || [],
+    icc_objectives:
+      input.icc_objectives ||
+      (input.conversation_objectives || []).map(
+        (o) => o.title || o.objective_id
+      ),
+    conversation_stages: input.conversation_stages || [],
+    constraints: contextObj.forbidden_terms || [],
+    rubric: input.rubric || {},
+    session_rules: {
+      minimum_student_responses: rules.minimumStudentResponses,
+      target_student_responses_min: rules.targetStudentResponsesMin,
+      target_student_responses_max: rules.targetStudentResponsesMax,
+      maximum_student_responses: rules.maximumStudentResponses,
+    },
   };
 }
 
@@ -995,6 +1098,16 @@ function normalizePracticeSessionPayload(rawSession, userId) {
   const scenarioVersion = Number(
     scenario.scenario_version || rawSession.scenario_version || rawSession.scenarioVersion || 1
   );
+  const topicId = rawSession.topicId || rawSession.topic_id || null;
+  const settingId = rawSession.settingId || rawSession.setting_id || null;
+  const experienceType =
+    rawSession.experienceType ||
+    rawSession.experience_type ||
+    (topicId || settingId ? "guided_topic" : "legacy_scenario");
+  const launchSource =
+    rawSession.launchSource ||
+    rawSession.launch_source ||
+    (experienceType === "guided_topic" ? "browse" : "legacy");
 
   return {
     userId,
@@ -1027,6 +1140,21 @@ function normalizePracticeSessionPayload(rawSession, userId) {
       student_id: student.student_id || rawSession.studentId || "local_student",
       display_name: student.display_name || rawSession.studentName || null,
     },
+    experienceType,
+    topicId,
+    topicTitle: rawSession.topicTitle || rawSession.topic_title || null,
+    settingId,
+    settingTitle: rawSession.settingTitle || rawSession.setting_title || null,
+    avatarKey: rawSession.avatarKey || rawSession.avatar_key || null,
+    launchSource,
+    moduleId: rawSession.moduleId || rawSession.module_id || null,
+    unitId: rawSession.unitId || rawSession.unit_id || null,
+    pageId: rawSession.pageId || rawSession.page_id || null,
+    coachingEvents: Array.isArray(
+      rawSession.coachingEvents || rawSession.coaching_events
+    )
+      ? rawSession.coachingEvents || rawSession.coaching_events
+      : [],
   };
 }
 
@@ -1058,6 +1186,17 @@ function serializePracticeSession(session) {
     average_scores: data.averageScores || {},
     overall_score: data.overallScore || 0,
     completed_objective_ids: data.completedObjectiveIds || [],
+    experience_type: data.experienceType || "legacy_scenario",
+    topic_id: data.topicId || null,
+    topic_title: data.topicTitle || null,
+    setting_id: data.settingId || null,
+    setting_title: data.settingTitle || null,
+    avatar_key: data.avatarKey || null,
+    launch_source: data.launchSource || "legacy",
+    module_id: data.moduleId || null,
+    unit_id: data.unitId || null,
+    page_id: data.pageId || null,
+    coaching_events: data.coachingEvents || [],
   };
 }
 
@@ -1918,5 +2057,8 @@ module.exports = {
   validateScenarioData,
   normalizePracticeSessionPayload,
   serializePracticeSession,
+  normalizeRuntimeContext,
   connectDatabase,
+  Topic,
+  Setting,
 };

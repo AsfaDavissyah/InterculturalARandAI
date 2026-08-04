@@ -1,6 +1,7 @@
 # Backend files to ignore
 backend/node_modules/
 backend/.env
+backend/backups/
 backend/public/audio_cache/*.mp3
 backend/public/audio_cache/**/*.mp3
 

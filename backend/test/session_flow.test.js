@@ -154,6 +154,49 @@ test("session memory preserves roles, setting, and recent exchanges", () => {
   assert.match(memory.recent_exchanges.at(-1).message, /library/i);
 });
 
+test("respond-turn preserves the fast chat response contract", async () => {
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise((resolve) => server.once("listening", resolve));
+  const { port } = server.address();
+
+  try {
+    const response = await fetch(
+      `http://127.0.0.1:${port}/api/chat/respond-turn`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: "session_fast_chat_test",
+          scenario_id: "G-ICC-008",
+          student_response_count: 1,
+          conversation_history: [
+            { speaker: "AI", message: "Hi, excuse me. Are you Rina?" },
+          ],
+          student_response: "Yes, welcome to our university.",
+          student_display_name: "Alya",
+          student_id: "student_001",
+        }),
+      }
+    );
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(body.session_id, "session_fast_chat_test");
+    assert.equal(body.scenario_id, "G-ICC-008");
+    assert.equal(body.turn_number, 1);
+    assert.equal(body.source, "local_fast_fallback");
+    assert.equal(body.fallback_reason, "openai_not_configured");
+    assert.equal(body.continue_conversation, true);
+    assert.ok(body.ai_message);
+    assert.ok(body.session_progress);
+    assert.ok(body.session_memory);
+  } finally {
+    await new Promise((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve()))
+    );
+  }
+});
+
 test("local fallback returns character dialogue without spoken correction", async () => {
   const server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
@@ -411,4 +454,71 @@ test("history payload maps between mobile snake_case and MongoDB fields", () => 
   assert.equal(serialized.student_response_count, 5);
   assert.equal(serialized.overall_score, 4.5);
   assert.deepEqual(serialized.completed_objective_ids, ["confirm_and_welcome"]);
+});
+
+test("guided session metadata survives history normalization and serialization", async () => {
+  const normalized = normalizePracticeSessionPayload(
+    {
+      session_id: "session_guided_history_test",
+      student: {
+        student_id: "student_2",
+        display_name: "Alya",
+      },
+      scenario: {
+        scenario_id: "ACADEMIC-LECTURER-OFFICE",
+        title: "Lecturer's Office Consultation",
+      },
+      experience_type: "guided_topic",
+      topic_id: "academic-communication",
+      topic_title: "Academic Communication",
+      setting_id: "ACADEMIC-LECTURER-OFFICE",
+      setting_title: "Lecturer's Office Consultation",
+      avatar_key: "female_lecturer_v1",
+      launch_source: "module_qr",
+      module_id: "module_001",
+      unit_id: "unit_01",
+      page_id: "page_12",
+      coaching_events: [
+        {
+          turn_number: 1,
+          student_utterance: "Hey teacher.",
+          hint: "Use a formal academic greeting.",
+        },
+      ],
+      completed_at: "2026-08-04T02:00:00.000Z",
+      overall_score: 4.2,
+    },
+    "507f1f77bcf86cd799439011"
+  );
+
+  assert.equal(normalized.experienceType, "guided_topic");
+  assert.equal(normalized.topicId, "academic-communication");
+  assert.equal(normalized.settingId, "ACADEMIC-LECTURER-OFFICE");
+  assert.equal(normalized.avatarKey, "female_lecturer_v1");
+  assert.equal(normalized.launchSource, "module_qr");
+  assert.equal(normalized.coachingEvents.length, 1);
+
+  const PracticeSession = require("../models/PracticeSession");
+  const sessionDocument = new PracticeSession(normalized);
+  await sessionDocument.validate();
+
+  const serialized = serializePracticeSession(sessionDocument);
+  assert.equal(serialized.experience_type, "guided_topic");
+  assert.equal(serialized.topic_id, "academic-communication");
+  assert.equal(serialized.topic_title, "Academic Communication");
+  assert.equal(serialized.setting_id, "ACADEMIC-LECTURER-OFFICE");
+  assert.equal(
+    serialized.setting_title,
+    "Lecturer's Office Consultation"
+  );
+  assert.equal(serialized.avatar_key, "female_lecturer_v1");
+  assert.equal(serialized.launch_source, "module_qr");
+  assert.equal(serialized.module_id, "module_001");
+  assert.equal(serialized.unit_id, "unit_01");
+  assert.equal(serialized.page_id, "page_12");
+  assert.equal(serialized.coaching_events.length, 1);
+  assert.equal(
+    serialized.coaching_events[0].hint,
+    "Use a formal academic greeting."
+  );
 });

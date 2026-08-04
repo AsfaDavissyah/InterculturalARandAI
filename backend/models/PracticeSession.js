@@ -87,6 +87,52 @@ const PracticeSessionSchema = new mongoose.Schema({
     type: [String],
     default: [],
   },
+  experienceType: {
+    type: String,
+    enum: ["legacy_scenario", "guided_topic"],
+    default: "legacy_scenario",
+  },
+  topicId: {
+    type: String,
+    trim: true,
+  },
+  topicTitle: {
+    type: String,
+    trim: true,
+  },
+  settingId: {
+    type: String,
+    trim: true,
+  },
+  settingTitle: {
+    type: String,
+    trim: true,
+  },
+  avatarKey: {
+    type: String,
+    trim: true,
+  },
+  launchSource: {
+    type: String,
+    enum: ["browse", "module_qr", "legacy"],
+    default: "legacy",
+  },
+  moduleId: {
+    type: String,
+    trim: true,
+  },
+  unitId: {
+    type: String,
+    trim: true,
+  },
+  pageId: {
+    type: String,
+    trim: true,
+  },
+  coachingEvents: {
+    type: [mongoose.Schema.Types.Mixed],
+    default: [],
+  },
 });
 
 module.exports = mongoose.model("PracticeSession", PracticeSessionSchema);

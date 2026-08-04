@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "backup_id": "pre_topics_migration_2026-08-04T13-27-40-790Z",
+  "purpose": "Pre-Topic and Setting migration backup for Phase 0",
+  "created_at": "2026-08-04T13:27:40.790Z",
+  "database_name": "redacted",
+  "collection_count": 3,
+  "total_document_count": 23,
+  "collections": [
+    {
+      "name": "practicesessions",
+      "document_count": 7,
+      "bytes": 94804,
+      "sha256": "17e237cafe428c474e5b72ddfb7c33b679900fc819340ff8aa16f42ded17f085"
+    },
+    {
+      "name": "scenarios",
+      "document_count": 10,
+      "bytes": 162331,
+      "sha256": "edde0b21f837e7e54f67eb87b832a3efb6ce2bb5505e023d84733084277e0fc1"
+    },
+    {
+      "name": "users",
+      "document_count": 6,
+      "bytes": 2242,
+      "sha256": "e5bdf6fef1b4eb0e62624ada4dd174690993b65c84bc69d36d8e0d1ba14e8fb3"
+    }
+  ],
+  "contains_sensitive_data": true,
+  "restore_tested": false,
+  "backup_storage": "backend/backups (gitignored)"
+}
