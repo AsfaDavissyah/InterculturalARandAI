@@ -462,6 +462,8 @@ The current visual system and sidebar remain consistent for both Admin and Lectu
 
 ### Phase 4: Dashboard Topic and Setting Builder
 
+**Status:** Completed on 2026-08-05.
+
 1. Add Topic and Setting navigation using the existing dashboard layout.
 2. Implement create, detail, edit, activate/deactivate, and archive behavior.
 3. Add form validation and visible success/error notifications.
@@ -470,6 +472,8 @@ The current visual system and sidebar remain consistent for both Admin and Lectu
 6. Add automated dashboard tests for the new CRUD flow.
 
 **Exit condition:** An admin can add a new setting without editing backend source files, and a lecturer can filter sessions by topic and setting.
+
+**Verification:** Admin topic and setting CRUD now validates IDs, required runtime fields, AI identity, conversation stages, rubric entries, and ordered response limits. Topic archival also deactivates related settings, while settings with historical sessions are preserved through soft deletion. The dashboard provides complete detail views, editable runtime configuration, briefing and asset previews, visible API feedback, lecturer topic/setting filters, and research summaries. Backend tests pass 43/43, dashboard tests pass 10/10, the production dashboard build succeeds, and desktop/mobile browser checks show no horizontal overflow or console errors.
 
 ### Phase 5: Mobile Topic Experience
 

@@ -198,6 +198,88 @@ async function findActiveTopic(topicId) {
   ) || null;
 }
 
+async function findTopicById(topicId) {
+  const normalizedId = String(topicId || "").trim().toLowerCase();
+  if (!normalizedId) return null;
+  if (mongoose.connection.readyState === 1) {
+    return Topic.findOne({ topicId: normalizedId });
+  }
+  return topicsData.find((topic) => topic.topicId === normalizedId) || null;
+}
+
+function validateTopicInput({ topicId, title }, { requireId = true } = {}) {
+  const normalizedId = String(topicId || "").trim().toLowerCase();
+  if (requireId && !normalizedId) return "topicId is required";
+  if (normalizedId && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(normalizedId)) {
+    return "topicId must use lowercase letters, numbers, and single hyphens";
+  }
+  if (title !== undefined && !String(title).trim()) return "title cannot be empty";
+  return null;
+}
+
+function normalizeSessionRulesInput(sessionRules = {}) {
+  return {
+    minimumStudentResponses: Number(sessionRules.minimumStudentResponses ?? 5),
+    targetStudentResponsesMin: Number(sessionRules.targetStudentResponsesMin ?? 6),
+    targetStudentResponsesMax: Number(sessionRules.targetStudentResponsesMax ?? 8),
+    maximumStudentResponses: Number(sessionRules.maximumStudentResponses ?? 10),
+  };
+}
+
+function validateSessionRulesInput(sessionRules = {}) {
+  const rules = normalizeSessionRulesInput(sessionRules);
+  const values = Object.values(rules);
+  if (!values.every((value) => Number.isInteger(value) && value > 0)) {
+    return "Session response limits must be positive integers";
+  }
+  if (
+    rules.minimumStudentResponses > rules.targetStudentResponsesMin ||
+    rules.targetStudentResponsesMin > rules.targetStudentResponsesMax ||
+    rules.targetStudentResponsesMax > rules.maximumStudentResponses
+  ) {
+    return "Invalid session response count range (minimum <= targetMin <= targetMax <= maximum)";
+  }
+  if (rules.maximumStudentResponses > 20) {
+    return "maximumStudentResponses cannot exceed 20";
+  }
+  return null;
+}
+
+function validateSettingInput(payload, { requireIdentity = true } = {}) {
+  const requiredFields = ["settingId", "topicId", "title", "location", "studentRole"];
+  if (requireIdentity) {
+    const missing = requiredFields.find((field) => !String(payload[field] || "").trim());
+    if (missing) return `${missing} is required`;
+    if (!payload.aiCharacter) return "aiCharacter is required";
+  }
+
+  const settingId = String(payload.settingId || "").trim().toUpperCase();
+  if (settingId && !/^[A-Z0-9]+(?:-[A-Z0-9]+)*$/.test(settingId)) {
+    return "settingId must use uppercase letters, numbers, and single hyphens";
+  }
+  if (payload.title !== undefined && !String(payload.title).trim()) return "title cannot be empty";
+  if (payload.location !== undefined && !String(payload.location).trim()) return "location cannot be empty";
+  if (payload.studentRole !== undefined && !String(payload.studentRole).trim()) return "studentRole cannot be empty";
+  if (payload.aiCharacter !== undefined) {
+    if (!String(payload.aiCharacter?.display_name || payload.aiCharacter?.displayName || "").trim()) {
+      return "aiCharacter.display_name is required";
+    }
+    if (!String(payload.aiCharacter?.role || "").trim()) {
+      return "aiCharacter.role is required";
+    }
+  }
+  if (payload.conversationStages !== undefined && !Array.isArray(payload.conversationStages)) {
+    return "conversationStages must be an array";
+  }
+  if (payload.constraints !== undefined && !Array.isArray(payload.constraints)) {
+    return "constraints must be an array";
+  }
+  if (payload.rubric !== undefined && (payload.rubric === null || Array.isArray(payload.rubric) || typeof payload.rubric !== "object")) {
+    return "rubric must be an object";
+  }
+  return payload.sessionRules ? validateSessionRulesInput(payload.sessionRules) : null;
+}
+
 async function findActiveSetting(settingId) {
   const normalizedId = String(settingId || "").trim().toUpperCase();
   if (!normalizedId) return null;
@@ -1198,6 +1280,15 @@ function authenticateJWT(req, res, next) {
   }
 }
 
+function requireRole(allowedRoles = []) {
+  return (req, res, next) => {
+    if (!req.user || !allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ error: "Access denied. Insufficient permissions." });
+    }
+    next();
+  };
+}
+
 function normalizePracticeSessionPayload(rawSession, userId) {
   const student = rawSession.student || {};
   const scenario = rawSession.scenario || {};
@@ -1749,7 +1840,29 @@ app.get("/api/lecturer/history", authenticateJWT, requireRole(["lecturer"]), asy
     });
     const studentIds = students.map(s => s._id);
 
-    const sessions = await PracticeSession.find({ userId: { $in: studentIds } })
+    const { topic_id, setting_id, scenario_id, student_id, status, start_date, end_date } = req.query;
+    const filter = { userId: { $in: studentIds } };
+
+    if (topic_id) filter.topicId = String(topic_id).toLowerCase().trim();
+    if (setting_id) filter.settingId = String(setting_id).toUpperCase().trim();
+    if (scenario_id) filter["scenario.scenario_id"] = String(scenario_id).toUpperCase().trim();
+    if (student_id) {
+      const ownsStudent = studentIds.some(
+        (id) => String(id) === String(student_id)
+      );
+      if (!ownsStudent) {
+        return res.status(403).json({ error: "Student is not linked to this lecturer." });
+      }
+      filter.userId = student_id;
+    }
+    if (status) filter.status = status;
+    if (start_date || end_date) {
+      filter.completedAt = {};
+      if (start_date) filter.completedAt.$gte = new Date(start_date);
+      if (end_date) filter.completedAt.$lte = new Date(end_date);
+    }
+
+    const sessions = await PracticeSession.find(filter)
       .populate("userId", "name email studentId consent consentAcceptedAt")
       .sort({ completedAt: -1 });
 
@@ -1768,6 +1881,91 @@ app.get("/api/lecturer/history", authenticateJWT, requireRole(["lecturer"]), asy
     }));
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/lecturer/research-summary", authenticateJWT, requireRole(["lecturer"]), async (req, res) => {
+  try {
+    const lecturer = await User.findById(req.user.userId);
+    if (!lecturer?.lecturerCode) {
+      return res.status(400).json({ error: "Lecturer profile is incomplete." });
+    }
+    const students = await User.find({
+      role: "student",
+      studentLecturerCode: lecturer.lecturerCode,
+    }).select("_id");
+    const studentIds = students.map((student) => student._id);
+    const { topic_id, setting_id, scenario_id, student_id, status, start_date, end_date } = req.query;
+    const filter = { userId: { $in: studentIds } };
+
+    if (student_id) {
+      const ownsStudent = studentIds.some((id) => String(id) === String(student_id));
+      if (!ownsStudent) return res.status(403).json({ error: "Student is not linked to this lecturer." });
+      filter.userId = student_id;
+    }
+    if (topic_id) filter.topicId = String(topic_id).toLowerCase().trim();
+    if (setting_id) filter.settingId = String(setting_id).toUpperCase().trim();
+    if (scenario_id) filter["scenario.scenario_id"] = String(scenario_id).toUpperCase().trim();
+    if (status) filter.status = status;
+    if (start_date || end_date) {
+      filter.completedAt = {};
+      if (start_date) filter.completedAt.$gte = new Date(start_date);
+      if (end_date) filter.completedAt.$lte = new Date(end_date);
+    }
+
+    const sessions = await PracticeSession.find(filter).lean();
+    const completedStatuses = new Set(["completed", "ended_manually"]);
+    const completedSessions = sessions.filter((session) => completedStatuses.has(session.status));
+    const summarize = (items) => ({
+      sessions: items.length,
+      completed_sessions: items.filter((item) => completedStatuses.has(item.status)).length,
+      completion_rate: items.length
+        ? Number((items.filter((item) => completedStatuses.has(item.status)).length / items.length).toFixed(4))
+        : 0,
+      average_score: items.length
+        ? Number((items.reduce((sum, item) => sum + Number(item.overallScore || 0), 0) / items.length).toFixed(2))
+        : 0,
+      average_duration_seconds: items.length
+        ? Number((items.reduce((sum, item) => sum + Number(item.durationSeconds || 0), 0) / items.length).toFixed(2))
+        : 0,
+      average_student_responses: items.length
+        ? Number((items.reduce((sum, item) => sum + Number(item.studentResponseCount || 0), 0) / items.length).toFixed(2))
+        : 0,
+    });
+    const groupBy = (keySelector) => {
+      const groups = new Map();
+      sessions.forEach((session) => {
+        const key = keySelector(session);
+        if (!key) return;
+        groups.set(key, [...(groups.get(key) || []), session]);
+      });
+      return [...groups.entries()]
+        .map(([id, items]) => ({ id, ...summarize(items) }))
+        .sort((left, right) => right.sessions - left.sessions || left.id.localeCompare(right.id));
+    };
+
+    return res.json({
+      filters: {
+        topic_id: topic_id || null,
+        setting_id: setting_id || null,
+        scenario_id: scenario_id || null,
+        student_id: student_id || null,
+        status: status || null,
+        start_date: start_date || null,
+        end_date: end_date || null,
+      },
+      totals: {
+        ...summarize(sessions),
+        completed_sessions: completedSessions.length,
+        students: studentIds.length,
+      },
+      by_topic: groupBy((session) => session.topicId || "legacy-scenarios"),
+      by_setting: groupBy(
+        (session) => session.settingId || session.scenario?.scenario_id || "unknown"
+      ),
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -1899,6 +2097,306 @@ app.delete("/api/admin/scenarios/:id", authenticateJWT, requireRole(["admin"]), 
       return res.status(404).json({ error: "Scenario not found" });
     }
     res.json({ success: true, message: "Scenario deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Admin Topic & Setting CRUD Endpoints ───
+
+app.get("/api/admin/topics", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  try {
+    const list = mongoose.connection.readyState === 1
+      ? await Topic.find().sort({ displayOrder: 1, title: 1 })
+      : topicsData;
+    res.json(list);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/admin/topics", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  const { topicId, title, description, iconKey, displayOrder, isActive, languageObjectives, iccObjectives } = req.body;
+  const validationError = validateTopicInput({ topicId, title });
+  if (validationError) return res.status(400).json({ error: validationError });
+  try {
+    const normalizedTopicId = String(topicId).toLowerCase().trim();
+    const existing = mongoose.connection.readyState === 1
+      ? await Topic.findOne({ topicId: normalizedTopicId })
+      : topicsData.find((t) => t.topicId === normalizedTopicId);
+
+    if (existing) {
+      return res.status(400).json({ error: `Topic with ID ${normalizedTopicId} already exists.` });
+    }
+
+    const topicData = {
+      topicId: normalizedTopicId,
+      title: String(title).trim(),
+      description: description ? String(description).trim() : "",
+      iconKey: iconKey ? String(iconKey).trim() : "",
+      displayOrder: Number(displayOrder || 0),
+      isActive: isActive !== false,
+      languageObjectives: Array.isArray(languageObjectives) ? languageObjectives.map(String) : [],
+      iccObjectives: Array.isArray(iccObjectives) ? iccObjectives.map(String) : [],
+    };
+
+    if (mongoose.connection.readyState === 1) {
+      const topic = new Topic(topicData);
+      await topic.save();
+      return res.status(201).json(topic);
+    } else {
+      topicsData.push(topicData);
+      return res.status(201).json(topicData);
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put("/api/admin/topics/:id", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  const { title, description, iconKey, displayOrder, isActive, languageObjectives, iccObjectives } = req.body;
+  const validationError = validateTopicInput({ title }, { requireId: false });
+  if (validationError) return res.status(400).json({ error: validationError });
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const topic = await Topic.findById(req.params.id);
+      if (!topic) {
+        return res.status(404).json({ error: "Topic not found" });
+      }
+      if (title !== undefined) topic.title = String(title).trim();
+      if (description !== undefined) topic.description = String(description).trim();
+      if (iconKey !== undefined) topic.iconKey = String(iconKey).trim();
+      if (displayOrder !== undefined) topic.displayOrder = Number(displayOrder);
+      if (isActive !== undefined) topic.isActive = Boolean(isActive);
+      if (languageObjectives !== undefined) topic.languageObjectives = Array.isArray(languageObjectives) ? languageObjectives.map(String) : [];
+      if (iccObjectives !== undefined) topic.iccObjectives = Array.isArray(iccObjectives) ? iccObjectives.map(String) : [];
+
+      await topic.save();
+      return res.json(topic);
+    } else {
+      const idx = topicsData.findIndex((t) => t.topicId === req.params.id || t._id === req.params.id);
+      if (idx === -1) return res.status(404).json({ error: "Topic not found" });
+      const t = topicsData[idx];
+      if (title !== undefined) t.title = String(title).trim();
+      if (description !== undefined) t.description = String(description).trim();
+      if (iconKey !== undefined) t.iconKey = String(iconKey).trim();
+      if (displayOrder !== undefined) t.displayOrder = Number(displayOrder);
+      if (isActive !== undefined) t.isActive = Boolean(isActive);
+      if (languageObjectives !== undefined) t.languageObjectives = Array.isArray(languageObjectives) ? languageObjectives.map(String) : [];
+      if (iccObjectives !== undefined) t.iccObjectives = Array.isArray(iccObjectives) ? iccObjectives.map(String) : [];
+      return res.json(t);
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete("/api/admin/topics/:id", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const topic = await Topic.findById(req.params.id);
+      if (!topic) {
+        return res.status(404).json({ error: "Topic not found" });
+      }
+      const sessionCount = await PracticeSession.countDocuments({ topicId: topic.topicId });
+      const settingCount = await Setting.countDocuments({ topicId: topic.topicId });
+      if (sessionCount > 0 || settingCount > 0) {
+        topic.isActive = false;
+        await topic.save();
+        await Setting.updateMany(
+          { topicId: topic.topicId },
+          { $set: { isActive: false, updatedAt: new Date() } }
+        );
+        return res.json({
+          success: true,
+          message: `Topic ${topic.topicId} has related settings or sessions; the topic and its settings were archived instead of deleted.`,
+          archived: true,
+        });
+      }
+      await Topic.findByIdAndDelete(req.params.id);
+      return res.json({ success: true, message: "Topic deleted successfully", archived: false });
+    } else {
+      const idx = topicsData.findIndex((t) => t.topicId === req.params.id || t._id === req.params.id);
+      if (idx === -1) return res.status(404).json({ error: "Topic not found" });
+      topicsData[idx].isActive = false;
+      settingsData.forEach((setting) => {
+        if (setting.topicId === topicsData[idx].topicId) setting.isActive = false;
+      });
+      return res.json({ success: true, message: "Topic and related settings deactivated", archived: true });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/admin/settings", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  const { topic_id } = req.query;
+  try {
+    const filter = topic_id ? { topicId: String(topic_id).toLowerCase().trim() } : {};
+    const list = mongoose.connection.readyState === 1
+      ? await Setting.find(filter).sort({ topicId: 1, displayOrder: 1, title: 1 })
+      : settingsData.filter((s) => !topic_id || s.topicId === topic_id);
+    res.json(list);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/admin/settings", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  const { settingId, topicId, title, location, briefing, stickerAssetKey, studentRole, aiCharacter, taskInstruction, conversationStages, constraints, rubric, sessionRules, displayOrder, isActive } = req.body;
+  const validationError = validateSettingInput(req.body);
+  if (validationError) return res.status(400).json({ error: validationError });
+
+  try {
+    const normalizedSettingId = String(settingId).toUpperCase().trim();
+    const normalizedTopicId = String(topicId).toLowerCase().trim();
+    const parentTopic = await findTopicById(normalizedTopicId);
+    if (!parentTopic) {
+      return res.status(400).json({ error: `Parent topic ${normalizedTopicId} does not exist.` });
+    }
+
+    const existing = mongoose.connection.readyState === 1
+      ? await Setting.findOne({ settingId: normalizedSettingId })
+      : settingsData.find((s) => s.settingId === normalizedSettingId);
+
+    if (existing) {
+      return res.status(400).json({ error: `Setting with ID ${normalizedSettingId} already exists.` });
+    }
+
+    const settingData = {
+      settingId: normalizedSettingId,
+      topicId: normalizedTopicId,
+      title: String(title).trim(),
+      location: String(location).trim(),
+      briefing: briefing ? String(briefing).trim() : "",
+      stickerAssetKey: stickerAssetKey ? String(stickerAssetKey).trim() : "",
+      studentRole: String(studentRole).trim(),
+      aiCharacter: {
+        display_name: aiCharacter?.display_name || aiCharacter?.displayName || "AI Character",
+        role: aiCharacter?.role || "Conversation partner",
+        culture: aiCharacter?.culture || "International",
+        avatar_key: aiCharacter?.avatar_key || aiCharacter?.avatarKey || "default_avatar",
+      },
+      taskInstruction: taskInstruction ? String(taskInstruction).trim() : "",
+      conversationStages: Array.isArray(conversationStages) ? conversationStages : [],
+      constraints: Array.isArray(constraints) ? constraints.map(String) : [],
+      rubric: rubric || {},
+      sessionRules: normalizeSessionRulesInput(sessionRules),
+      displayOrder: Number(displayOrder || 0),
+      isActive: isActive !== false,
+      version: 1,
+    };
+
+    if (mongoose.connection.readyState === 1) {
+      const setting = new Setting(settingData);
+      await setting.save();
+      return res.status(201).json(setting);
+    } else {
+      settingsData.push(settingData);
+      return res.status(201).json(settingData);
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put("/api/admin/settings/:id", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  const { topicId, title, location, briefing, stickerAssetKey, studentRole, aiCharacter, taskInstruction, conversationStages, constraints, rubric, sessionRules, displayOrder, isActive } = req.body;
+  const validationError = validateSettingInput(req.body, { requireIdentity: false });
+  if (validationError) return res.status(400).json({ error: validationError });
+
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const setting = await Setting.findById(req.params.id);
+      if (!setting) {
+        return res.status(404).json({ error: "Setting not found" });
+      }
+      if (topicId !== undefined) {
+        const normalizedTopicId = String(topicId).toLowerCase().trim();
+        const parentTopic = await findTopicById(normalizedTopicId);
+        if (!parentTopic) {
+          return res.status(400).json({ error: `Parent topic ${normalizedTopicId} does not exist.` });
+        }
+        setting.topicId = normalizedTopicId;
+      }
+      if (title !== undefined) setting.title = String(title).trim();
+      if (location !== undefined) setting.location = String(location).trim();
+      if (briefing !== undefined) setting.briefing = String(briefing).trim();
+      if (stickerAssetKey !== undefined) setting.stickerAssetKey = String(stickerAssetKey).trim();
+      if (studentRole !== undefined) setting.studentRole = String(studentRole).trim();
+      if (aiCharacter !== undefined) {
+        setting.aiCharacter = {
+          display_name: aiCharacter.display_name || aiCharacter.displayName || setting.aiCharacter.display_name,
+          role: aiCharacter.role || setting.aiCharacter.role,
+          culture: aiCharacter.culture || setting.aiCharacter.culture,
+          avatar_key: aiCharacter.avatar_key || aiCharacter.avatarKey || setting.aiCharacter.avatar_key,
+        };
+      }
+      if (taskInstruction !== undefined) setting.taskInstruction = String(taskInstruction).trim();
+      if (conversationStages !== undefined) setting.conversationStages = Array.isArray(conversationStages) ? conversationStages : [];
+      if (constraints !== undefined) setting.constraints = Array.isArray(constraints) ? constraints.map(String) : [];
+      if (rubric !== undefined) setting.rubric = rubric;
+      if (sessionRules !== undefined) {
+        setting.sessionRules = normalizeSessionRulesInput(sessionRules);
+      }
+      if (displayOrder !== undefined) setting.displayOrder = Number(displayOrder);
+      if (isActive !== undefined) setting.isActive = Boolean(isActive);
+
+      setting.version = (setting.version || 1) + 1;
+      await setting.save();
+      return res.json(setting);
+    } else {
+      const idx = settingsData.findIndex((s) => s.settingId === req.params.id || s._id === req.params.id);
+      if (idx === -1) return res.status(404).json({ error: "Setting not found" });
+      const s = settingsData[idx];
+      if (topicId !== undefined) {
+        const normalizedTopicId = String(topicId).toLowerCase().trim();
+        const parentTopic = await findTopicById(normalizedTopicId);
+        if (!parentTopic) return res.status(400).json({ error: `Parent topic ${normalizedTopicId} does not exist.` });
+        s.topicId = normalizedTopicId;
+      }
+      if (title !== undefined) s.title = String(title).trim();
+      if (location !== undefined) s.location = String(location).trim();
+      if (briefing !== undefined) s.briefing = String(briefing).trim();
+      if (stickerAssetKey !== undefined) s.stickerAssetKey = String(stickerAssetKey).trim();
+      if (studentRole !== undefined) s.studentRole = String(studentRole).trim();
+      if (aiCharacter !== undefined) s.aiCharacter = { ...s.aiCharacter, ...aiCharacter };
+      if (taskInstruction !== undefined) s.taskInstruction = String(taskInstruction).trim();
+      if (conversationStages !== undefined) s.conversationStages = conversationStages;
+      if (constraints !== undefined) s.constraints = constraints.map(String);
+      if (rubric !== undefined) s.rubric = rubric;
+      if (sessionRules !== undefined) s.sessionRules = normalizeSessionRulesInput(sessionRules);
+      if (displayOrder !== undefined) s.displayOrder = Number(displayOrder);
+      if (isActive !== undefined) s.isActive = Boolean(isActive);
+      s.version = Number(s.version || 1) + 1;
+      return res.json(s);
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete("/api/admin/settings/:id", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const setting = await Setting.findById(req.params.id);
+      if (!setting) {
+        return res.status(404).json({ error: "Setting not found" });
+      }
+      const sessionCount = await PracticeSession.countDocuments({ settingId: setting.settingId });
+      if (sessionCount > 0) {
+        setting.isActive = false;
+        await setting.save();
+        return res.json({ success: true, message: `Setting ${setting.settingId} has existing sessions; archived (deactivated) instead of physical deletion.`, archived: true });
+      }
+      await Setting.findByIdAndDelete(req.params.id);
+      return res.json({ success: true, message: "Setting deleted successfully", archived: false });
+    } else {
+      const idx = settingsData.findIndex((s) => s.settingId === req.params.id || s._id === req.params.id);
+      if (idx === -1) return res.status(404).json({ error: "Setting not found" });
+      settingsData[idx].isActive = false;
+      return res.json({ success: true, message: "Setting deactivated", archived: true });
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

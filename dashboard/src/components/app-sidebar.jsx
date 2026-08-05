@@ -4,6 +4,7 @@ import {
   BookOpen,
   ClipboardList,
   GraduationCap,
+  Layers,
   LogOut,
   ShieldCheck,
   Users,
@@ -30,6 +31,7 @@ export function AppSidebar({
 }) {
   const navItems = user.role === "admin"
     ? [
+        { id: "topics", icon: Layers, label: "Topics & Settings" },
         { id: "scenarios", icon: BookOpen, label: "Scenario Builder" },
         { id: "lecturers", icon: Users, label: "Lecturers" },
       ]

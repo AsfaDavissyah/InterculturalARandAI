@@ -80,6 +80,22 @@ const scoreLabels = {
 
 const parseLines = (value) => String(value || '').split('\n').map((line) => line.trim()).filter(Boolean);
 
+const parseSettingRubric = (value) => Object.fromEntries(
+  parseLines(value).map((line) => {
+    const [criterion, weight] = line.split('|').map((item) => item?.trim());
+    return [criterion, Math.max(1, Number(weight) || 5)];
+  }).filter(([criterion]) => criterion)
+);
+
+const formatSettingRubric = (value) => Object.entries(value || {})
+  .map(([criterion, weight]) => `${criterion} | ${weight}`)
+  .join('\n');
+
+const formatConversationStages = (value) => normalizeCollection(value)
+  .map((stage) => typeof stage === 'string' ? stage : stage?.stage_id || stage?.stage || '')
+  .filter(Boolean)
+  .join('\n');
+
 const parseObjectives = (value) =>
   parseLines(value).map((line, index) => {
     const [id, description, cues] = line.split('|').map((item) => item?.trim());
@@ -427,8 +443,56 @@ export default function App() {
   const [studentPage, setStudentPage] = useState(1);
   const [historySearch, setHistorySearch] = useState('');
   const [historyScenarioFilter, setHistoryScenarioFilter] = useState('all');
+  const [historyTopicFilter, setHistoryTopicFilter] = useState('all');
+  const [historySettingFilter, setHistorySettingFilter] = useState('all');
   const [historyStatusFilter, setHistoryStatusFilter] = useState('all');
   const [historyPage, setHistoryPage] = useState(1);
+
+  const [topics, setTopics] = useState([]);
+  const [settingsList, setSettingsList] = useState([]);
+  const [topicModalOpen, setTopicModalOpen] = useState(false);
+  const [editingTopicId, setEditingTopicId] = useState(null);
+  const [topicForm, setTopicForm] = useState({
+    topicId: '',
+    title: '',
+    description: '',
+    iconKey: 'school',
+    displayOrder: 1,
+    isActive: true,
+    languageObjectivesText: '',
+    iccObjectivesText: '',
+  });
+
+  const [settingModalOpen, setSettingModalOpen] = useState(false);
+  const [editingSettingId, setEditingSettingId] = useState(null);
+  const [settingForm, setSettingForm] = useState({
+    settingId: '',
+    topicId: 'academic-communication',
+    title: '',
+    location: '',
+    briefing: '',
+    stickerAssetKey: '',
+    studentRole: '',
+    aiDisplayName: '',
+    aiRole: '',
+    aiCulture: 'United Kingdom',
+    avatarKey: 'female_lecturer_v1',
+    taskInstruction: '',
+    conversationStagesText: '',
+    constraintsText: '',
+    rubricText: '',
+    displayOrder: 1,
+    minResponses: 5,
+    targetMin: 6,
+    targetMax: 8,
+    maxResponses: 10,
+    isActive: true,
+  });
+
+  const [topicSearch, setTopicSearch] = useState('');
+  const [topicStatusFilter, setTopicStatusFilter] = useState('all');
+  const [selectedTopicDetail, setSelectedTopicDetail] = useState(null);
+  const [selectedSettingDetail, setSelectedSettingDetail] = useState(null);
 
   const callApi = useCallback((endpoint, method = 'GET', body = null, options = {}) =>
     requestJson({
@@ -485,6 +549,28 @@ export default function App() {
   const setSectionLoading = (key, value) => {
     setLoadingSections((current) => ({ ...current, [key]: value }));
   };
+
+  const fetchAdminTopics = useCallback(async (signal) => {
+    setSectionLoading('topics', true);
+    try {
+      setTopics(await callApi('/api/admin/topics', 'GET', null, { signal }));
+    } catch (error) {
+      notifyRequestError(error, 'Topik tidak dapat dimuat.');
+    } finally {
+      if (!signal?.aborted) setSectionLoading('topics', false);
+    }
+  }, [callApi, notifyRequestError]);
+
+  const fetchAdminSettings = useCallback(async (signal) => {
+    setSectionLoading('settingsList', true);
+    try {
+      setSettingsList(await callApi('/api/admin/settings', 'GET', null, { signal }));
+    } catch (error) {
+      notifyRequestError(error, 'Setting tidak dapat dimuat.');
+    } finally {
+      if (!signal?.aborted) setSectionLoading('settingsList', false);
+    }
+  }, [callApi, notifyRequestError]);
 
   const fetchAdminScenarios = useCallback(async (signal) => {
     setSectionLoading('scenarios', true);
@@ -547,13 +633,17 @@ export default function App() {
       setActiveTab('');
       return;
     }
-    setActiveTab(user.role === 'admin' ? 'scenarios' : 'overview');
+    setActiveTab(user.role === 'admin' ? 'topics' : 'overview');
   }, [user]);
 
   useEffect(() => {
     if (!token || !activeTab) return undefined;
     const controller = new AbortController();
 
+    if (activeTab === 'topics') {
+      void fetchAdminTopics(controller.signal);
+      void fetchAdminSettings(controller.signal);
+    }
     if (activeTab === 'scenarios') void fetchAdminScenarios(controller.signal);
     if (activeTab === 'lecturers') void fetchAdminLecturers(controller.signal);
     if (activeTab === 'overview') void fetchOverviewData(controller.signal);
@@ -563,6 +653,8 @@ export default function App() {
     return () => controller.abort();
   }, [
     activeTab,
+    fetchAdminTopics,
+    fetchAdminSettings,
     fetchAdminLecturers,
     fetchAdminScenarios,
     fetchLecturerHistory,
@@ -574,7 +666,7 @@ export default function App() {
   useEffect(() => { setScenarioPage(1); }, [scenarioSearch, scenarioStatusFilter]);
   useEffect(() => { setLecturerPage(1); }, [lecturerSearch]);
   useEffect(() => { setStudentPage(1); }, [studentSearch]);
-  useEffect(() => { setHistoryPage(1); }, [historySearch, historyScenarioFilter, historyStatusFilter]);
+  useEffect(() => { setHistoryPage(1); }, [historySearch, historyScenarioFilter, historyTopicFilter, historySettingFilter, historyStatusFilter]);
 
   const dashboardMetrics = useMemo(() => {
     const completed = history.filter((item) => item.status === 'completed' || item.status === 'ended_manually');
@@ -623,8 +715,23 @@ export default function App() {
   ), [students, studentSearch]);
   const studentPagination = paginate(filteredStudents, studentPage);
 
-  const historyScenarioOptions = useMemo(() => Array.from(new Set(
-    history.map((item) => item.scenario?.scenario_id).filter(Boolean)
+  const filteredTopics = useMemo(() => topics.filter((t) => {
+    const matchesSearch = !topicSearch
+      || includesText(t.topicId, topicSearch)
+      || includesText(t.title, topicSearch)
+      || includesText(t.description, topicSearch);
+    const matchesStatus = topicStatusFilter === 'all'
+      || (topicStatusFilter === 'active' && t.isActive !== false)
+      || (topicStatusFilter === 'inactive' && t.isActive === false);
+    return matchesSearch && matchesStatus;
+  }), [topics, topicSearch, topicStatusFilter]);
+
+  const historyTopicOptions = useMemo(() => Array.from(new Set(
+    history.map((item) => item.topic_id).filter(Boolean)
+  )).sort(), [history]);
+
+  const historySettingOptions = useMemo(() => Array.from(new Set(
+    history.map((item) => item.setting_id).filter(Boolean)
   )).sort(), [history]);
 
   const filteredHistory = useMemo(() => history.filter((item) => {
@@ -632,12 +739,280 @@ export default function App() {
       || includesText(item.student_details?.student_id, historySearch)
       || includesText(item.student_details?.name, historySearch)
       || includesText(item.scenario?.scenario_id, historySearch)
-      || includesText(item.scenario?.title, historySearch);
+      || includesText(item.scenario?.title, historySearch)
+      || includesText(item.topic_id, historySearch)
+      || includesText(item.setting_id, historySearch);
     const matchesScenario = historyScenarioFilter === 'all' || item.scenario?.scenario_id === historyScenarioFilter;
+    const matchesTopic = historyTopicFilter === 'all' || item.topic_id === historyTopicFilter;
+    const matchesSetting = historySettingFilter === 'all' || item.setting_id === historySettingFilter;
     const matchesStatus = historyStatusFilter === 'all' || item.status === historyStatusFilter;
-    return matchesSearch && matchesScenario && matchesStatus;
-  }), [history, historySearch, historyScenarioFilter, historyStatusFilter]);
+    return matchesSearch && matchesScenario && matchesTopic && matchesSetting && matchesStatus;
+  }), [history, historySearch, historyScenarioFilter, historyTopicFilter, historySettingFilter, historyStatusFilter]);
   const historyPagination = paginate(filteredHistory, historyPage);
+  const researchBreakdown = useMemo(() => {
+    const summarize = (keySelector) => {
+      const groups = new Map();
+      filteredHistory.forEach((item) => {
+        const key = keySelector(item);
+        if (!key) return;
+        const current = groups.get(key) || { id: key, sessions: 0, completed: 0, scoreTotal: 0, durationTotal: 0 };
+        current.sessions += 1;
+        if (item.status === 'completed' || item.status === 'ended_manually') current.completed += 1;
+        current.scoreTotal += Number(item.overall_score || 0);
+        current.durationTotal += Number(item.duration_seconds || 0);
+        groups.set(key, current);
+      });
+      return [...groups.values()].map((group) => ({
+        id: group.id,
+        sessions: group.sessions,
+        completionRate: group.sessions ? (group.completed / group.sessions) * 100 : 0,
+        averageScore: group.sessions ? group.scoreTotal / group.sessions : 0,
+        averageDuration: group.sessions ? group.durationTotal / group.sessions : 0,
+      })).sort((left, right) => right.sessions - left.sessions || left.id.localeCompare(right.id));
+    };
+    return {
+      topics: summarize((item) => item.topic_id || 'legacy-scenarios'),
+      settings: summarize((item) => item.setting_id || item.scenario?.scenario_id || 'unknown'),
+    };
+  }, [filteredHistory]);
+
+  const openNewTopic = () => {
+    setEditingTopicId(null);
+    setTopicForm({
+      topicId: '',
+      title: '',
+      description: '',
+      iconKey: 'school',
+      displayOrder: (topics.length || 0) + 1,
+      isActive: true,
+      languageObjectivesText: '',
+      iccObjectivesText: '',
+    });
+    setTopicModalOpen(true);
+  };
+
+  const openEditTopic = (topic) => {
+    setEditingTopicId(topic._id || topic.topicId);
+    setTopicForm({
+      topicId: topic.topicId || '',
+      title: topic.title || '',
+      description: topic.description || '',
+      iconKey: topic.iconKey || 'school',
+      displayOrder: topic.displayOrder || 1,
+      isActive: topic.isActive !== false,
+      languageObjectivesText: joinTextList(topic.languageObjectives),
+      iccObjectivesText: joinTextList(topic.iccObjectives),
+    });
+    setTopicModalOpen(true);
+  };
+
+  const handleSaveTopic = async (event) => {
+    event.preventDefault();
+    if (!topicForm.topicId || !topicForm.title) {
+      toast.error('Topic ID and Title are required.');
+      return;
+    }
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(topicForm.topicId.trim().toLowerCase())) {
+      toast.error('Topic ID must use lowercase letters, numbers, and single hyphens.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const payload = {
+        topicId: topicForm.topicId.trim().toLowerCase(),
+        title: topicForm.title.trim(),
+        description: topicForm.description.trim(),
+        iconKey: topicForm.iconKey.trim(),
+        displayOrder: Number(topicForm.displayOrder || 1),
+        isActive: topicForm.isActive,
+        languageObjectives: parseLines(topicForm.languageObjectivesText),
+        iccObjectives: parseLines(topicForm.iccObjectivesText),
+      };
+
+      if (editingTopicId) {
+        const idToUpdate = typeof editingTopicId === 'string' ? editingTopicId : editingTopicId._id;
+        await callApi(`/api/admin/topics/${idToUpdate}`, 'PUT', payload);
+        toast.success('Topic updated successfully.');
+      } else {
+        await callApi('/api/admin/topics', 'POST', payload);
+        toast.success('New topic created successfully.');
+      }
+      setTopicModalOpen(false);
+      fetchAdminTopics(null);
+    } catch (error) {
+      notifyRequestError(error, 'Failed to save topic.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleTopicStatus = async (topicItem) => {
+    const targetId = topicItem._id || topicItem.topicId;
+    try {
+      if (topicItem.isActive !== false) {
+        const res = await callApi(`/api/admin/topics/${targetId}`, 'DELETE');
+        toast.success(res.message || 'Topic deactivated/archived.');
+      } else {
+        await callApi(`/api/admin/topics/${targetId}`, 'PUT', { isActive: true });
+        toast.success('Topic activated successfully.');
+      }
+      fetchAdminTopics(null);
+    } catch (error) {
+      notifyRequestError(error, 'Failed to update topic status.');
+    }
+  };
+
+  const openNewSetting = () => {
+    setEditingSettingId(null);
+    setSettingForm({
+      settingId: '',
+      topicId: topics[0]?.topicId || 'academic-communication',
+      title: '',
+      location: '',
+      briefing: '',
+      stickerAssetKey: '',
+      studentRole: '',
+      aiDisplayName: '',
+      aiRole: '',
+      aiCulture: 'United Kingdom',
+      avatarKey: 'female_lecturer_v1',
+      taskInstruction: '',
+      conversationStagesText: 'greeting_and_introduction\nmain_task\nclarification\npolite_closing',
+      constraintsText: 'Stay in the selected location and role.\nDo not assign a fictional name to the learner.',
+      rubricText: 'politeness | 5\nclarity | 5\nintercultural_awareness | 5',
+      displayOrder: (settingsList.length || 0) + 1,
+      minResponses: 5,
+      targetMin: 6,
+      targetMax: 8,
+      maxResponses: 10,
+      isActive: true,
+    });
+    setSettingModalOpen(true);
+  };
+
+  const openNewSettingForTopic = (topicId) => {
+    openNewSetting();
+    setSettingForm((prev) => ({ ...prev, topicId }));
+  };
+
+  const openEditSetting = (setting) => {
+    setEditingSettingId(setting._id || setting.settingId);
+    setSettingForm({
+      settingId: setting.settingId || '',
+      topicId: setting.topicId || topics[0]?.topicId || 'academic-communication',
+      title: setting.title || '',
+      location: setting.location || '',
+      briefing: setting.briefing || '',
+      stickerAssetKey: setting.stickerAssetKey || '',
+      studentRole: setting.studentRole || '',
+      aiDisplayName: setting.aiCharacter?.display_name || '',
+      aiRole: setting.aiCharacter?.role || '',
+      aiCulture: setting.aiCharacter?.culture || '',
+      avatarKey: setting.aiCharacter?.avatar_key || '',
+      taskInstruction: setting.taskInstruction || '',
+      conversationStagesText: formatConversationStages(setting.conversationStages),
+      constraintsText: joinTextList(setting.constraints),
+      rubricText: formatSettingRubric(setting.rubric),
+      displayOrder: setting.displayOrder ?? 1,
+      minResponses: setting.sessionRules?.minimumStudentResponses || 5,
+      targetMin: setting.sessionRules?.targetStudentResponsesMin || 6,
+      targetMax: setting.sessionRules?.targetStudentResponsesMax || 8,
+      maxResponses: setting.sessionRules?.maximumStudentResponses || 10,
+      isActive: setting.isActive !== false,
+    });
+    setSettingModalOpen(true);
+  };
+
+  const handleSaveSetting = async (event) => {
+    event.preventDefault();
+    if (!settingForm.settingId || !settingForm.topicId || !settingForm.title || !settingForm.location || !settingForm.studentRole || !settingForm.aiDisplayName || !settingForm.aiRole) {
+      toast.error('Setting ID, Topic, Title, Location, Student Role, AI Display Name, and AI Role are required.');
+      return;
+    }
+    if (!/^[A-Z0-9]+(?:-[A-Z0-9]+)*$/.test(settingForm.settingId.trim().toUpperCase())) {
+      toast.error('Setting ID must use uppercase letters, numbers, and single hyphens.');
+      return;
+    }
+    if (!parseLines(settingForm.conversationStagesText).length) {
+      toast.error('Add at least one conversation stage.');
+      return;
+    }
+    if (!Object.keys(parseSettingRubric(settingForm.rubricText)).length) {
+      toast.error('Add at least one rubric criterion.');
+      return;
+    }
+
+    const min = Number(settingForm.minResponses || 5);
+    const targetMin = Number(settingForm.targetMin || 6);
+    const targetMax = Number(settingForm.targetMax || 8);
+    const max = Number(settingForm.maxResponses || 10);
+    if (min > targetMin || targetMin > targetMax || targetMax > max) {
+      toast.error('Invalid response count range (Minimum <= Target Min <= Target Max <= Maximum).');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const payload = {
+        settingId: settingForm.settingId.trim().toUpperCase(),
+        topicId: settingForm.topicId.trim().toLowerCase(),
+        title: settingForm.title.trim(),
+        location: settingForm.location.trim(),
+        briefing: settingForm.briefing.trim(),
+        stickerAssetKey: settingForm.stickerAssetKey.trim(),
+        studentRole: settingForm.studentRole.trim(),
+        aiCharacter: {
+          display_name: settingForm.aiDisplayName.trim() || 'AI Character',
+          role: settingForm.aiRole.trim() || 'Conversation partner',
+          culture: settingForm.aiCulture.trim() || 'International',
+          avatar_key: settingForm.avatarKey.trim() || 'default_avatar',
+        },
+        taskInstruction: settingForm.taskInstruction.trim(),
+        conversationStages: parseLines(settingForm.conversationStagesText),
+        constraints: parseLines(settingForm.constraintsText),
+        rubric: parseSettingRubric(settingForm.rubricText),
+        displayOrder: Number(settingForm.displayOrder || 0),
+        sessionRules: {
+          minimumStudentResponses: min,
+          targetStudentResponsesMin: targetMin,
+          targetStudentResponsesMax: targetMax,
+          maximumStudentResponses: max,
+        },
+        isActive: settingForm.isActive,
+      };
+
+      if (editingSettingId) {
+        const idToUpdate = typeof editingSettingId === 'string' ? editingSettingId : editingSettingId._id;
+        await callApi(`/api/admin/settings/${idToUpdate}`, 'PUT', payload);
+        toast.success('Setting updated successfully.');
+      } else {
+        await callApi('/api/admin/settings', 'POST', payload);
+        toast.success('New setting created successfully.');
+      }
+      setSettingModalOpen(false);
+      fetchAdminSettings(null);
+    } catch (error) {
+      notifyRequestError(error, 'Failed to save setting.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleSettingStatus = async (settingItem) => {
+    const targetId = settingItem._id || settingItem.settingId;
+    try {
+      if (settingItem.isActive !== false) {
+        const res = await callApi(`/api/admin/settings/${targetId}`, 'DELETE');
+        toast.success(res.message || 'Setting deactivated/archived.');
+      } else {
+        await callApi(`/api/admin/settings/${targetId}`, 'PUT', { isActive: true });
+        toast.success('Setting activated successfully.');
+      }
+      fetchAdminSettings(null);
+    } catch (error) {
+      notifyRequestError(error, 'Failed to update setting status.');
+    }
+  };
 
   const openNewScenario = () => {
     setEditingScenarioId(null);
@@ -810,10 +1185,182 @@ export default function App() {
           <div>
             <SidebarTrigger className="sidebar-top-trigger" />
             <span>{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
-            <h1>{activeTab === 'scenarios' ? 'Scenario Builder' : activeTab === 'lecturers' ? 'Lecturer Accounts' : activeTab === 'overview' ? 'Research Overview' : activeTab === 'students' ? 'Registered Students' : 'Practice History'}</h1>
+            <h1>{activeTab === 'topics' ? 'Topics & Settings' : activeTab === 'scenarios' ? 'Scenario Builder' : activeTab === 'lecturers' ? 'Lecturer Accounts' : activeTab === 'overview' ? 'Research Overview' : activeTab === 'students' ? 'Registered Students' : 'Practice History'}</h1>
           </div>
           <div className="search-pill"><Search size={16} /><span>{apiBaseUrl.replace(/^https?:\/\//, '')}</span></div>
         </header>
+
+        {user.role === 'admin' && activeTab === 'topics' && (
+          <section className="screen-stack">
+            <div className="action-row">
+              <p>Configure guided communication topics, 2D stickers, 3D character profiles, and response rules.</p>
+              <div className="flex gap-2">
+                <button type="button" className="secondary-action" onClick={openNewSetting}>
+                  <Plus size={16} /> New Setting
+                </button>
+                <button type="button" className="primary-action" onClick={openNewTopic}>
+                  <Plus size={16} /> New Topic
+                </button>
+              </div>
+            </div>
+
+            <div className="data-panel">
+              <div className="panel-heading">
+                <h3>Guided Topics ({filteredTopics.length})</h3>
+                <span>Manage topics and their practice settings</span>
+              </div>
+              <div className="table-toolbar multi">
+                <label className="toolbar-field">
+                  <Search size={15} />
+                  <input
+                    value={topicSearch}
+                    onChange={(event) => setTopicSearch(event.target.value)}
+                    placeholder="Search topic ID, title, description..."
+                  />
+                </label>
+                <select
+                  value={topicStatusFilter}
+                  onChange={(event) => setTopicStatusFilter(event.target.value)}
+                >
+                  <option value="all">All status</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+
+              <div className="topic-cards-container">
+                {filteredTopics.map((topic) => {
+                  const settingsForTopic = settingsList.filter((s) => s.topicId === topic.topicId);
+                  return (
+                    <div key={topic.topicId} className="topic-card-panel">
+                      <div className="topic-card-header">
+                        <div className="topic-title-group">
+                          <span className="topic-icon-tag">{topic.iconKey || 'school'}</span>
+                          <div>
+                            <h4>{topic.title}</h4>
+                            <span className="topic-id-badge">{topic.topicId}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="btn-table-action"
+                            onClick={() => setSelectedTopicDetail(topic)}
+                          >
+                            <Eye size={14} /> Detail
+                          </button>
+                          <button
+                            type="button"
+                            className={`status-pill ${topic.isActive !== false ? 'active' : 'inactive'}`}
+                            onClick={() => handleToggleTopicStatus(topic)}
+                          >
+                            {topic.isActive !== false ? 'Active' : 'Inactive'}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-table-action icon-action edit-action"
+                            onClick={() => openEditTopic(topic)}
+                            title="Edit topic"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            className="secondary-action text-xs"
+                            onClick={() => openNewSettingForTopic(topic.topicId)}
+                          >
+                            <Plus size={13} /> Add Setting
+                          </button>
+                        </div>
+                      </div>
+
+                      <p className="topic-desc">{topic.description}</p>
+
+                      <div className="topic-objectives-row">
+                        {topic.languageObjectives?.length > 0 && (
+                          <div className="obj-col">
+                            <strong>Language Objectives:</strong>
+                            <ul>
+                              {topic.languageObjectives.map((obj, i) => (
+                                <li key={i}>{obj}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {topic.iccObjectives?.length > 0 && (
+                          <div className="obj-col">
+                            <strong>ICC Objectives:</strong>
+                            <ul>
+                              {topic.iccObjectives.map((obj, i) => (
+                                <li key={i}>{obj}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="topic-settings-section">
+                        <h5>Associated Settings ({settingsForTopic.length})</h5>
+                        <div className="settings-grid">
+                          {settingsForTopic.map((setting) => (
+                            <div key={setting.settingId} className="setting-card">
+                              <div className="setting-card-header">
+                                <div>
+                                  <strong>{setting.title}</strong>
+                                  <span className="setting-id-tag">{setting.settingId}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    className="btn-table-action icon-action"
+                                    onClick={() => setSelectedSettingDetail(setting)}
+                                    title="View setting detail"
+                                    aria-label={`View ${setting.title}`}
+                                  >
+                                    <Eye size={14} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`status-pill ${setting.isActive !== false ? 'active' : 'inactive'}`}
+                                    onClick={() => handleToggleSettingStatus(setting)}
+                                  >
+                                    {setting.isActive !== false ? 'Active' : 'Inactive'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn-table-action icon-action edit-action"
+                                    onClick={() => openEditSetting(setting)}
+                                    title="Edit setting"
+                                  >
+                                    <Edit2 size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Location: {setting.location} | Sticker: {setting.stickerAssetKey || 'None'}
+                              </p>
+                              <div className="setting-details-box">
+                                <p><strong>Student:</strong> {setting.studentRole}</p>
+                                <p><strong>AI Partner:</strong> {setting.aiCharacter?.display_name} ({setting.aiCharacter?.role}, {setting.aiCharacter?.culture})</p>
+                                <p><strong>Response Limits:</strong> {setting.sessionRules?.minimumStudentResponses || 5} min / {setting.sessionRules?.targetStudentResponsesMin || 6}-{setting.sessionRules?.targetStudentResponsesMax || 8} target / {setting.sessionRules?.maximumStudentResponses || 10} max</p>
+                              </div>
+                            </div>
+                          ))}
+                          {!settingsForTopic.length && (
+                            <p className="empty-note text-xs">No settings created for this topic yet.</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {!filteredTopics.length && (
+                  <p className="empty-note">No topics match the current filter.</p>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
 
         {user.role === 'admin' && activeTab === 'scenarios' && (
           <section className="screen-stack">
@@ -1055,6 +1602,28 @@ export default function App() {
         {user.role === 'lecturer' && activeTab === 'history' && (
           <section className="screen-stack">
             <div className="action-row"><p>This history can be exported as research data.</p><button className="primary-action" onClick={exportHistoryToCSV}><Download size={16} /> Export CSV</button></div>
+            <div className="research-breakdown-grid">
+              <div className="data-panel">
+                <div className="panel-heading"><h3>Topic Research Summary</h3><span>current filters</span></div>
+                <table className="custom-table compact-research-table">
+                  <thead><tr><th>Topic</th><th>Sessions</th><th>Completion</th><th>Avg. score</th></tr></thead>
+                  <tbody>
+                    {researchBreakdown.topics.map((item) => <tr key={item.id}><td><strong>{item.id}</strong></td><td>{item.sessions}</td><td>{item.completionRate.toFixed(0)}%</td><td>{item.averageScore.toFixed(2)}</td></tr>)}
+                    {!researchBreakdown.topics.length && <TableStatusRow colSpan={4} emptyText="No topic data for the current filters." />}
+                  </tbody>
+                </table>
+              </div>
+              <div className="data-panel">
+                <div className="panel-heading"><h3>Setting Research Summary</h3><span>current filters</span></div>
+                <table className="custom-table compact-research-table">
+                  <thead><tr><th>Setting</th><th>Sessions</th><th>Completion</th><th>Avg. duration</th></tr></thead>
+                  <tbody>
+                    {researchBreakdown.settings.map((item) => <tr key={item.id}><td><strong>{item.id}</strong></td><td>{item.sessions}</td><td>{item.completionRate.toFixed(0)}%</td><td>{Math.round(item.averageDuration)}s</td></tr>)}
+                    {!researchBreakdown.settings.length && <TableStatusRow colSpan={4} emptyText="No setting data for the current filters." />}
+                  </tbody>
+                </table>
+              </div>
+            </div>
             <div className="data-panel">
               <div className="panel-heading"><h3>Practice Sessions</h3><span>{filteredHistory.length} of {history.length} sessions</span></div>
               <div className="table-toolbar multi">
@@ -1065,6 +1634,14 @@ export default function App() {
                 <select value={historyScenarioFilter} onChange={(event) => setHistoryScenarioFilter(event.target.value)}>
                   <option value="all">All scenarios</option>
                   {historyScenarioOptions.map((id) => <option key={id} value={id}>{id}</option>)}
+                </select>
+                <select value={historyTopicFilter} onChange={(event) => setHistoryTopicFilter(event.target.value)}>
+                  <option value="all">All topics</option>
+                  {historyTopicOptions.map((id) => <option key={id} value={id}>{id}</option>)}
+                </select>
+                <select value={historySettingFilter} onChange={(event) => setHistorySettingFilter(event.target.value)}>
+                  <option value="all">All settings</option>
+                  {historySettingOptions.map((id) => <option key={id} value={id}>{id}</option>)}
                 </select>
                 <select value={historyStatusFilter} onChange={(event) => setHistoryStatusFilter(event.target.value)}>
                   <option value="all">All status</option>
@@ -1409,6 +1986,206 @@ export default function App() {
               <button type="button" className="primary-action" onClick={() => setSelectedScenarioForDetail(null)}>Done</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {selectedTopicDetail && (
+        <div className="modal-backdrop">
+          <div className="detail-modal content-detail-modal">
+            <div className="panel-heading">
+              <div>
+                <span className="eyebrow">Guided topic</span>
+                <h3>{selectedTopicDetail.title}</h3>
+                <span>{selectedTopicDetail.topicId}</span>
+              </div>
+              <button type="button" className="text-button" onClick={() => setSelectedTopicDetail(null)}>Close</button>
+            </div>
+            <p>{selectedTopicDetail.description || 'No description provided.'}</p>
+            <div className="detail-grid">
+              <div><span>Icon key</span><strong>{selectedTopicDetail.iconKey || '-'}</strong></div>
+              <div><span>Display order</span><strong>{selectedTopicDetail.displayOrder ?? 0}</strong></div>
+              <div><span>Status</span><strong>{selectedTopicDetail.isActive !== false ? 'Active' : 'Inactive'}</strong></div>
+              <div><span>Settings</span><strong>{settingsList.filter((item) => item.topicId === selectedTopicDetail.topicId).length}</strong></div>
+            </div>
+            <div className="topic-objectives-row">
+              <div className="obj-col"><strong>Language objectives</strong><ul>{(selectedTopicDetail.languageObjectives || []).map((item) => <li key={item}>{item}</li>)}</ul></div>
+              <div className="obj-col"><strong>ICC objectives</strong><ul>{(selectedTopicDetail.iccObjectives || []).map((item) => <li key={item}>{item}</li>)}</ul></div>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="secondary-action" onClick={() => setSelectedTopicDetail(null)}>Done</button>
+              <button type="button" className="primary-action" onClick={() => { setSelectedTopicDetail(null); openEditTopic(selectedTopicDetail); }}><Edit2 size={15} /> Edit Topic</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedSettingDetail && (
+        <div className="modal-backdrop">
+          <div className="detail-modal content-detail-modal setting-detail-modal">
+            <div className="panel-heading">
+              <div>
+                <span className="eyebrow">Guided setting</span>
+                <h3>{selectedSettingDetail.title}</h3>
+                <span>{selectedSettingDetail.settingId}</span>
+              </div>
+              <button type="button" className="text-button" onClick={() => setSelectedSettingDetail(null)}>Close</button>
+            </div>
+            <div className="setting-preview compact-preview">
+              <div className="setting-preview-scene">
+                <span>2D setting asset</span>
+                <strong>{selectedSettingDetail.stickerAssetKey || 'Not configured'}</strong>
+                <small>{selectedSettingDetail.location}</small>
+              </div>
+              <div className="setting-preview-copy">
+                <span className="eyebrow">Briefing</span>
+                <p>{selectedSettingDetail.briefing || 'No briefing provided.'}</p>
+                <dl>
+                  <div><dt>Topic</dt><dd>{selectedSettingDetail.topicId}</dd></div>
+                  <div><dt>Student</dt><dd>{selectedSettingDetail.studentRole}</dd></div>
+                  <div><dt>AI partner</dt><dd>{selectedSettingDetail.aiCharacter?.display_name} ({selectedSettingDetail.aiCharacter?.role})</dd></div>
+                  <div><dt>Avatar key</dt><dd>{selectedSettingDetail.aiCharacter?.avatar_key || 'default_avatar'}</dd></div>
+                </dl>
+              </div>
+            </div>
+            <div className="detail-copy-block"><span>Task instruction</span><p>{selectedSettingDetail.taskInstruction || '-'}</p></div>
+            <div className="detail-columns">
+              <div className="detail-copy-block"><span>Conversation stages</span><ol>{normalizeCollection(selectedSettingDetail.conversationStages).map((item, index) => <li key={`${index}-${typeof item === 'string' ? item : item?.stage_id}`}>{typeof item === 'string' ? item : item?.stage_id || item?.stage || 'Unnamed stage'}</li>)}</ol></div>
+              <div className="detail-copy-block"><span>Constraints</span><ul>{(selectedSettingDetail.constraints || []).map((item) => <li key={item}>{item}</li>)}</ul></div>
+              <div className="detail-copy-block"><span>Rubric</span><ul>{Object.entries(selectedSettingDetail.rubric || {}).map(([key, value]) => <li key={key}>{key}: {value}</li>)}</ul></div>
+            </div>
+            <div className="detail-grid">
+              <div><span>Minimum</span><strong>{selectedSettingDetail.sessionRules?.minimumStudentResponses || 5}</strong></div>
+              <div><span>Target</span><strong>{selectedSettingDetail.sessionRules?.targetStudentResponsesMin || 6}-{selectedSettingDetail.sessionRules?.targetStudentResponsesMax || 8}</strong></div>
+              <div><span>Maximum</span><strong>{selectedSettingDetail.sessionRules?.maximumStudentResponses || 10}</strong></div>
+              <div><span>Version</span><strong>{selectedSettingDetail.version || 1}</strong></div>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="secondary-action" onClick={() => setSelectedSettingDetail(null)}>Done</button>
+              <button type="button" className="primary-action" onClick={() => { setSelectedSettingDetail(null); openEditSetting(selectedSettingDetail); }}><Edit2 size={15} /> Edit Setting</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {topicModalOpen && (
+        <div className="modal-backdrop">
+          <form className="scenario-modal" onSubmit={handleSaveTopic}>
+            <div className="panel-heading">
+              <div>
+                <h3>{editingTopicId ? 'Edit Topic' : 'Create New Topic'}</h3>
+                <span>Configure topic title, icon key, and language/ICC objectives.</span>
+              </div>
+              <button type="button" className="text-button" onClick={() => setTopicModalOpen(false)}>Close</button>
+            </div>
+
+            <div className="builder-section">
+              <div className="builder-grid">
+                <label>Topic ID (lowercase)<input required disabled={!!editingTopicId} value={topicForm.topicId} onChange={(event) => setTopicForm({ ...topicForm, topicId: event.target.value })} placeholder="academic-communication" /></label>
+                <label>Title<input required value={topicForm.title} onChange={(event) => setTopicForm({ ...topicForm, title: event.target.value })} placeholder="Academic Communication" /></label>
+                <label>Icon Key<input value={topicForm.iconKey} onChange={(event) => setTopicForm({ ...topicForm, iconKey: event.target.value })} placeholder="school" /></label>
+                <label>Display Order<input type="number" value={topicForm.displayOrder} onChange={(event) => setTopicForm({ ...topicForm, displayOrder: event.target.value })} /></label>
+              </div>
+              <label>Description<textarea rows="3" value={topicForm.description} onChange={(event) => setTopicForm({ ...topicForm, description: event.target.value })} placeholder="Communicate effectively in university and academic settings..." /></label>
+              <label>Language Objectives (one per line)<textarea rows="3" value={topicForm.languageObjectivesText} onChange={(event) => setTopicForm({ ...topicForm, languageObjectivesText: event.target.value })} placeholder="Making formal academic inquiries&#10;Asking for clarification on assignments" /></label>
+              <label>ICC Objectives (one per line)<textarea rows="3" value={topicForm.iccObjectivesText} onChange={(event) => setTopicForm({ ...topicForm, iccObjectivesText: event.target.value })} placeholder="Respecting power distance with lecturers&#10;Understanding indirect feedback" /></label>
+
+              <div className="modal-options mt-4">
+                <label className="switch-row">
+                  <input type="checkbox" checked={topicForm.isActive} onChange={(event) => setTopicForm({ ...topicForm, isActive: event.target.checked })} /> Active on mobile app
+                </label>
+              </div>
+            </div>
+
+            <div className="modal-actions" style={{ justifyContent: 'flex-end', display: 'flex', gap: '8px' }}>
+              <button type="button" className="secondary-action" onClick={() => setTopicModalOpen(false)}>Cancel</button>
+              <button type="submit" className="primary-action">{editingTopicId ? 'Update Topic' : 'Save Topic'}</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {settingModalOpen && (
+        <div className="modal-backdrop">
+          <form className="scenario-modal" onSubmit={handleSaveSetting}>
+            <div className="panel-heading">
+              <div>
+                <h3>{editingSettingId ? 'Edit Setting' : 'Create New Setting'}</h3>
+                <span>Configure setting scenario, 2D sticker, 3D AI character role, and response limits.</span>
+              </div>
+              <button type="button" className="text-button" onClick={() => setSettingModalOpen(false)}>Close</button>
+            </div>
+
+            <div className="builder-section">
+              <div className="builder-grid">
+                <label>Setting ID (UPPERCASE)<input required disabled={!!editingSettingId} value={settingForm.settingId} onChange={(event) => setSettingForm({ ...settingForm, settingId: event.target.value })} placeholder="ACADEMIC-LECTURER-OFFICE" /></label>
+                <label>Parent Topic<select value={settingForm.topicId} onChange={(event) => setSettingForm({ ...settingForm, topicId: event.target.value })}>
+                  {topics.map((t) => <option key={t.topicId} value={t.topicId}>{t.title} ({t.topicId})</option>)}
+                </select></label>
+                <label>Title<input required value={settingForm.title} onChange={(event) => setSettingForm({ ...settingForm, title: event.target.value })} placeholder="Lecturer's Consultation Office" /></label>
+                <label>Location<input required value={settingForm.location} onChange={(event) => setSettingForm({ ...settingForm, location: event.target.value })} placeholder="Faculty Office Building" /></label>
+                <label>Display Order<input type="number" min="0" value={settingForm.displayOrder} onChange={(event) => setSettingForm({ ...settingForm, displayOrder: event.target.value })} /></label>
+              </div>
+
+              <div className="builder-grid">
+                <label>2D Sticker Asset Key<input value={settingForm.stickerAssetKey} onChange={(event) => setSettingForm({ ...settingForm, stickerAssetKey: event.target.value })} placeholder="academic_office_sticker" /></label>
+                <label>Student Role<input required value={settingForm.studentRole} onChange={(event) => setSettingForm({ ...settingForm, studentRole: event.target.value })} placeholder="Undergraduate Student" /></label>
+              </div>
+
+              <label>Briefing Text<textarea rows="2" value={settingForm.briefing} onChange={(event) => setSettingForm({ ...settingForm, briefing: event.target.value })} placeholder="You are visiting your lecturer to request a deadline extension..." /></label>
+
+              <h4>AI Character Configuration</h4>
+              <div className="builder-grid">
+                <label>AI Display Name<input required value={settingForm.aiDisplayName} onChange={(event) => setSettingForm({ ...settingForm, aiDisplayName: event.target.value })} placeholder="Dr. Sarah Jenkins" /></label>
+                <label>AI Role<input required value={settingForm.aiRole} onChange={(event) => setSettingForm({ ...settingForm, aiRole: event.target.value })} placeholder="Academic Advisor" /></label>
+                <label>AI Culture<input value={settingForm.aiCulture} onChange={(event) => setSettingForm({ ...settingForm, aiCulture: event.target.value })} placeholder="United Kingdom" /></label>
+                <label>3D Avatar Model Key<input value={settingForm.avatarKey} onChange={(event) => setSettingForm({ ...settingForm, avatarKey: event.target.value })} placeholder="female_lecturer_v1" /></label>
+              </div>
+
+              <label>Task Instruction<textarea rows="2" value={settingForm.taskInstruction} onChange={(event) => setSettingForm({ ...settingForm, taskInstruction: event.target.value })} placeholder="Explain your circumstances clearly and negotiate a revised submission date." /></label>
+
+              <h4>Conversation Structure</h4>
+              <label>Conversation Stages (one stable ID per line)<textarea required rows="4" value={settingForm.conversationStagesText} onChange={(event) => setSettingForm({ ...settingForm, conversationStagesText: event.target.value })} placeholder="greeting_and_introduction&#10;main_task&#10;clarification&#10;polite_closing" /></label>
+              <label>Constraints (one per line)<textarea rows="3" value={settingForm.constraintsText} onChange={(event) => setSettingForm({ ...settingForm, constraintsText: event.target.value })} placeholder="Remain in the selected location.&#10;Do not change roles." /></label>
+              <label>Rubric (criterion | maximum score)<textarea required rows="3" value={settingForm.rubricText} onChange={(event) => setSettingForm({ ...settingForm, rubricText: event.target.value })} placeholder="politeness | 5&#10;clarity | 5&#10;intercultural_awareness | 5" /></label>
+
+              <div className="setting-preview" aria-label="Setting preview">
+                <div className="setting-preview-scene">
+                  <span>2D setting</span>
+                  <strong>{settingForm.stickerAssetKey || 'No sticker asset selected'}</strong>
+                  <small>{settingForm.location || 'Location preview'}</small>
+                </div>
+                <div className="setting-preview-copy">
+                  <span className="eyebrow">Student briefing preview</span>
+                  <h4>{settingForm.title || 'Untitled setting'}</h4>
+                  <p>{settingForm.briefing || 'The student briefing will appear here.'}</p>
+                  <dl>
+                    <div><dt>AI partner</dt><dd>{settingForm.aiDisplayName || 'Not configured'}</dd></div>
+                    <div><dt>Avatar key</dt><dd>{settingForm.avatarKey || 'default_avatar'}</dd></div>
+                    <div><dt>Student role</dt><dd>{settingForm.studentRole || 'Not configured'}</dd></div>
+                  </dl>
+                </div>
+              </div>
+
+              <h4>Session Rules (Response Limits)</h4>
+              <div className="builder-grid compact">
+                <label>Minimum responses<input type="number" min="1" value={settingForm.minResponses} onChange={(event) => setSettingForm({ ...settingForm, minResponses: event.target.value })} /></label>
+                <label>Target min<input type="number" min="1" value={settingForm.targetMin} onChange={(event) => setSettingForm({ ...settingForm, targetMin: event.target.value })} /></label>
+                <label>Target max<input type="number" min="1" value={settingForm.targetMax} onChange={(event) => setSettingForm({ ...settingForm, targetMax: event.target.value })} /></label>
+                <label>Maximum<input type="number" min="1" value={settingForm.maxResponses} onChange={(event) => setSettingForm({ ...settingForm, maxResponses: event.target.value })} /></label>
+              </div>
+
+              <div className="modal-options mt-4">
+                <label className="switch-row">
+                  <input type="checkbox" checked={settingForm.isActive} onChange={(event) => setSettingForm({ ...settingForm, isActive: event.target.checked })} /> Active on mobile app
+                </label>
+              </div>
+            </div>
+
+            <div className="modal-actions" style={{ justifyContent: 'flex-end', display: 'flex', gap: '8px' }}>
+              <button type="button" className="secondary-action" onClick={() => setSettingModalOpen(false)}>Cancel</button>
+              <button type="submit" className="primary-action">{editingSettingId ? 'Update Setting' : 'Save Setting'}</button>
+            </div>
+          </form>
         </div>
       )}
     </SidebarProvider>
