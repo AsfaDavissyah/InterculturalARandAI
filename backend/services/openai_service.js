@@ -18,7 +18,7 @@ Personalization rules:
 - Do not overuse the learner's name. Use it mostly in greetings, warm acknowledgements, or closing.
 - The learner's real display name replaces any default student character name in the scenario.
 - Never call the learner by default sample names from scenario text, such as Rina, Raka, David, or other scripted names, unless that is the learner's actual display name.
-- Do not introduce yourself with a scripted sample name. Speak as the role, not as a named script character.
+- Keep the configured AI character's identity when one is provided. Never assign a fictional or sample name to the learner.
 `;
 }
 
@@ -27,6 +27,9 @@ function buildPromptScenario(scenarioData) {
   const context = scenarioData.context || {};
 
   return {
+    experience_type: scenarioData.experience_type || "legacy_scenario",
+    topic_id: scenarioData.topic_id || null,
+    setting_id: scenarioData.setting_id || null,
     scenario_id: scenario.scenario_id,
     title: scenario.title,
     type: scenario.scenario_type,
@@ -38,8 +41,11 @@ function buildPromptScenario(scenarioData) {
     student_role: scenario.student_role,
     ai_character_prompt: scenario.ai_character_prompt,
     cultural_focus: scenario.cultural_focus,
+    language_objectives: scenarioData.language_objectives || [],
+    icc_objectives: scenarioData.icc_objectives || [],
     boundaries: context.boundaries || [],
     forbidden_terms: context.forbidden_terms || [],
+    rubric: scenarioData.rubric || {},
   };
 }
 
@@ -159,6 +165,9 @@ function buildPromptMemory(
   return {
     fixed_context: {
       scenario_id: scenarioData.scenario.scenario_id,
+      experience_type: scenarioData.experience_type || "legacy_scenario",
+      topic_id: scenarioData.topic_id || null,
+      setting_id: scenarioData.setting_id || null,
       setting: scenarioData.context.setting,
       ai_role: scenarioData.scenario.ai_role,
       boundaries: scenarioData.context.boundaries,
@@ -257,7 +266,10 @@ function buildOutputSchema(scenarioData) {
   };
 }
 
-function buildChatOutputSchema() {
+function buildChatOutputSchema(scenarioData) {
+  const objectiveIds = (scenarioData.conversation_objectives || [])
+    .map((objective) => objective.objective_id)
+    .filter(Boolean);
   return {
     type: "object",
     additionalProperties: false,
@@ -265,7 +277,9 @@ function buildChatOutputSchema() {
       ai_message: { type: "string" },
       completed_objective_ids: {
         type: "array",
-        items: { type: "string" },
+        items: objectiveIds.length
+          ? { type: "string", enum: objectiveIds }
+          : { type: "string" },
       },
     },
     required: ["ai_message", "completed_objective_ids"],
@@ -334,7 +348,7 @@ Generate the next short role-play message and list objective IDs that now appear
       format: {
         type: "json_schema",
         name: "intercultural_chat_response",
-        schema: buildChatOutputSchema(),
+        schema: buildChatOutputSchema(scenarioData),
         strict: true,
       },
     },

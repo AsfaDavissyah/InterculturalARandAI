@@ -13,7 +13,16 @@ const PracticeSession = require("./models/PracticeSession");
 const Scenario = require("./models/Scenario");
 const Topic = require("./models/Topic");
 const Setting = require("./models/Setting");
-const { seedTopicsAndSettings } = require("./scripts/seed_topics_and_settings");
+const {
+  seedTopicsAndSettings,
+  topicsData,
+  settingsData,
+} = require("./scripts/seed_topics_and_settings");
+const {
+  buildGuidedScenarioData,
+  serializeSetting,
+  serializeTopic,
+} = require("./services/guided_scenario_service");
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET || "intercultural_ai_secret_key_2026";
@@ -177,6 +186,92 @@ app.use((err, req, res, next) => {
 const dataDir = path.join(__dirname, "data");
 const defaultScenarioId = "G-ICC-008";
 const scenarioMap = loadScenarios(dataDir);
+
+async function findActiveTopic(topicId) {
+  const normalizedId = String(topicId || "").trim().toLowerCase();
+  if (!normalizedId) return null;
+  if (mongoose.connection.readyState === 1) {
+    return Topic.findOne({ topicId: normalizedId, isActive: true }).lean();
+  }
+  return topicsData.find(
+    (topic) => topic.topicId === normalizedId && topic.isActive !== false
+  ) || null;
+}
+
+async function findActiveSetting(settingId) {
+  const normalizedId = String(settingId || "").trim().toUpperCase();
+  if (!normalizedId) return null;
+  if (mongoose.connection.readyState === 1) {
+    return Setting.findOne({ settingId: normalizedId, isActive: true }).lean();
+  }
+  return settingsData.find(
+    (setting) => setting.settingId === normalizedId && setting.isActive !== false
+  ) || null;
+}
+
+async function resolveConversationScenario({ scenarioId, topicId, settingId }) {
+  const requestedSettingId = String(settingId || scenarioId || "")
+    .trim()
+    .toUpperCase();
+  const guidedSetting = await findActiveSetting(requestedSettingId);
+
+  if (guidedSetting) {
+    const guidedTopic = await findActiveTopic(guidedSetting.topicId);
+    if (!guidedTopic) {
+      return { error: `Topic ${guidedSetting.topicId} is not supported or active.`, status: 400 };
+    }
+    if (
+      topicId &&
+      String(topicId).trim().toLowerCase() !== guidedSetting.topicId
+    ) {
+      return {
+        error: `Setting ${guidedSetting.settingId} does not belong to topic ${topicId}.`,
+        status: 400,
+      };
+    }
+    return {
+      scenarioData: buildGuidedScenarioData(guidedSetting, guidedTopic),
+    };
+  }
+
+  const normalizedScenarioId = String(scenarioId || "").trim().toUpperCase();
+  if (!normalizedScenarioId) {
+    return { error: "scenario_id or setting_id is required.", status: 400 };
+  }
+
+  if (mongoose.connection.readyState === 1) {
+    const scenarioDoc = await Scenario.findOne({
+      scenarioId: normalizedScenarioId,
+      isActive: true,
+    });
+    if (scenarioDoc) {
+      const version = Number(
+        scenarioDoc.version || scenarioDoc.data?.scenario?.scenario_version || 1
+      );
+      return { scenarioData: attachScenarioVersion(scenarioDoc.data, version) };
+    }
+  } else {
+    const fallback = scenarioMap.get(normalizedScenarioId);
+    if (fallback) {
+      return { scenarioData: attachScenarioVersion(fallback, 1) };
+    }
+  }
+
+  return {
+    error: `Scenario or setting ${normalizedScenarioId} is not supported or active.`,
+    status: 400,
+  };
+}
+
+function getExperienceMetadata(scenarioData) {
+  return {
+    experience_type: scenarioData.experience_type || "legacy_scenario",
+    topic_id: scenarioData.topic_id || null,
+    setting_id: scenarioData.setting_id || null,
+    avatar_key:
+      scenarioData.scenario?.avatar_key || scenarioData.avatar_key || "default_avatar",
+  };
+}
 
 const VALID_CATEGORIES = [
   "GOOD",
@@ -612,6 +707,9 @@ function buildSessionMemory(
 
   return {
     scenario_id: scenarioData.scenario.scenario_id,
+    experience_type: scenarioData.experience_type || "legacy_scenario",
+    topic_id: scenarioData.topic_id || null,
+    setting_id: scenarioData.setting_id || null,
     setting: scenarioData.context.setting,
     student_role: scenarioData.scenario.student_role,
     ai_role: scenarioData.scenario.ai_role,
@@ -621,10 +719,14 @@ function buildSessionMemory(
 }
 
 function cleanAiDialogue(value, scenarioData, learnerProfile = {}) {
-  return cleanScenarioText(
+  const cleaned = cleanScenarioText(
     replaceDefaultLearnerNames(value, scenarioData, learnerProfile),
     scenarioData
   );
+  if (!cleaned) return cleaned;
+
+  const sentences = cleaned.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [cleaned];
+  return sentences.slice(0, 2).join(" ").trim().slice(0, 360).trim();
 }
 
 function hasCasualCue(text) {
@@ -947,6 +1049,7 @@ function buildRuleBasedResponse({
   return {
     session_id,
     scenario_id,
+    ...getExperienceMetadata(scenarioData),
     turn_number: studentResponseCount,
     ai_message: cleanAiDialogue(
       sessionProgress.session_complete
@@ -1010,6 +1113,7 @@ function normalizeOpenAIResult(
     ...aiResult,
     session_id: sessionId,
     scenario_id: scenarioData.scenario.scenario_id,
+    ...getExperienceMetadata(scenarioData),
     turn_number: numericTurn,
     detected_category: detectedCategory,
     scores: aiResult?.scores || generateScores(detectedCategory),
@@ -1532,6 +1636,81 @@ app.get("/api/scenarios/:scenario_id", async (req, res) => {
 
 // ─── Lecturer Endpoints ───
 
+app.get("/api/topics", async (req, res) => {
+  try {
+    const topics = mongoose.connection.readyState === 1
+      ? await Topic.find({ isActive: true }).sort({ displayOrder: 1, title: 1 }).lean()
+      : topicsData
+          .filter((topic) => topic.isActive !== false)
+          .sort((left, right) => left.displayOrder - right.displayOrder);
+    return res.json(topics.map(serializeTopic));
+  } catch (error) {
+    return res.status(500).json({ error: true, message: error.message });
+  }
+});
+
+app.get("/api/topics/:topic_id", async (req, res) => {
+  try {
+    const topic = await findActiveTopic(req.params.topic_id);
+    if (!topic) {
+      return res.status(404).json({
+        error: true,
+        message: `Topic ${req.params.topic_id} is not available.`,
+      });
+    }
+    return res.json(serializeTopic(topic));
+  } catch (error) {
+    return res.status(500).json({ error: true, message: error.message });
+  }
+});
+
+app.get("/api/topics/:topic_id/settings", async (req, res) => {
+  try {
+    const topic = await findActiveTopic(req.params.topic_id);
+    if (!topic) {
+      return res.status(404).json({
+        error: true,
+        message: `Topic ${req.params.topic_id} is not available.`,
+      });
+    }
+    const settings = mongoose.connection.readyState === 1
+      ? await Setting.find({ topicId: topic.topicId, isActive: true })
+          .sort({ displayOrder: 1, title: 1 })
+          .lean()
+      : settingsData
+          .filter(
+            (setting) =>
+              setting.topicId === topic.topicId && setting.isActive !== false
+          )
+          .sort((left, right) => left.displayOrder - right.displayOrder);
+    return res.json(settings.map((setting) => serializeSetting(setting, topic)));
+  } catch (error) {
+    return res.status(500).json({ error: true, message: error.message });
+  }
+});
+
+app.get("/api/settings/:setting_id", async (req, res) => {
+  try {
+    const setting = await findActiveSetting(req.params.setting_id);
+    if (!setting) {
+      return res.status(404).json({
+        error: true,
+        message: `Setting ${req.params.setting_id} is not available.`,
+      });
+    }
+    const topic = await findActiveTopic(setting.topicId);
+    if (!topic) {
+      return res.status(404).json({
+        error: true,
+        message: `Topic ${setting.topicId} is not available.`,
+      });
+    }
+    return res.json(serializeSetting(setting, topic));
+  } catch (error) {
+    return res.status(500).json({ error: true, message: error.message });
+  }
+});
+
 app.get("/api/lecturer/students", authenticateJWT, requireRole(["lecturer"]), async (req, res) => {
   try {
     const lecturer = await User.findById(req.user.userId);
@@ -1731,6 +1910,8 @@ app.post("/api/chat/respond-turn", async (req, res) => {
   const {
     session_id,
     scenario_id,
+    topic_id,
+    setting_id,
     turn_number,
     student_response_count,
     conversation_history = [],
@@ -1739,37 +1920,25 @@ app.post("/api/chat/respond-turn", async (req, res) => {
     student_id,
   } = req.body;
 
-  if (!scenario_id || !student_response) {
+  if ((!scenario_id && !setting_id) || !student_response) {
     return res.status(400).json({
       error: true,
-      message: "scenario_id and student_response are required.",
+      message: "scenario_id or setting_id, and student_response are required.",
     });
   }
 
-  let versionedScenarioData = null;
-
-  if (mongoose.connection.readyState === 1) {
-    const scenarioDoc = await Scenario.findOne({
-      scenarioId: scenario_id.toUpperCase(),
-      isActive: true
-    });
-    if (scenarioDoc) {
-      const scenarioVersion = Number(scenarioDoc.version || scenarioDoc.data?.scenario?.scenario_version || 1);
-      versionedScenarioData = attachScenarioVersion(scenarioDoc.data, scenarioVersion);
-    }
-  } else {
-    const fallbackScenarioData = scenarioMap.get(scenario_id.toUpperCase());
-    if (fallbackScenarioData) {
-      versionedScenarioData = attachScenarioVersion(fallbackScenarioData, 1);
-    }
-  }
-
-  if (!versionedScenarioData) {
-    return res.status(400).json({
+  const resolution = await resolveConversationScenario({
+    scenarioId: scenario_id,
+    topicId: topic_id,
+    settingId: setting_id,
+  });
+  if (!resolution.scenarioData) {
+    return res.status(resolution.status || 400).json({
       error: true,
-      message: `Scenario ${scenario_id} is not supported or active.`,
+      message: resolution.error,
     });
   }
+  const versionedScenarioData = resolution.scenarioData;
 
   const responseCount = Number(student_response_count ?? turn_number);
   const normalizedHistory = normalizeConversationHistory(conversation_history);
@@ -1856,6 +2025,7 @@ app.post("/api/chat/respond-turn", async (req, res) => {
   return res.json({
     session_id: String(session_id || ""),
     scenario_id: versionedScenarioData.scenario.scenario_id,
+    ...getExperienceMetadata(versionedScenarioData),
     turn_number: responseCount,
     ai_message: cleanAiDialogue(
       sessionProgress.session_complete ? rules.naturalClosingMessage : aiMessage,
@@ -1886,6 +2056,8 @@ app.post("/api/chat/evaluate-turn", async (req, res) => {
   const {
     session_id,
     scenario_id,
+    topic_id,
+    setting_id,
     turn_number,
     student_response_count,
     conversation_history = [],
@@ -1894,38 +2066,25 @@ app.post("/api/chat/evaluate-turn", async (req, res) => {
     student_id,
   } = req.body;
 
-  if (!scenario_id || !student_response) {
+  if ((!scenario_id && !setting_id) || !student_response) {
     return res.status(400).json({
       error: true,
-      message: "scenario_id and student_response are required.",
+      message: "scenario_id or setting_id, and student_response are required.",
     });
   }
 
-  let scenarioDoc = null;
-  let versionedScenarioData = null;
-
-  if (mongoose.connection.readyState === 1) {
-    scenarioDoc = await Scenario.findOne({
-      scenarioId: scenario_id.toUpperCase(),
-      isActive: true
-    });
-    if (scenarioDoc) {
-      const scenarioVersion = Number(scenarioDoc.version || scenarioDoc.data?.scenario?.scenario_version || 1);
-      versionedScenarioData = attachScenarioVersion(scenarioDoc.data, scenarioVersion);
-    }
-  } else {
-    const fallbackScenarioData = scenarioMap.get(scenario_id.toUpperCase());
-    if (fallbackScenarioData) {
-      versionedScenarioData = attachScenarioVersion(fallbackScenarioData, 1);
-    }
-  }
-
-  if (!versionedScenarioData) {
-    return res.status(400).json({
+  const resolution = await resolveConversationScenario({
+    scenarioId: scenario_id,
+    topicId: topic_id,
+    settingId: setting_id,
+  });
+  if (!resolution.scenarioData) {
+    return res.status(resolution.status || 400).json({
       error: true,
-      message: `Scenario ${scenario_id} is not supported or active.`,
+      message: resolution.error,
     });
   }
+  const versionedScenarioData = resolution.scenarioData;
 
   const responseCount = Number(student_response_count ?? turn_number);
   const normalizedHistory = normalizeConversationHistory(conversation_history);

@@ -445,6 +445,8 @@ The current visual system and sidebar remain consistent for both Admin and Lectu
 
 ### Phase 3: Backend API and AI Guardrails
 
+**Status:** Completed on 2026-08-05.
+
 1. Add public topic and setting endpoints.
 2. Update chat start and continuation endpoints to accept the new configuration.
 3. Build prompts from normalized runtime context.
@@ -455,6 +457,8 @@ The current visual system and sidebar remain consistent for both Admin and Lectu
 8. Add timeout, fast fallback, and structured logging.
 
 **Exit condition:** Every new setting produces natural responses without changing role or location, while old scenarios still work.
+
+**Verification:** Public API contract tests cover all three topics and six settings. Both chat endpoints accept guided settings through `topic_id` and `setting_id`, while `scenario_id` remains backward-compatible. The full backend suite passes for guided and legacy experiences, and an end-to-end smoke test against the actual MongoDB database successfully produced an OpenAI response for the London restaurant setting.
 
 ### Phase 4: Dashboard Topic and Setting Builder
 
