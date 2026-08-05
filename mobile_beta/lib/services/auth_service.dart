@@ -121,11 +121,11 @@ class AuthService {
         if (serverError != null && serverError.toString().isNotEmpty) {
           throw Exception(serverError.toString());
         }
-        throw Exception('Login gagal. Periksa kembali email dan password.');
+        throw Exception('Login failed. Please check your email and password.');
       }
     } catch (e) {
       if (e.toString().contains('Exception:')) rethrow;
-      throw Exception('Gagal terhubung ke server. Periksa alamat server backend.');
+      throw Exception('Failed to connect to server. Check your backend server address.');
     }
   }
 
@@ -178,17 +178,17 @@ class AuthService {
           throw Exception(serverError.toString());
         }
         if (response.statusCode == 400) {
-          throw Exception('Pendaftaran gagal. Periksa kembali Kode Dosen dan email yang Anda gunakan.');
+          throw Exception('Registration failed. Please check your Lecturer Code and email.');
         }
         if (response.statusCode == 429) {
-          throw Exception('Batas pendaftaran tercapai. Silakan coba lagi dalam 15 menit.');
+          throw Exception('Registration limit reached. Please try again in 15 minutes.');
         }
-        throw Exception('Terjadi kesalahan server (HTTP ${response.statusCode}). Coba beberapa saat lagi.');
+        throw Exception('Server error (HTTP ${response.statusCode}). Please try again later.');
       }
     } catch (e) {
       if (e.toString().contains('Exception:')) rethrow;
       throw Exception(
-        'Gagal terhubung ke server backend. Periksa koneksi internet atau alamat server.',
+        'Failed to connect to backend server. Check your internet connection or server address.',
       );
     }
   }

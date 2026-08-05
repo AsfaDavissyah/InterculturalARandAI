@@ -1,13 +1,15 @@
 import 'dart:async';
 
-
 import 'package:flutter/material.dart';
 
+import '../data/guided_topic_fallback.dart';
+import '../models/guided_topic.dart';
 import '../models/scenario_topic.dart';
 import '../services/app_settings.dart';
-import '../services/chat_service.dart';
 import '../services/auth_service.dart';
+import '../services/chat_service.dart';
 import 'ar_speaking_screen.dart';
+import 'guided_settings_screen.dart';
 import 'login_screen.dart';
 import 'onboarding_screen.dart';
 import '../main.dart';
@@ -24,8 +26,23 @@ class ScenarioSelectionScreen extends StatefulWidget {
 
 class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
   List<ScenarioTopic> _scenarios = scenarioTopics;
+  List<GuidedTopic> _guidedTopics = buildFallbackGuidedTopics();
+  int _selectedTabIndex = 0; // 0 = Guided Topics, 1 = Legacy Scenarios
   bool _refreshing = false;
-  bool _connected = false;
+  bool _guidedTopicsConnected = false;
+  bool _legacyScenariosConnected = false;
+
+  bool get _connected => _guidedTopicsConnected && _legacyScenariosConnected;
+
+  String get _connectionStatusMessage {
+    if (!_guidedTopicsConnected && !_legacyScenariosConnected) {
+      return 'The server is unavailable. Legacy scenarios remain available from the local backup.';
+    }
+    if (!_guidedTopicsConnected) {
+      return 'Guided topics could not be refreshed. Legacy scenarios are still available.';
+    }
+    return 'Legacy scenarios could not be refreshed. Guided topics are still available.';
+  }
 
   // Controller for stacked card scrolling
   late PageController _pageController;
@@ -75,16 +92,47 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
     if (mounted) setState(() => _refreshing = true);
     try {
       final baseUrl = await AppSettings.getBaseUrl();
-      final scenarios = await ChatService(baseUrl: baseUrl).getScenarios();
+      final chatService = ChatService(baseUrl: baseUrl);
+      final results = await Future.wait<bool>([
+        _loadGuidedTopics(chatService),
+        _loadLegacyScenarios(chatService),
+      ]);
       if (!mounted) return;
       setState(() {
-        if (scenarios.isNotEmpty) _scenarios = scenarios;
-        _connected = true;
+        _guidedTopicsConnected = results[0];
+        _legacyScenariosConnected = results[1];
       });
     } catch (_) {
-      if (mounted) setState(() => _connected = false);
+      if (mounted) {
+        setState(() {
+          _guidedTopicsConnected = false;
+          _legacyScenariosConnected = false;
+        });
+      }
     } finally {
       if (mounted) setState(() => _refreshing = false);
+    }
+  }
+
+  Future<bool> _loadGuidedTopics(ChatService chatService) async {
+    try {
+      final topics = await chatService.getTopics();
+      if (topics.isEmpty) return false;
+      if (mounted) setState(() => _guidedTopics = topics);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> _loadLegacyScenarios(ChatService chatService) async {
+    try {
+      final scenarios = await chatService.getScenarios();
+      if (scenarios.isEmpty) return false;
+      if (mounted) setState(() => _scenarios = scenarios);
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -100,9 +148,7 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
 
     Navigator.push(
       context,
-      SlideUpRoute(
-        page: ArSpeakingScreen(scenario: scenario),
-      ),
+      SlideUpRoute(page: ArSpeakingScreen(scenario: scenario)),
     );
   }
 
@@ -144,10 +190,7 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
                 ),
                 title: const Text(
                   'Backend Address',
-                  style: TextStyle(
-                    color: _black,
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: TextStyle(color: _black, fontWeight: FontWeight.w800),
                 ),
                 content: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -161,7 +204,9 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
                       style: const TextStyle(color: _black),
                       decoration: InputDecoration(
                         hintText: 'http://192.168.1.8:3000',
-                        hintStyle: TextStyle(color: _black.withValues(alpha: 0.3)),
+                        hintStyle: TextStyle(
+                          color: _black.withValues(alpha: 0.3),
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -238,19 +283,28 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                    border: Border.all(
+                      color: Colors.red.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 20),
+                      const Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.red,
+                        size: 20,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Connection failed. Using offline backup. Tap the cloud icon to retry.',
+                          _connectionStatusMessage,
                           style: TextStyle(
                             color: Colors.red.shade800,
                             fontSize: 13,
@@ -293,18 +347,215 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
               ),
             ),
 
-            const SizedBox(height: 28),
+            const SizedBox(height: 20),
 
-            // ─── Stacked Scenario Cards ───
+            // ─── Mode Selector Segmented Control ───
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey.shade900 : Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _selectedTabIndex = 0),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _selectedTabIndex == 0
+                                ? (isDark ? Colors.grey.shade800 : Colors.white)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: _selectedTabIndex == 0
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.05,
+                                      ),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ]
+                                : [],
+                          ),
+                          child: Text(
+                            'Guided Topics',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: _selectedTabIndex == 0
+                                  ? primaryColor
+                                  : primaryColor.withValues(alpha: 0.5),
+                              fontWeight: _selectedTabIndex == 0
+                                  ? FontWeight.w800
+                                  : FontWeight.w600,
+                              fontSize: 13.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _selectedTabIndex = 1),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _selectedTabIndex == 1
+                                ? (isDark ? Colors.grey.shade800 : Colors.white)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: _selectedTabIndex == 1
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.05,
+                                      ),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ]
+                                : [],
+                          ),
+                          child: Text(
+                            'Legacy Scenarios',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: _selectedTabIndex == 1
+                                  ? primaryColor
+                                  : primaryColor.withValues(alpha: 0.5),
+                              fontWeight: _selectedTabIndex == 1
+                                  ? FontWeight.w800
+                                  : FontWeight.w600,
+                              fontSize: 13.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // ─── Content Body ───
             Expanded(
-              child: _scenarios.isEmpty
-                  ? const Center(child: CircularProgressIndicator())
-                  : _buildStackedCards(),
+              child: _selectedTabIndex == 0
+                  ? _buildGuidedTopicsList(primaryColor, isDark)
+                  : (_scenarios.isEmpty
+                        ? const Center(child: CircularProgressIndicator())
+                        : _buildStackedCards()),
             ),
             const SizedBox(height: 80),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildGuidedTopicsList(Color primaryColor, bool isDark) {
+    if (_refreshing && _guidedTopics.isEmpty) {
+      return const Center(child: CircularProgressIndicator(color: _orange));
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      itemCount: _guidedTopics.length,
+      itemBuilder: (context, index) {
+        final topic = _guidedTopics[index];
+        IconData iconData = Icons.school_rounded;
+        if (topic.iconKey.contains('coffee') ||
+            topic.iconKey.contains('cafe')) {
+          iconData = Icons.local_cafe_rounded;
+        } else if (topic.iconKey.contains('work') ||
+            topic.iconKey.contains('briefcase')) {
+          iconData = Icons.work_rounded;
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.grey.shade900 : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: primaryColor.withValues(alpha: 0.08)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  SlideUpRoute(page: GuidedSettingsScreen(topic: topic)),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: _orange.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Icon(iconData, color: _orange, size: 26),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            topic.title,
+                            style: TextStyle(
+                              color: primaryColor,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            topic.description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: primaryColor.withValues(alpha: 0.6),
+                              fontSize: 12.5,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: primaryColor.withValues(alpha: 0.3),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -349,13 +600,21 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
                       style: TextStyle(color: primaryColor),
                       decoration: InputDecoration(
                         labelText: 'Full Name',
-                        labelStyle: TextStyle(color: primaryColor.withValues(alpha: 0.6)),
+                        labelStyle: TextStyle(
+                          color: primaryColor.withValues(alpha: 0.6),
+                        ),
                         enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: primaryColor, width: 1.5),
+                          borderSide: BorderSide(
+                            color: primaryColor,
+                            width: 1.5,
+                          ),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderSide: const BorderSide(color: _orange, width: 2),
+                          borderSide: const BorderSide(
+                            color: _orange,
+                            width: 2,
+                          ),
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
@@ -375,19 +634,29 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
                         // Male option
                         Expanded(
                           child: GestureDetector(
-                            onTap: saving ? null : () => setDialogState(() => tempGender = 'male'),
+                            onTap: saving
+                                ? null
+                                : () =>
+                                      setDialogState(() => tempGender = 'male'),
                             child: Container(
                               height: 46,
                               decoration: BoxDecoration(
-                                color: tempGender == 'male' ? _orange : Colors.transparent,
+                                color: tempGender == 'male'
+                                    ? _orange
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: primaryColor, width: 1.5),
+                                border: Border.all(
+                                  color: primaryColor,
+                                  width: 1.5,
+                                ),
                               ),
                               child: Center(
                                 child: Text(
                                   'Laki-laki',
                                   style: TextStyle(
-                                    color: tempGender == 'male' ? Colors.white : primaryColor,
+                                    color: tempGender == 'male'
+                                        ? Colors.white
+                                        : primaryColor,
                                     fontWeight: FontWeight.w800,
                                     fontSize: 13,
                                   ),
@@ -400,19 +669,30 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
                         // Female option
                         Expanded(
                           child: GestureDetector(
-                            onTap: saving ? null : () => setDialogState(() => tempGender = 'female'),
+                            onTap: saving
+                                ? null
+                                : () => setDialogState(
+                                    () => tempGender = 'female',
+                                  ),
                             child: Container(
                               height: 46,
                               decoration: BoxDecoration(
-                                color: tempGender == 'female' ? _orange : Colors.transparent,
+                                color: tempGender == 'female'
+                                    ? _orange
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: primaryColor, width: 1.5),
+                                border: Border.all(
+                                  color: primaryColor,
+                                  width: 1.5,
+                                ),
                               ),
                               child: Center(
                                 child: Text(
                                   'Perempuan',
                                   style: TextStyle(
-                                    color: tempGender == 'female' ? Colors.white : primaryColor,
+                                    color: tempGender == 'female'
+                                        ? Colors.white
+                                        : primaryColor,
                                     fontWeight: FontWeight.w800,
                                     fontSize: 13,
                                   ),
@@ -428,7 +708,12 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
                 actions: [
                   TextButton(
                     onPressed: saving ? null : () => Navigator.pop(context),
-                    child: Text('Cancel', style: TextStyle(color: primaryColor.withValues(alpha: 0.6))),
+                    child: Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color: primaryColor.withValues(alpha: 0.6),
+                      ),
+                    ),
                   ),
                   FilledButton(
                     onPressed: saving
@@ -460,9 +745,15 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
                     child: saving
                         ? const SizedBox.square(
                             dimension: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
-                        : const Text('Save', style: TextStyle(fontWeight: FontWeight.w800)),
+                        : const Text(
+                            'Save',
+                            style: TextStyle(fontWeight: FontWeight.w800),
+                          ),
                   ),
                 ],
               ),
@@ -479,7 +770,9 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
     final appState = InterculturalAISpeakingBetaApp.of(context);
 
     // Initial letter calculation
-    final initialLetter = _displayName.isNotEmpty ? _displayName[0].toUpperCase() : 'S';
+    final initialLetter = _displayName.isNotEmpty
+        ? _displayName[0].toUpperCase()
+        : 'S';
 
     showModalBottomSheet(
       context: context,
@@ -490,11 +783,15 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
-            final currentIsDark = Theme.of(context).brightness == Brightness.dark;
-            
+            final currentIsDark =
+                Theme.of(context).brightness == Brightness.dark;
+
             return SafeArea(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 20,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -532,7 +829,9 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
                               Text(
                                 _displayName,
                                 style: TextStyle(
-                                  color: currentIsDark ? Colors.white : Colors.black,
+                                  color: currentIsDark
+                                      ? Colors.white
+                                      : Colors.black,
                                   fontSize: 20,
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -540,7 +839,11 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
                               Text(
                                 _displayEmail,
                                 style: TextStyle(
-                                  color: (currentIsDark ? Colors.white : Colors.black).withValues(alpha: 0.6),
+                                  color:
+                                      (currentIsDark
+                                              ? Colors.white
+                                              : Colors.black)
+                                          .withValues(alpha: 0.6),
                                   fontSize: 14,
                                 ),
                               ),
@@ -550,13 +853,20 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
                       ],
                     ),
                     const SizedBox(height: 24),
-                    Divider(color: currentIsDark ? Colors.white24 : const Color(0xFFE8E2D8)),
+                    Divider(
+                      color: currentIsDark
+                          ? Colors.white24
+                          : const Color(0xFFE8E2D8),
+                    ),
                     const SizedBox(height: 8),
-                    
+
                     // Edit Profile Menu
                     ListTile(
                       contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.edit_outlined, color: currentIsDark ? Colors.white : Colors.black),
+                      leading: Icon(
+                        Icons.edit_outlined,
+                        color: currentIsDark ? Colors.white : Colors.black,
+                      ),
                       title: Text(
                         'Edit Profile',
                         style: TextStyle(
@@ -575,7 +885,9 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(
-                        currentIsDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                        currentIsDark
+                            ? Icons.dark_mode_rounded
+                            : Icons.light_mode_rounded,
                         color: currentIsDark ? Colors.white : Colors.black,
                       ),
                       title: Text(
@@ -585,7 +897,9 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      subtitle: const Text('Toggle between dark and light themes'),
+                      subtitle: const Text(
+                        'Toggle between dark and light themes',
+                      ),
                       trailing: Switch(
                         value: currentIsDark,
                         activeTrackColor: _orange,
@@ -600,7 +914,10 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
                     // Onboarding & Guide option
                     ListTile(
                       contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.help_outline_rounded, color: currentIsDark ? Colors.white : Colors.black),
+                      leading: Icon(
+                        Icons.help_outline_rounded,
+                        color: currentIsDark ? Colors.white : Colors.black,
+                      ),
                       title: Text(
                         'Panduan & Onboarding',
                         style: TextStyle(
@@ -608,12 +925,16 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      subtitle: const Text('Petunjuk izin kamera, mic, & cara latihan'),
+                      subtitle: const Text(
+                        'Petunjuk izin kamera, mic, & cara latihan',
+                      ),
                       onTap: () {
                         Navigator.pop(context);
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+                          MaterialPageRoute(
+                            builder: (context) => const OnboardingScreen(),
+                          ),
                         );
                       },
                     ),
@@ -621,7 +942,10 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
                     // Settings option
                     ListTile(
                       contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.settings_ethernet_rounded, color: currentIsDark ? Colors.white : Colors.black),
+                      leading: Icon(
+                        Icons.settings_ethernet_rounded,
+                        color: currentIsDark ? Colors.white : Colors.black,
+                      ),
                       title: Text(
                         'Backend Server Settings',
                         style: TextStyle(
@@ -636,7 +960,7 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
                       },
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Logout button
                     SizedBox(
                       width: double.infinity,
@@ -646,7 +970,9 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
                           final navigator = Navigator.of(context);
                           await AuthService.logout();
                           navigator.pushAndRemoveUntil(
-                            MaterialPageRoute(builder: (context) => const LoginScreen()),
+                            MaterialPageRoute(
+                              builder: (context) => const LoginScreen(),
+                            ),
                             (route) => false,
                           );
                         },
@@ -660,7 +986,10 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
                         icon: const Icon(Icons.logout_rounded, size: 20),
                         label: const Text(
                           'LOGOUT',
-                          style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1.0),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.0,
+                          ),
                         ),
                       ),
                     ),
@@ -679,7 +1008,9 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final primaryColor = isDark ? Colors.white : Colors.black;
-    final initialLetter = _displayName.isNotEmpty ? _displayName[0].toUpperCase() : 'S';
+    final initialLetter = _displayName.isNotEmpty
+        ? _displayName[0].toUpperCase()
+        : 'S';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),

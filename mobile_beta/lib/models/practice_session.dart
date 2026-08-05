@@ -29,6 +29,13 @@ class PracticeSession {
   final Map<String, double> averageScores;
   final double overallScore;
   final List<String> completedObjectiveIds;
+  final String experienceType;
+  final String? topicId;
+  final String? topicTitle;
+  final String? settingId;
+  final String? settingTitle;
+  final String? avatarKey;
+  final String launchSource;
 
   const PracticeSession({
     required this.sessionId,
@@ -46,6 +53,13 @@ class PracticeSession {
     required this.averageScores,
     required this.overallScore,
     required this.completedObjectiveIds,
+    this.experienceType = 'legacy_scenario',
+    this.topicId,
+    this.topicTitle,
+    this.settingId,
+    this.settingTitle,
+    this.avatarKey,
+    this.launchSource = 'legacy',
   });
 
   static String createSessionId({DateTime? now, Random? random}) {
@@ -63,6 +77,13 @@ class PracticeSession {
     required List<AiResponse> evaluations,
     String studentId = 'local_student',
     String? studentName,
+    String experienceType = 'legacy_scenario',
+    String? topicId,
+    String? topicTitle,
+    String? settingId,
+    String? settingTitle,
+    String? avatarKey,
+    String launchSource = 'legacy',
   }) {
     final averages = <String, double>{};
     for (final key in scoreKeys) {
@@ -96,6 +117,13 @@ class PracticeSession {
       averageScores: averages,
       overallScore: overall,
       completedObjectiveIds: finalResponse?.completedObjectiveIds ?? const [],
+      experienceType: experienceType,
+      topicId: topicId,
+      topicTitle: topicTitle,
+      settingId: settingId,
+      settingTitle: settingTitle,
+      avatarKey: avatarKey,
+      launchSource: launchSource,
     );
   }
 
@@ -131,6 +159,13 @@ class PracticeSession {
           (json['completed_objective_ids'] as List<dynamic>? ?? const [])
               .map((item) => item.toString())
               .toList(),
+      experienceType: json['experience_type'] as String? ?? 'legacy_scenario',
+      topicId: json['topic_id'] as String?,
+      topicTitle: json['topic_title'] as String?,
+      settingId: json['setting_id'] as String?,
+      settingTitle: json['setting_title'] as String?,
+      avatarKey: json['avatar_key'] as String?,
+      launchSource: json['launch_source'] as String? ?? 'legacy',
     );
   }
 
@@ -150,6 +185,13 @@ class PracticeSession {
     'average_scores': averageScores,
     'overall_score': overallScore,
     'completed_objective_ids': completedObjectiveIds,
+    'experience_type': experienceType,
+    if (topicId != null) 'topic_id': topicId,
+    if (topicTitle != null) 'topic_title': topicTitle,
+    if (settingId != null) 'setting_id': settingId,
+    if (settingTitle != null) 'setting_title': settingTitle,
+    if (avatarKey != null) 'avatar_key': avatarKey,
+    'launch_source': launchSource,
   };
 
   Map<String, dynamic> toDashboardRecord() => {
@@ -170,5 +212,12 @@ class PracticeSession {
     'average_scores': averageScores,
     'completed_objective_ids': completedObjectiveIds,
     'transcript': transcript,
+    'experience_type': experienceType,
+    if (topicId != null) 'topic_id': topicId,
+    if (topicTitle != null) 'topic_title': topicTitle,
+    if (settingId != null) 'setting_id': settingId,
+    if (settingTitle != null) 'setting_title': settingTitle,
+    if (avatarKey != null) 'avatar_key': avatarKey,
+    'launch_source': launchSource,
   };
 }

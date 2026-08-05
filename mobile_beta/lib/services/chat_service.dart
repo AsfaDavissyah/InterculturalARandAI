@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/ai_response.dart';
+import '../models/guided_setting.dart';
+import '../models/guided_topic.dart';
 import '../models/scenario_topic.dart';
 
 class ChatService {
@@ -19,6 +21,44 @@ class ChatService {
     if (response.statusCode != 200) {
       throw Exception('Backend returned ${response.statusCode}.');
     }
+  }
+
+  Future<List<GuidedTopic>> getTopics() async {
+    final response = await http
+        .get(Uri.parse('$baseUrl/api/topics'))
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode != 200) {
+      throw Exception('Failed to load topics: ${response.body}');
+    }
+    final data = jsonDecode(response.body) as List<dynamic>;
+    return data
+        .map((item) => GuidedTopic.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<GuidedSetting>> getSettingsForTopic(String topicId) async {
+    final response = await http
+        .get(Uri.parse('$baseUrl/api/topics/$topicId/settings'))
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode != 200) {
+      throw Exception('Failed to load settings for topic $topicId: ${response.body}');
+    }
+    final data = jsonDecode(response.body) as List<dynamic>;
+    return data
+        .map((item) => GuidedSetting.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<GuidedSetting> getSettingDetail(String settingId) async {
+    final response = await http
+        .get(Uri.parse('$baseUrl/api/settings/$settingId'))
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode != 200) {
+      throw Exception('Failed to load setting detail $settingId: ${response.body}');
+    }
+    return GuidedSetting.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
   Future<List<ScenarioTopic>> getScenarios() async {
@@ -52,6 +92,8 @@ class ChatService {
   Future<AiResponse> evaluateTurn({
     required String sessionId,
     required String scenarioId,
+    String? topicId,
+    String? settingId,
     required int studentResponseCount,
     required List<Map<String, String>> conversationHistory,
     required String studentResponse,
@@ -60,19 +102,23 @@ class ChatService {
   }) async {
     final url = Uri.parse("$baseUrl/api/chat/evaluate-turn");
 
+    final payload = <String, dynamic>{
+      "session_id": sessionId,
+      "scenario_id": scenarioId,
+      if (topicId != null && topicId.isNotEmpty) "topic_id": topicId,
+      if (settingId != null && settingId.isNotEmpty) "setting_id": settingId,
+      "student_response_count": studentResponseCount,
+      "conversation_history": conversationHistory,
+      "student_response": studentResponse,
+      "student_display_name": studentDisplayName,
+      "student_id": studentId,
+    };
+
     final response = await http
         .post(
           url,
           headers: {"Content-Type": "application/json"},
-          body: jsonEncode({
-            "session_id": sessionId,
-            "scenario_id": scenarioId,
-            "student_response_count": studentResponseCount,
-            "conversation_history": conversationHistory,
-            "student_response": studentResponse,
-            "student_display_name": studentDisplayName,
-            "student_id": studentId,
-          }),
+          body: jsonEncode(payload),
         )
         .timeout(const Duration(seconds: 35));
 
@@ -86,6 +132,8 @@ class ChatService {
   Future<AiResponse> respondTurn({
     required String sessionId,
     required String scenarioId,
+    String? topicId,
+    String? settingId,
     required int studentResponseCount,
     required List<Map<String, String>> conversationHistory,
     required String studentResponse,
@@ -94,19 +142,23 @@ class ChatService {
   }) async {
     final url = Uri.parse("$baseUrl/api/chat/respond-turn");
 
+    final payload = <String, dynamic>{
+      "session_id": sessionId,
+      "scenario_id": scenarioId,
+      if (topicId != null && topicId.isNotEmpty) "topic_id": topicId,
+      if (settingId != null && settingId.isNotEmpty) "setting_id": settingId,
+      "student_response_count": studentResponseCount,
+      "conversation_history": conversationHistory,
+      "student_response": studentResponse,
+      "student_display_name": studentDisplayName,
+      "student_id": studentId,
+    };
+
     final response = await http
         .post(
           url,
           headers: {"Content-Type": "application/json"},
-          body: jsonEncode({
-            "session_id": sessionId,
-            "scenario_id": scenarioId,
-            "student_response_count": studentResponseCount,
-            "conversation_history": conversationHistory,
-            "student_response": studentResponse,
-            "student_display_name": studentDisplayName,
-            "student_id": studentId,
-          }),
+          body: jsonEncode(payload),
         )
         .timeout(const Duration(seconds: 12));
 

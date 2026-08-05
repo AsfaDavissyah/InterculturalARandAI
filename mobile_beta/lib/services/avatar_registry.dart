@@ -1,0 +1,33 @@
+class AvatarRegistry {
+  static const String femalePrototype = 'assets/models/female_char.glb';
+  static const String malePrototype = 'assets/models/male_char.glb';
+
+  static const Map<String, String> _prototypeByKey = {
+    'female_lecturer_v1': femalePrototype,
+    'waitress_v1': femalePrototype,
+    'barista_v1': femalePrototype,
+    'hr_manager_v1': malePrototype,
+    'dr_emma': femalePrototype,
+    'sarah_bennett': femalePrototype,
+    'olivia_reed': femalePrototype,
+    'michael_harris': malePrototype,
+  };
+
+  static String modelPathFor({String? avatarKey, String aiRole = ''}) {
+    final normalizedKey = avatarKey?.trim().toLowerCase() ?? '';
+    final registeredPath = _prototypeByKey[normalizedKey];
+    if (registeredPath != null) return registeredPath;
+
+    final normalizedRole = aiRole.toLowerCase();
+    final identifiesMaleRole =
+        normalizedRole.contains('male') && !normalizedRole.contains('female');
+    if (identifiesMaleRole ||
+        normalizedRole.contains('mr.') ||
+        normalizedRole.contains('manager') ||
+        normalizedRole.contains('michael') ||
+        normalizedRole.contains('david')) {
+      return malePrototype;
+    }
+    return femalePrototype;
+  }
+}

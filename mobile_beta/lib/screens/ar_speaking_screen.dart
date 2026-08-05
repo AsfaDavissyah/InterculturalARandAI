@@ -11,10 +11,12 @@ import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import '../models/ai_response.dart';
+import '../models/guided_setting.dart';
 import '../models/practice_session.dart';
 import '../models/scenario_topic.dart';
 import '../services/app_settings.dart';
 import '../services/auth_service.dart';
+import '../services/avatar_registry.dart';
 import '../services/chat_service.dart';
 import '../services/practice_history_store.dart';
 import '../widgets/ar_avatar.dart';
@@ -36,8 +38,29 @@ class ConversationMessage {
 
 class ArSpeakingScreen extends StatefulWidget {
   final ScenarioTopic scenario;
+  final String? topicId;
+  final String? topicTitle;
+  final String? settingId;
+  final String? settingTitle;
+  final String? avatarKey;
+  final String? stickerAssetKey;
+  final GuidedSetting? guidedSetting;
+  final String experienceType;
+  final String launchSource;
 
-  const ArSpeakingScreen({super.key, required this.scenario});
+  const ArSpeakingScreen({
+    super.key,
+    required this.scenario,
+    this.topicId,
+    this.topicTitle,
+    this.settingId,
+    this.settingTitle,
+    this.avatarKey,
+    this.stickerAssetKey,
+    this.guidedSetting,
+    this.experienceType = 'legacy_scenario',
+    this.launchSource = 'legacy',
+  });
 
   @override
   State<ArSpeakingScreen> createState() => _ArSpeakingScreenState();
@@ -143,12 +166,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     await _initializeTts();
 
     try {
-      final scenarioData = await _chatService!.getScenario(widget.scenario.id);
-      final openingMessage = _sanitizeScenarioOpening(
-        scenarioData['initial_conversation_state']?['ai_opening_message'] ??
-            scenarioData['conversation_flow']?[0]?['message'] ??
-            'Hello. Shall we begin?',
-      );
+      final openingMessage = await _loadOpeningMessage();
 
       if (!mounted) return;
       setState(() {
@@ -168,6 +186,26 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         _activity = AvatarActivity.error;
       });
     }
+  }
+
+  Future<String> _loadOpeningMessage() async {
+    if (widget.experienceType == 'guided_topic') {
+      final settingId = widget.settingId?.trim() ?? '';
+      if (settingId.isEmpty) {
+        throw StateError('A guided practice session requires a setting ID.');
+      }
+      final setting =
+          widget.guidedSetting ??
+          await _chatService!.getSettingDetail(settingId);
+      return _sanitizeScenarioOpening(setting.buildOpeningMessage());
+    }
+
+    final scenarioData = await _chatService!.getScenario(widget.scenario.id);
+    return _sanitizeScenarioOpening(
+      scenarioData['initial_conversation_state']?['ai_opening_message'] ??
+          scenarioData['conversation_flow']?[0]?['message'] ??
+          'Hello. Shall we begin?',
+    );
   }
 
   Future<void> _initializeCamera() async {
@@ -505,6 +543,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       final result = await _chatService!.respondTurn(
         sessionId: _sessionId,
         scenarioId: widget.scenario.id,
+        topicId: widget.topicId,
+        settingId: widget.settingId,
         studentResponseCount: turnNumber,
         conversationHistory: history,
         studentResponse: text,
@@ -563,6 +603,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       final detailedResult = await _chatService!.evaluateTurn(
         sessionId: _sessionId,
         scenarioId: widget.scenario.id,
+        topicId: widget.topicId,
+        settingId: widget.settingId,
         studentResponseCount: turnNumber,
         conversationHistory: history,
         studentResponse: studentResponse,
@@ -637,6 +679,13 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
           ? _profile!.studentId
           : 'local_student',
       studentName: _profile?.name,
+      experienceType: widget.experienceType,
+      topicId: widget.topicId,
+      topicTitle: widget.topicTitle,
+      settingId: widget.settingId,
+      settingTitle: widget.settingTitle,
+      avatarKey: widget.avatarKey,
+      launchSource: widget.launchSource,
     );
     await _historyStore.saveSession(session);
     if (!mounted) return;
@@ -798,14 +847,10 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   }
 
   String get _modelPath {
-    final aiRoleLower = widget.scenario.aiRole.toLowerCase();
-    if (aiRoleLower.contains('david') ||
-        aiRoleLower.contains('male') ||
-        aiRoleLower.contains('man') ||
-        aiRoleLower.contains('mr.')) {
-      return 'assets/models/male_char.glb';
-    }
-    return 'assets/models/female_char.glb';
+    return AvatarRegistry.modelPathFor(
+      avatarKey: widget.avatarKey,
+      aiRole: widget.scenario.aiRole,
+    );
   }
 
   String _sanitizeScenarioOpening(String text) {
@@ -1161,7 +1206,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                                                 shape: BoxShape.circle,
                                                 color: const Color(0xFFD54343)
                                                     .withValues(
-                                                      alpha: 0.45 * (1.0 - pulse),
+                                                      alpha:
+                                                          0.45 * (1.0 - pulse),
                                                     ),
                                               ),
                                             ),

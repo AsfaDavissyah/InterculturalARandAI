@@ -21,21 +21,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final List<Map<String, String>> _slides = const [
     {
       'title': 'Orbis Partner',
-      'subtitle': 'Latihan Pembelajaran Bahasa Inggris Lintas Budaya',
+      'subtitle': 'Intercultural English Speaking Practice',
       'description':
-          'Berinteraksi langsung dengan mitra percakapan AI 3D berbasis skenario kehidupan nyata kampus & dunia internasional.',
+          'Engage directly with 3D AI conversation partners based on real-world academic and international campus scenarios.',
     },
     {
-      'title': 'Izin Kamera & Mikrofon',
-      'subtitle': 'Fitur Real-Time Voice & AR Avatar',
+      'title': 'Camera & Microphone Permissions',
+      'subtitle': 'Real-Time Voice & AR Avatar Experience',
       'description':
-          'Aktifkan mikrofon untuk pengenalan suara dan kamera untuk menampilkan visualisasi avatar 3D di ruangan Anda.',
+          'Enable microphone for speech recognition and camera to display 3D avatar visualizers in your room.',
     },
     {
-      'title': 'Siap Latihan Skenario!',
-      'subtitle': 'Evaluasi & Umpan Balik Instan',
+      'title': 'Ready for Practice!',
+      'subtitle': 'Instant Evaluation & Feedback',
       'description':
-          'Respon percakapan AI, selesaikan target komunikasi, dan dapatkan penilaian Grammar, Fluency, & Intercultural Awareness.',
+          'Respond to AI conversations, complete communicative goals, and receive scores for Grammar, Fluency, & Intercultural Awareness.',
     },
   ];
 
@@ -186,8 +186,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             icon: const Icon(Icons.security_rounded),
                             label: Text(
                               _cameraGranted && _micGranted
-                                  ? '✓ Perangkat Tersedia'
-                                  : 'Cek Kamera & Mikrofon',
+                                  ? '✓ Devices Ready'
+                                  : 'Check Camera & Microphone',
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: _cameraGranted && _micGranted
@@ -247,8 +247,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                       child: Text(
                         _currentPage == _slides.length - 1
-                            ? 'Mulai Latihan Sekarang'
-                            : 'Lanjutkan',
+                            ? 'Start Practice Now'
+                            : 'Continue',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
