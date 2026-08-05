@@ -13,6 +13,7 @@ const PracticeSession = require("./models/PracticeSession");
 const Scenario = require("./models/Scenario");
 const Topic = require("./models/Topic");
 const Setting = require("./models/Setting");
+const { seedTopicsAndSettings } = require("./scripts/seed_topics_and_settings");
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET || "intercultural_ai_secret_key_2026";
@@ -79,6 +80,7 @@ async function connectDatabase() {
     console.log("Connected to MongoDB Atlas successfully.");
     await seedAdmin();
     await seedScenarios();
+    await seedTopicsAndSettings();
   } catch (err) {
     console.error("MongoDB Atlas connection error:", err);
   }
