@@ -517,6 +517,8 @@ The current visual system and sidebar remain consistent for both Admin and Lectu
 
 ### Phase 8: End-to-End QA and Device Build
 
+**Status:** Engineering verification completed on 2026-08-10. Physical-device and client acceptance remain external validation steps.
+
 1. Test all six new settings on a physical Android phone.
 2. Test every legacy scenario for regression.
 3. Test camera permission, microphone permission, speech recognition, TTS, subtitle timing, avatar animation, manual end, and natural closing.
@@ -525,6 +527,8 @@ The current visual system and sidebar remain consistent for both Admin and Lectu
 6. Build a signed Android test artifact and conduct client acceptance testing.
 
 **Exit condition:** The full flow is stable on the target phone and research records are complete and attributable.
+
+**Verification:** Backend tests pass 53/53, dashboard tests pass 11/11, Flutter tests pass 18/18, Flutter analysis reports no issues, the dashboard production build succeeds, and the backend dependency audit reports zero known vulnerabilities. Debug and release-candidate Android APKs build successfully. The release-candidate still uses debug signing and must be signed with a production keystore before public distribution. Physical camera, microphone, TTS, network-loss, and client acceptance checks are tracked in `PHASE8_QA_AND_CLIENT_ACCEPTANCE.md`.
 
 ## 13. Recommended Delivery Order
 
