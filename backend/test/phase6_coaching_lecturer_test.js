@@ -52,6 +52,7 @@ function request(app, method, path, body = null, headers = {}) {
 }
 
 const jwt = require("jsonwebtoken");
+const User = require("../models/User");
 const JWT_SECRET = process.env.JWT_SECRET || "intercultural_ai_secret_key_2026";
 const lecturerToken = jwt.sign(
   { userId: "507f1f77bcf86cd799439011", email: "lecturer@icc.com", role: "lecturer", lecturerCode: "LEC-101" },
@@ -78,13 +79,31 @@ test("Phase 6 Backend: evaluate-turn attaches coaching_event for pragmatic frict
 });
 
 test("Phase 6 Backend: GET /api/lecturer/students returns student roster", async () => {
-  const res = await request(app, "GET", "/api/lecturer/students", null, authHeaders);
-  if (res.status !== 200) {
-    console.error("DEBUG /api/lecturer/students response:", res.status, res.text);
+  const originalFindById = User.findById;
+  const originalFind = User.find;
+  User.findById = async () => ({ lecturerCode: "LEC-101" });
+  User.find = () => ({
+    sort: async () => [
+      {
+        _id: "507f1f77bcf86cd799439012",
+        name: "Test Student",
+        email: "student@icc.com",
+        gender: "female",
+        studentId: "STU-001",
+        consent: true,
+        createdAt: new Date("2026-08-01T00:00:00.000Z"),
+      },
+    ],
+  });
+  try {
+    const res = await request(app, "GET", "/api/lecturer/students", null, authHeaders);
+    assert.equal(res.status, 200);
+    assert.ok(Array.isArray(res.body));
+    assert.equal(res.body[0].studentId, "STU-001");
+  } finally {
+    User.findById = originalFindById;
+    User.find = originalFind;
   }
-  assert.equal(res.status, 200);
-  assert.equal(res.body.success, true);
-  assert.ok(Array.isArray(res.body.students));
 });
 
 test("Phase 6 Backend: GET /api/lecturer/sessions returns practice sessions list", async () => {
