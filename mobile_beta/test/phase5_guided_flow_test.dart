@@ -22,7 +22,7 @@ void main() {
       );
     });
 
-    test('prototype avatar registry covers every guided avatar key', () {
+    test('avatar registry covers every guided avatar key', () {
       expect(
         AvatarRegistry.modelPathFor(avatarKey: 'female_lecturer_v1'),
         AvatarRegistry.femalePrototype,
@@ -33,11 +33,15 @@ void main() {
       );
       expect(
         AvatarRegistry.modelPathFor(avatarKey: 'barista_v1'),
-        AvatarRegistry.femalePrototype,
+        AvatarRegistry.olivia,
       );
       expect(
         AvatarRegistry.modelPathFor(avatarKey: 'hr_manager_v1'),
         AvatarRegistry.malePrototype,
+      );
+      expect(
+        AvatarRegistry.modelPathFor(avatarKey: 'olivia_reed'),
+        AvatarRegistry.olivia,
       );
     });
 

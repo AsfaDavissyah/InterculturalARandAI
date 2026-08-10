@@ -107,6 +107,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   String _currentSegmentWords = '';
   String? _cameraError;
   String? _sessionError;
+  CoachingEvent? _activeCoachingEvent;
+  Timer? _coachingTimer;
 
   @override
   void initState() {
@@ -562,6 +564,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         _studentResponseCount++;
       });
 
+      _triggerCoachingBanner(result.coachingEvent);
+
       await _speak(result.aiMessage);
       unawaited(
         _refreshTurnEvaluation(
@@ -803,6 +807,100 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         ? ' | Goals $completed/${completed + remaining}'
         : '';
     return '$activityLabel | Response $_studentResponseCount/$maximum$objectiveProgress';
+  }
+
+  void _triggerCoachingBanner(CoachingEvent? event) {
+    if (event == null) return;
+    _coachingTimer?.cancel();
+    setState(() {
+      _activeCoachingEvent = event;
+    });
+    _coachingTimer = Timer(const Duration(seconds: 6), () {
+      if (mounted) {
+        setState(() {
+          _activeCoachingEvent = null;
+        });
+      }
+    });
+  }
+
+  Widget _buildCoachingBanner() {
+    final event = _activeCoachingEvent;
+    if (event == null) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1C1C1E).withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _orange.withValues(alpha: 0.5), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: _orange.withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.lightbulb_outline_rounded,
+              color: _orange,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'PRAGMATIC TIP',
+                      style: TextStyle(
+                        color: _orange,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 11,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => setState(() => _activeCoachingEvent = null),
+                      child: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white54,
+                        size: 16,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  event.shortHint,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildThinkingIndicator() {
@@ -1136,6 +1234,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                         ),
                       ],
                     ),
+                    _buildCoachingBanner(),
                     const Spacer(),
                     _buildThinkingIndicator(),
                     if (_sessionError == null)

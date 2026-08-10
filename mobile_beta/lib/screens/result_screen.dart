@@ -147,6 +147,105 @@ class ResultScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildCoachingSection() {
+    final coachingList = _results
+        .map((r) => r.coachingEvent)
+        .whereType<CoachingEvent>()
+        .toList();
+
+    if (coachingList.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionTitle('Intercultural Coaching & Feedback'),
+        ...coachingList.map((event) {
+          return Container(
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF8F0),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _orange.withValues(alpha: 0.3)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.lightbulb_rounded, color: _orange, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'TURN ${event.turnNumber} • ${event.category.replaceAll('_', ' ').toUpperCase()}',
+                        style: const TextStyle(
+                          color: _orange,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Your Utterance: "${event.studentUtterance}"',
+                  style: TextStyle(
+                    color: _black.withValues(alpha: 0.7),
+                    fontStyle: FontStyle.italic,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  event.explanation,
+                  style: const TextStyle(
+                    color: _black,
+                    fontSize: 13.5,
+                    height: 1.4,
+                  ),
+                ),
+                if (event.improvedResponse.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: _line),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'SUGGESTED ALTERNATIVE',
+                          style: TextStyle(
+                            color: Colors.green.shade800,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          event.improvedResponse,
+                          style: TextStyle(
+                            color: Colors.green.shade900,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
   Widget _buildCategoryBadge(String category) {
     Color bg;
     Color fg;
@@ -289,7 +388,7 @@ class ResultScreen extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Ronde ${round + 1}',
+                      'Turn ${round + 1}',
                       style: const TextStyle(
                         color: _black,
                         fontWeight: FontWeight.w900,
@@ -616,6 +715,8 @@ class ResultScreen extends StatelessWidget {
                 'Intercultural Awareness',
                 _averageFor('intercultural_awareness'),
               ),
+
+              _buildCoachingSection(),
 
               _sectionTitle('Feedback'),
               _infoBox(finalResponse.feedback),

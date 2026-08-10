@@ -1,15 +1,16 @@
 class AvatarRegistry {
   static const String femalePrototype = 'assets/models/female_char.glb';
   static const String malePrototype = 'assets/models/male_char.glb';
+  static const String olivia = 'assets/models/olivia_animated.glb';
 
   static const Map<String, String> _prototypeByKey = {
     'female_lecturer_v1': femalePrototype,
     'waitress_v1': femalePrototype,
-    'barista_v1': femalePrototype,
+    'barista_v1': olivia,
     'hr_manager_v1': malePrototype,
     'dr_emma': femalePrototype,
     'sarah_bennett': femalePrototype,
-    'olivia_reed': femalePrototype,
+    'olivia_reed': olivia,
     'michael_harris': malePrototype,
   };
 

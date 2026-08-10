@@ -31,4 +31,4 @@ flutter:
   assets:
     - assets/models/male_char.glb
     - assets/models/female_char.glb
-
+    - assets/models/olivia_animated.glb

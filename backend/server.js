@@ -1097,6 +1097,51 @@ function generateImprovedResponse(category, scenarioData) {
   return examples[0] || "Could you express that in a clear and respectful way?";
 }
 
+function buildCoachingEvent(category, studentResponse, turnNumber = 1) {
+  if (!category || category === "GOOD" || category === "ACCEPTABLE" || category === "SILENCE_OR_UNCLEAR") {
+    return null;
+  }
+
+  const map = {
+    TOO_DIRECT: {
+      category: "excessive_directness",
+      short_hint: "Consider using softer, modal phrasing (e.g. 'Would it be possible...' or 'Could you please...').",
+      explanation: "Direct imperatives can sound overly commanding in academic and professional contexts.",
+      improved_response: "Could you please explain that in a bit more detail when you have a moment?",
+    },
+    TOO_PERSONAL: {
+      category: "personal_boundaries",
+      short_hint: "In international academic settings, personal topics (e.g., salary, marital status) are usually avoided early on.",
+      explanation: "Respecting personal privacy boundaries helps build comfortable rapport with international peers.",
+      improved_response: "What do you enjoy doing around campus during your free time?",
+    },
+    STEREOTYPING: {
+      category: "stereotyping",
+      short_hint: "Avoid broad generalizations about an entire nationality or cultural background.",
+      explanation: "Intercultural competence involves acknowledging individual preferences rather than making broad assumptions.",
+      improved_response: "What has your personal experience been like so far?",
+    },
+    DISMISSIVE: {
+      category: "dismissiveness",
+      short_hint: "Express empathy and acknowledge your conversation partner's perspective politely.",
+      explanation: "Dismissive phrasing can reduce mutual trust during collaborative intercultural dialogue.",
+      improved_response: "I understand your perspective. Let's see how we can find a common solution.",
+    },
+  };
+
+  const details = map[category];
+  if (!details) return null;
+
+  return {
+    turn_number: turnNumber,
+    student_utterance: studentResponse,
+    category: details.category,
+    short_hint: details.short_hint,
+    explanation: details.explanation,
+    improved_response: details.improved_response,
+  };
+}
+
 function buildRuleBasedResponse({
   session_id,
   scenario_id,
@@ -1128,6 +1173,12 @@ function buildRuleBasedResponse({
     conversation_history
   );
 
+  const coachingEvent = buildCoachingEvent(
+    detectedCategory,
+    student_response,
+    studentResponseCount
+  );
+
   return {
     session_id,
     scenario_id,
@@ -1145,6 +1196,7 @@ function buildRuleBasedResponse({
     feedback: generateFeedback(detectedCategory, student_response, scenarioData),
     cultural_note: cleanScenarioText(scenarioData.scenario.cultural_note, scenarioData),
     improved_response: generateImprovedResponse(detectedCategory, scenarioData),
+    coaching_event: coachingEvent,
     continue_conversation: !sessionProgress.session_complete,
     completed_objective_ids: completedObjectiveIds,
     session_progress: sessionProgress,
@@ -1190,6 +1242,11 @@ function normalizeOpenAIResult(
     completedObjectiveIds
   );
   const rules = getSessionRules(scenarioData);
+  const coachingEvent = buildCoachingEvent(
+    detectedCategory,
+    studentResponse,
+    numericTurn
+  );
 
   const normalized = {
     ...aiResult,
@@ -1211,6 +1268,7 @@ function normalizeOpenAIResult(
       aiResult?.improved_response || generateImprovedResponse(detectedCategory, scenarioData),
       scenarioData
     ),
+    coaching_event: coachingEvent,
     continue_conversation: !sessionProgress.session_complete,
     completed_objective_ids: completedObjectiveIds,
     session_progress: sessionProgress,
@@ -2696,6 +2754,191 @@ app.post("/api/tts", async (req, res) => {
       error: true,
       message: "Failed to generate text-to-speech audio: " + error.message
     });
+  }
+});
+
+// --- Lecturer Research Endpoints ---
+
+app.get("/api/lecturer/students", authenticateJWT, requireRole(["admin", "lecturer"]), async (req, res) => {
+  try {
+    let filter = { role: "student" };
+    if (req.user.role === "lecturer" && req.user.lecturerCode) {
+      filter.studentLecturerCode = req.user.lecturerCode;
+    }
+
+    let students = [];
+    if (mongoose.connection.readyState === 1) {
+      try {
+        students = await User.find(filter, "-password").sort({ name: 1 }).lean();
+      } catch (_) {}
+    }
+
+    return res.json({
+      success: true,
+      students: (students || []).map((s) => ({
+        user_id: s._id,
+        name: s.name,
+        email: s.email,
+        student_id: s.studentId,
+        student_lecturer_code: s.studentLecturerCode,
+        consent: Boolean(s.consent),
+        created_at: s.createdAt,
+      })),
+    });
+  } catch (err) {
+    return res.status(500).json({ error: true, message: err.message });
+  }
+});
+
+app.get("/api/lecturer/sessions", authenticateJWT, requireRole(["admin", "lecturer"]), async (req, res) => {
+  try {
+    const { student_id, startDate, endDate, topic_id, setting_id, status, launch_source } = req.query;
+
+    const query = {};
+    if (student_id) query["student.student_id"] = student_id;
+    if (topic_id) query.topicId = topic_id;
+    if (setting_id) query.settingId = setting_id;
+    if (status) query.status = status;
+    if (launch_source) query.launchSource = launch_source;
+
+    if (startDate || endDate) {
+      query.completedAt = {};
+      if (startDate) query.completedAt.$gte = new Date(startDate);
+      if (endDate) query.completedAt.$lte = new Date(endDate);
+    }
+
+    let sessions = [];
+    if (mongoose.connection.readyState === 1) {
+      try {
+        sessions = await PracticeSession.find(query).sort({ completedAt: -1 }).lean();
+      } catch (_) {}
+    }
+
+    return res.json({
+      success: true,
+      count: sessions.length,
+      sessions: (sessions || []).map((s) => ({
+        session_id: s.sessionId,
+        student_id: s.student?.student_id || "local_student",
+        student_name: s.student?.display_name || "Student",
+        scenario_id: s.scenario?.scenario_id,
+        scenario_title: s.scenario?.title,
+        experience_type: s.experienceType || "legacy_scenario",
+        topic_id: s.topicId,
+        topic_title: s.topicTitle,
+        setting_id: s.settingId,
+        setting_title: s.settingTitle,
+        avatar_key: s.avatarKey,
+        launch_source: s.launchSource || "legacy",
+        status: s.status,
+        overall_score: s.overallScore,
+        average_scores: s.averageScores,
+        duration_seconds: s.durationSeconds,
+        student_response_count: s.studentResponseCount,
+        completed_at: s.completedAt,
+        coaching_events: s.coachingEvents || [],
+        transcript: s.transcript || [],
+      })),
+    });
+  } catch (err) {
+    return res.status(500).json({ error: true, message: err.message });
+  }
+});
+
+app.get("/api/lecturer/analytics", authenticateJWT, requireRole(["admin", "lecturer"]), async (req, res) => {
+  try {
+    let sessions = [];
+    if (mongoose.connection.readyState === 1) {
+      try {
+        sessions = await PracticeSession.find().lean();
+      } catch (_) {}
+    }
+
+    const totalSessions = sessions.length;
+    const completedSessions = sessions.filter((s) => s.status === "completed").length;
+    const completionRate = totalSessions > 0 ? (completedSessions / totalSessions) * 100 : 0;
+
+    const avgDuration = totalSessions > 0
+      ? sessions.reduce((sum, s) => sum + (s.durationSeconds || 0), 0) / totalSessions
+      : 0;
+
+    const avgResponseCount = totalSessions > 0
+      ? sessions.reduce((sum, s) => sum + (s.studentResponseCount || 0), 0) / totalSessions
+      : 0;
+
+    const overallScoreAvg = totalSessions > 0
+      ? sessions.reduce((sum, s) => sum + (s.overallScore || 0), 0) / totalSessions
+      : 0;
+
+    const coachingCategories = {};
+    sessions.forEach((s) => {
+      (s.coachingEvents || []).forEach((c) => {
+        if (c?.category) {
+          coachingCategories[c.category] = (coachingCategories[c.category] || 0) + 1;
+        }
+      });
+    });
+
+    return res.json({
+      success: true,
+      total_sessions: totalSessions,
+      completed_sessions: completedSessions,
+      completion_rate: Math.round(completionRate * 10) / 10,
+      average_duration_seconds: Math.round(avgDuration),
+      average_response_count: Math.round(avgResponseCount * 10) / 10,
+      overall_score_average: Math.round(overallScoreAvg * 100) / 100,
+      frequent_coaching_categories: coachingCategories,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: true, message: err.message });
+  }
+});
+
+app.get("/api/lecturer/export/csv", authenticateJWT, requireRole(["admin", "lecturer"]), async (req, res) => {
+  try {
+    let sessions = [];
+    if (mongoose.connection.readyState === 1) {
+      try {
+        sessions = await PracticeSession.find().lean();
+      } catch (_) {}
+    }
+
+    const headers = [
+      "session_id",
+      "student_id",
+      "student_name",
+      "experience_type",
+      "topic_id",
+      "setting_id",
+      "overall_score",
+      "duration_seconds",
+      "student_response_count",
+      "status",
+      "completed_at",
+    ];
+
+    const rows = [headers.join(",")];
+    sessions.forEach((s) => {
+      rows.push([
+        `"${s.sessionId || ""}"`,
+        `"${s.student?.student_id || ""}"`,
+        `"${(s.student?.display_name || "").replace(/"/g, '""')}"`,
+        `"${s.experienceType || "legacy"}"`,
+        `"${s.topicId || ""}"`,
+        `"${s.settingId || ""}"`,
+        s.overallScore || 0,
+        s.durationSeconds || 0,
+        s.studentResponseCount || 0,
+        `"${s.status || ""}"`,
+        `"${s.completedAt ? new Date(s.completedAt).toISOString() : ""}"`,
+      ].join(","));
+    });
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", 'attachment; filename="practice_sessions_export.csv"');
+    return res.send(rows.join("\n"));
+  } catch (err) {
+    return res.status(500).json({ error: true, message: err.message });
   }
 });
 

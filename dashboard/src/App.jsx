@@ -1812,6 +1812,13 @@ export default function App() {
               </button>
               <button
                 type="button"
+                className={`tab-btn ${sessionTab === 'coaching' ? 'active' : ''}`}
+                onClick={() => setSessionTab('coaching')}
+              >
+                <Activity size={15} /> Coaching Events ({selectedSession.coaching_events?.length || 0})
+              </button>
+              <button
+                type="button"
                 className={`tab-btn ${sessionTab === 'rubric' ? 'active' : ''}`}
                 onClick={() => setSessionTab('rubric')}
               >
@@ -1827,7 +1834,7 @@ export default function App() {
                     <div key={index} className={`turn-card ${isAI ? 'ai-turn' : 'student-turn'}`}>
                       <div className="turn-card-header">
                         <span className={`turn-speaker-badge ${isAI ? 'ai' : 'student'}`}>
-                          {isAI ? (selectedSession.scenario?.ai_role || 'AI Partner') : 'Mahasiswa'}
+                          {isAI ? (selectedSession.scenario?.ai_role || 'AI Partner') : 'Student'}
                         </span>
                         <span className="turn-number-tag">Turn #{index + 1}</span>
                       </div>
@@ -1841,7 +1848,35 @@ export default function App() {
                   );
                 })}
                 {!selectedSession.transcript?.length && (
-                  <p className="empty-note">Tidak ada item transkrip dalam sesi ini.</p>
+                  <p className="empty-note">No transcript turns recorded for this session.</p>
+                )}
+              </div>
+            ) : sessionTab === 'coaching' ? (
+              <div className="turns-container">
+                {(selectedSession.coaching_events || []).map((event, index) => (
+                  <div key={index} className="turn-card" style={{ borderLeft: '4px solid #f97316', background: '#fff7ed' }}>
+                    <div className="turn-card-header">
+                      <span className="turn-speaker-badge ai" style={{ background: '#ea580c' }}>
+                        Turn #{event.turn_number || index + 1} • {String(event.category || '').replaceAll('_', ' ').toUpperCase()}
+                      </span>
+                    </div>
+                    <p style={{ fontStyle: 'italic', color: '#475569', fontSize: '0.85rem', marginBottom: '8px' }}>
+                      Utterance: "{event.student_utterance}"
+                    </p>
+                    <p className="turn-message-body" style={{ fontWeight: '600', color: '#1e293b' }}>
+                      {event.explanation}
+                    </p>
+                    {event.improved_response && (
+                      <div className="turn-feedback-box" style={{ background: '#ecfdf5', borderColor: '#a7f3d0', marginTop: '10px' }}>
+                        <small style={{ color: '#065f46', fontWeight: 'bold' }}>
+                          Suggested Alternative: "{event.improved_response}"
+                        </small>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {!selectedSession.coaching_events?.length && (
+                  <p className="empty-note">No pragmatic friction coaching events recorded for this session.</p>
                 )}
               </div>
             ) : (
