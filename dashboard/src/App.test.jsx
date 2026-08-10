@@ -62,6 +62,14 @@ const settingFixture = {
   version: 1,
 };
 
+const moduleFixture = {
+  module_id: 'ICC-MODULE-01',
+  title: 'Intercultural Speaking Module',
+  description: 'Printed module activities.',
+  is_active: true,
+  units: [],
+};
+
 function jsonResponse(body, status = 200) {
   return {
     ok: status >= 200 && status < 300,
@@ -83,6 +91,15 @@ function mockAdminApi(onRequest = () => {}) {
     }
     if (path === '/api/admin/settings' && (!options.method || options.method === 'GET')) {
       return jsonResponse([settingFixture]);
+    }
+    if (path === '/api/admin/modules' && (!options.method || options.method === 'GET')) {
+      return jsonResponse([moduleFixture]);
+    }
+    if (path === '/api/admin/launch-tokens' && (!options.method || options.method === 'GET')) {
+      return jsonResponse([]);
+    }
+    if (path === '/api/admin/modules' && options.method === 'POST') {
+      return jsonResponse(JSON.parse(options.body), 201);
     }
     if (path === '/api/admin/topics' && options.method === 'POST') {
       return jsonResponse(JSON.parse(options.body), 201);
@@ -216,5 +233,29 @@ describe('dashboard login', () => {
     await user.click(screen.getByRole('button', { name: 'Save Setting' }));
 
     expect(toastError).toHaveBeenCalledWith('Invalid response count range (Minimum <= Target Min <= Target Max <= Maximum).');
+  });
+
+  it('opens Learning Modules and creates a module', async () => {
+    const requests = [];
+    vi.stubGlobal('fetch', mockAdminApi((path, options) => requests.push({ path, options })));
+    const user = userEvent.setup();
+
+    render(<App />);
+    await user.type(screen.getByLabelText('Email'), 'admin@example.com');
+    await user.type(screen.getByLabelText('Password'), 'correct-password');
+    await user.click(screen.getByRole('button', { name: 'Log in to Portal' }));
+    await user.click(await screen.findByRole('button', { name: 'Learning Modules' }));
+    expect(await screen.findByRole('heading', { name: 'Learning Modules' })).toBeVisible();
+
+    await user.type(screen.getByLabelText('Module ID'), 'ICC-MODULE-02');
+    await user.type(screen.getByLabelText('Module title'), 'Social Communication Book');
+    await user.click(screen.getByRole('button', { name: 'Create Module' }));
+
+    expect(toastSuccess).toHaveBeenCalledWith('Learning module created.');
+    const request = requests.find((item) => item.path === '/api/admin/modules' && item.options.method === 'POST');
+    expect(JSON.parse(request.options.body)).toMatchObject({
+      module_id: 'ICC-MODULE-02',
+      title: 'Social Communication Book',
+    });
   });
 });

@@ -477,6 +477,8 @@ The current visual system and sidebar remain consistent for both Admin and Lectu
 
 ### Phase 5: Mobile Topic Experience
 
+**Status:** Technically completed on 2026-08-10. Final 2D setting stickers remain as finishing assets and do not block runtime behavior.
+
 1. Add the three entry options to the practice home flow.
 2. Build the three topic cards.
 3. Build the six setting cards with temporary or final 2D stickers.
@@ -489,6 +491,8 @@ The current visual system and sidebar remain consistent for both Admin and Lectu
 
 ### Phase 6: Silent Coaching and Result Integration
 
+**Status:** Completed and regression-tested on 2026-08-10.
+
 1. Define which issues deserve live coaching and avoid commenting on every utterance.
 2. Show one short silent hint above the AR interface.
 3. Prevent the hint from becoming avatar speech or transcript dialogue.
@@ -499,6 +503,8 @@ The current visual system and sidebar remain consistent for both Admin and Lectu
 
 ### Phase 7: Learning Module QR Foundation
 
+**Status:** Completed on 2026-08-10.
+
 1. Add module, unit, page, and launch-token models.
 2. Add a secure token resolver endpoint.
 3. Add the mobile scanner and briefing handoff.
@@ -506,6 +512,8 @@ The current visual system and sidebar remain consistent for both Admin and Lectu
 5. Add dashboard QR generation and scan analytics after the basic scanner is stable.
 
 **Exit condition:** Scanning a printed test QR opens the correct briefing and starts the same AR runtime used by manual selection.
+
+**Verification:** Backend models, hashed launch tokens, QR generation, invalid/expired handling, public resolver, mobile scanner, briefing handoff, session attribution, dashboard builder, scan analytics, and automated tests are implemented. No pilot module is inserted into the production database until the client provides the real printed-module structure.
 
 ### Phase 8: End-to-End QA and Device Build
 

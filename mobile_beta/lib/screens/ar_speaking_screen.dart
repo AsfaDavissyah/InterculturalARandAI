@@ -47,6 +47,9 @@ class ArSpeakingScreen extends StatefulWidget {
   final GuidedSetting? guidedSetting;
   final String experienceType;
   final String launchSource;
+  final String? moduleId;
+  final String? unitId;
+  final String? pageId;
 
   const ArSpeakingScreen({
     super.key,
@@ -60,6 +63,9 @@ class ArSpeakingScreen extends StatefulWidget {
     this.guidedSetting,
     this.experienceType = 'legacy_scenario',
     this.launchSource = 'legacy',
+    this.moduleId,
+    this.unitId,
+    this.pageId,
   });
 
   @override
@@ -690,6 +696,9 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       settingTitle: widget.settingTitle,
       avatarKey: widget.avatarKey,
       launchSource: widget.launchSource,
+      moduleId: widget.moduleId,
+      unitId: widget.unitId,
+      pageId: widget.pageId,
     );
     await _historyStore.saveSession(session);
     if (!mounted) return;

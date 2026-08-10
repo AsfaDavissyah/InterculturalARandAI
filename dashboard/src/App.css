@@ -7,6 +7,136 @@
   background: radial-gradient(circle at 50% 50%, #fbfbfb 0%, #f1f5f9 100%);
 }
 
+.module-builder-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.table-scroll .custom-table {
+  min-width: 680px;
+}
+
+.session-attribution {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.session-attribution span {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.module-tree {
+  display: grid;
+  gap: 12px;
+}
+
+.module-node,
+.unit-node,
+.page-node {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+}
+
+.module-node > div,
+.unit-node > div,
+.page-node > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.module-node span,
+.unit-node span,
+.page-node span {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.unit-node {
+  margin-left: 16px;
+  background: color-mix(in srgb, var(--muted) 45%, var(--background));
+}
+
+.page-node {
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-left: 16px;
+  background: var(--background);
+}
+
+.qr-modal {
+  width: min(460px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 20px;
+  border-radius: 8px;
+  background: var(--background);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 18%);
+}
+
+.qr-modal > img {
+  display: block;
+  width: min(320px, 100%);
+  aspect-ratio: 1;
+  margin: 20px auto;
+  border: 1px solid var(--border);
+}
+
+.qr-token-copy {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.qr-token-copy code {
+  display: block;
+  overflow-wrap: anywhere;
+  padding: 12px;
+  border-radius: 6px;
+  background: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 1100px) {
+  .module-builder-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .module-node > div,
+  .unit-node > div,
+  .page-node > div,
+  .page-node {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .unit-node,
+  .page-node {
+    margin-left: 0;
+  }
+}
+
 .config-button {
   position: fixed;
   right: 24px;

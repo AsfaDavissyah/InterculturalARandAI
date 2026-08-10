@@ -7,12 +7,18 @@ const path = require("path");
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
+const QRCode = require("qrcode");
 
 const User = require("./models/User");
 const PracticeSession = require("./models/PracticeSession");
 const Scenario = require("./models/Scenario");
 const Topic = require("./models/Topic");
 const Setting = require("./models/Setting");
+const LearningModule = require("./models/LearningModule");
+const LearningUnit = require("./models/LearningUnit");
+const LearningPage = require("./models/LearningPage");
+const LaunchToken = require("./models/LaunchToken");
 const {
   seedTopicsAndSettings,
   topicsData,
@@ -1307,6 +1313,96 @@ function normalizeOpenAIResult(
   return normalized;
 }
 
+function normalizeLearningId(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
+function validateLearningId(value, fieldName) {
+  const normalized = normalizeLearningId(value);
+  if (!normalized) return `${fieldName} is required`;
+  if (!/^[A-Z0-9]+(?:-[A-Z0-9]+)*$/.test(normalized)) {
+    return `${fieldName} must use uppercase letters, numbers, and single hyphens`;
+  }
+  return null;
+}
+
+function extractLaunchToken(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw);
+    return String(parsed.searchParams.get("token") || "").trim();
+  } catch (_) {
+    return raw.replace(/^orbis:\/\/launch\?token=/i, "").trim();
+  }
+}
+
+function hashLaunchToken(token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function serializeLearningModule(module) {
+  return {
+    id: module._id,
+    module_id: module.moduleId,
+    title: module.title,
+    description: module.description || "",
+    display_order: module.displayOrder || 0,
+    is_active: module.isActive !== false,
+    created_at: module.createdAt,
+    updated_at: module.updatedAt,
+  };
+}
+
+function serializeLearningUnit(unit) {
+  return {
+    id: unit._id,
+    unit_id: unit.unitId,
+    module_id: unit.moduleId,
+    title: unit.title,
+    description: unit.description || "",
+    display_order: unit.displayOrder || 0,
+    is_active: unit.isActive !== false,
+    created_at: unit.createdAt,
+    updated_at: unit.updatedAt,
+  };
+}
+
+function serializeLearningPage(page) {
+  return {
+    id: page._id,
+    page_id: page.pageId,
+    module_id: page.moduleId,
+    unit_id: page.unitId,
+    title: page.title,
+    instructions: page.instructions || "",
+    setting_id: page.settingId,
+    display_order: page.displayOrder || 0,
+    is_active: page.isActive !== false,
+    created_at: page.createdAt,
+    updated_at: page.updatedAt,
+  };
+}
+
+async function buildLearningModuleTree() {
+  const [modules, units, pages] = await Promise.all([
+    LearningModule.find().sort({ displayOrder: 1, title: 1 }).lean(),
+    LearningUnit.find().sort({ displayOrder: 1, title: 1 }).lean(),
+    LearningPage.find().sort({ displayOrder: 1, title: 1 }).lean(),
+  ]);
+  return modules.map((module) => ({
+    ...serializeLearningModule(module),
+    units: units
+      .filter((unit) => unit.moduleId === module.moduleId)
+      .map((unit) => ({
+        ...serializeLearningUnit(unit),
+        pages: pages
+          .filter((page) => page.unitId === unit.unitId)
+          .map(serializeLearningPage),
+      })),
+  }));
+}
+
 app.get("/", async (req, res) => {
   const defaultScenario = await getScenarioData(defaultScenarioId);
   const scenarioCount = await Scenario.countDocuments();
@@ -2461,6 +2557,327 @@ app.delete("/api/admin/settings/:id", authenticateJWT, requireRole(["admin"]), a
 });
 
 // ─── Evaluation Endpoint ───
+
+// --- Learning Module and QR Launch Endpoints ---
+
+app.get("/api/admin/modules", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  try {
+    return res.json(await buildLearningModuleTree());
+  } catch (error) {
+    return res.status(500).json({ error: true, message: error.message });
+  }
+});
+
+app.post("/api/admin/modules", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  try {
+    const moduleId = normalizeLearningId(req.body.module_id || req.body.moduleId);
+    const validationError = validateLearningId(moduleId, "module_id");
+    if (validationError) return res.status(400).json({ error: validationError });
+    if (!String(req.body.title || "").trim()) {
+      return res.status(400).json({ error: "title is required" });
+    }
+    if (await LearningModule.exists({ moduleId })) {
+      return res.status(409).json({ error: `Module ${moduleId} already exists.` });
+    }
+    const module = await LearningModule.create({
+      moduleId,
+      title: String(req.body.title).trim(),
+      description: String(req.body.description || "").trim(),
+      displayOrder: Number(req.body.display_order || 0),
+      isActive: req.body.is_active !== false,
+      createdBy: req.user.userId,
+    });
+    return res.status(201).json(serializeLearningModule(module));
+  } catch (error) {
+    return res.status(500).json({ error: true, message: error.message });
+  }
+});
+
+app.put("/api/admin/modules/:module_id", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  try {
+    const moduleId = normalizeLearningId(req.params.module_id);
+    const update = {};
+    if (req.body.title !== undefined) update.title = String(req.body.title).trim();
+    if (req.body.description !== undefined) update.description = String(req.body.description).trim();
+    if (req.body.display_order !== undefined) update.displayOrder = Number(req.body.display_order);
+    if (req.body.is_active !== undefined) update.isActive = Boolean(req.body.is_active);
+    if (update.title === "") return res.status(400).json({ error: "title cannot be empty" });
+    const module = await LearningModule.findOneAndUpdate(
+      { moduleId },
+      { $set: update },
+      { new: true, runValidators: true }
+    );
+    if (!module) return res.status(404).json({ error: `Module ${moduleId} was not found.` });
+    return res.json(serializeLearningModule(module));
+  } catch (error) {
+    return res.status(500).json({ error: true, message: error.message });
+  }
+});
+
+app.delete("/api/admin/modules/:module_id", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  try {
+    const moduleId = normalizeLearningId(req.params.module_id);
+    const module = await LearningModule.findOneAndUpdate(
+      { moduleId },
+      { $set: { isActive: false } },
+      { new: true }
+    );
+    if (!module) return res.status(404).json({ error: `Module ${moduleId} was not found.` });
+    await Promise.all([
+      LearningUnit.updateMany({ moduleId }, { $set: { isActive: false } }),
+      LearningPage.updateMany({ moduleId }, { $set: { isActive: false } }),
+      LaunchToken.updateMany({ moduleId }, { $set: { isActive: false } }),
+    ]);
+    return res.json({ success: true, module: serializeLearningModule(module) });
+  } catch (error) {
+    return res.status(500).json({ error: true, message: error.message });
+  }
+});
+
+app.post("/api/admin/modules/:module_id/units", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  try {
+    const moduleId = normalizeLearningId(req.params.module_id);
+    const unitId = normalizeLearningId(req.body.unit_id || req.body.unitId);
+    const validationError = validateLearningId(unitId, "unit_id");
+    if (validationError) return res.status(400).json({ error: validationError });
+    if (!String(req.body.title || "").trim()) return res.status(400).json({ error: "title is required" });
+    if (!(await LearningModule.exists({ moduleId, isActive: true }))) {
+      return res.status(404).json({ error: `Active module ${moduleId} was not found.` });
+    }
+    if (await LearningUnit.exists({ unitId })) {
+      return res.status(409).json({ error: `Unit ${unitId} already exists.` });
+    }
+    const unit = await LearningUnit.create({
+      unitId,
+      moduleId,
+      title: String(req.body.title).trim(),
+      description: String(req.body.description || "").trim(),
+      displayOrder: Number(req.body.display_order || 0),
+      isActive: req.body.is_active !== false,
+    });
+    return res.status(201).json(serializeLearningUnit(unit));
+  } catch (error) {
+    return res.status(500).json({ error: true, message: error.message });
+  }
+});
+
+app.put("/api/admin/units/:unit_id", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  try {
+    const unitId = normalizeLearningId(req.params.unit_id);
+    const update = {};
+    if (req.body.title !== undefined) update.title = String(req.body.title).trim();
+    if (req.body.description !== undefined) update.description = String(req.body.description).trim();
+    if (req.body.display_order !== undefined) update.displayOrder = Number(req.body.display_order);
+    if (req.body.is_active !== undefined) update.isActive = Boolean(req.body.is_active);
+    if (update.title === "") return res.status(400).json({ error: "title cannot be empty" });
+    const unit = await LearningUnit.findOneAndUpdate(
+      { unitId },
+      { $set: update },
+      { new: true, runValidators: true }
+    );
+    if (!unit) return res.status(404).json({ error: `Unit ${unitId} was not found.` });
+    if (update.isActive === false) {
+      await Promise.all([
+        LearningPage.updateMany({ unitId }, { $set: { isActive: false } }),
+        LaunchToken.updateMany({ unitId }, { $set: { isActive: false } }),
+      ]);
+    }
+    return res.json(serializeLearningUnit(unit));
+  } catch (error) {
+    return res.status(500).json({ error: true, message: error.message });
+  }
+});
+
+app.post("/api/admin/units/:unit_id/pages", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  try {
+    const unitId = normalizeLearningId(req.params.unit_id);
+    const pageId = normalizeLearningId(req.body.page_id || req.body.pageId);
+    const settingId = normalizeLearningId(req.body.setting_id || req.body.settingId);
+    const validationError = validateLearningId(pageId, "page_id") || validateLearningId(settingId, "setting_id");
+    if (validationError) return res.status(400).json({ error: validationError });
+    if (!String(req.body.title || "").trim()) return res.status(400).json({ error: "title is required" });
+    const unit = await LearningUnit.findOne({ unitId, isActive: true }).lean();
+    if (!unit) return res.status(404).json({ error: `Active unit ${unitId} was not found.` });
+    if (!(await Setting.exists({ settingId, isActive: true }))) {
+      return res.status(404).json({ error: `Active setting ${settingId} was not found.` });
+    }
+    if (await LearningPage.exists({ pageId })) {
+      return res.status(409).json({ error: `Page ${pageId} already exists.` });
+    }
+    const page = await LearningPage.create({
+      pageId,
+      moduleId: unit.moduleId,
+      unitId,
+      title: String(req.body.title).trim(),
+      instructions: String(req.body.instructions || "").trim(),
+      settingId,
+      displayOrder: Number(req.body.display_order || 0),
+      isActive: req.body.is_active !== false,
+    });
+    return res.status(201).json(serializeLearningPage(page));
+  } catch (error) {
+    return res.status(500).json({ error: true, message: error.message });
+  }
+});
+
+app.put("/api/admin/pages/:page_id", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  try {
+    const pageId = normalizeLearningId(req.params.page_id);
+    const update = {};
+    if (req.body.title !== undefined) update.title = String(req.body.title).trim();
+    if (req.body.instructions !== undefined) update.instructions = String(req.body.instructions).trim();
+    if (req.body.display_order !== undefined) update.displayOrder = Number(req.body.display_order);
+    if (req.body.is_active !== undefined) update.isActive = Boolean(req.body.is_active);
+    if (req.body.setting_id !== undefined) {
+      const settingId = normalizeLearningId(req.body.setting_id);
+      if (!(await Setting.exists({ settingId, isActive: true }))) {
+        return res.status(404).json({ error: `Active setting ${settingId} was not found.` });
+      }
+      update.settingId = settingId;
+    }
+    const page = await LearningPage.findOneAndUpdate(
+      { pageId },
+      { $set: update },
+      { new: true, runValidators: true }
+    );
+    if (!page) return res.status(404).json({ error: `Page ${pageId} was not found.` });
+    if (update.isActive === false) {
+      await LaunchToken.updateMany({ pageId }, { $set: { isActive: false } });
+    }
+    return res.json(serializeLearningPage(page));
+  } catch (error) {
+    return res.status(500).json({ error: true, message: error.message });
+  }
+});
+
+app.post("/api/admin/pages/:page_id/launch-token", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  try {
+    const pageId = normalizeLearningId(req.params.page_id);
+    const page = await LearningPage.findOne({ pageId, isActive: true }).lean();
+    if (!page) return res.status(404).json({ error: `Active page ${pageId} was not found.` });
+    const [module, unit, setting] = await Promise.all([
+      LearningModule.findOne({ moduleId: page.moduleId, isActive: true }).lean(),
+      LearningUnit.findOne({ unitId: page.unitId, isActive: true }).lean(),
+      Setting.findOne({ settingId: page.settingId, isActive: true }).lean(),
+    ]);
+    if (!module || !unit || !setting) {
+      return res.status(409).json({ error: "Page references inactive module, unit, or setting." });
+    }
+    const expiresInDays = Math.min(730, Math.max(1, Number(req.body.expires_in_days || 365)));
+    const token = crypto.randomBytes(32).toString("base64url");
+    const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
+    const launchUri = `orbis://launch?token=${encodeURIComponent(token)}`;
+    const launchToken = await LaunchToken.create({
+      tokenHash: hashLaunchToken(token),
+      tokenPrefix: token.slice(0, 8),
+      moduleId: page.moduleId,
+      unitId: page.unitId,
+      pageId: page.pageId,
+      settingId: page.settingId,
+      expiresAt,
+      createdBy: req.user.userId,
+    });
+    const qrDataUrl = await QRCode.toDataURL(launchUri, {
+      errorCorrectionLevel: "M",
+      width: 512,
+      margin: 2,
+      color: { dark: "#000000", light: "#FFFFFF" },
+    });
+    return res.status(201).json({
+      id: launchToken._id,
+      token,
+      token_prefix: launchToken.tokenPrefix,
+      launch_uri: launchUri,
+      qr_data_url: qrDataUrl,
+      expires_at: expiresAt,
+      page: serializeLearningPage(page),
+    });
+  } catch (error) {
+    return res.status(500).json({ error: true, message: error.message });
+  }
+});
+
+app.get("/api/admin/launch-tokens", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  try {
+    const tokens = await LaunchToken.find().sort({ createdAt: -1 }).lean();
+    return res.json(tokens.map((token) => ({
+      id: token._id,
+      token_prefix: token.tokenPrefix,
+      module_id: token.moduleId,
+      unit_id: token.unitId,
+      page_id: token.pageId,
+      setting_id: token.settingId,
+      expires_at: token.expiresAt,
+      is_active: token.isActive !== false,
+      scan_count: token.scanCount || 0,
+      last_scanned_at: token.lastScannedAt,
+      created_at: token.createdAt,
+    })));
+  } catch (error) {
+    return res.status(500).json({ error: true, message: error.message });
+  }
+});
+
+app.patch("/api/admin/launch-tokens/:id/deactivate", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+  try {
+    const token = await LaunchToken.findByIdAndUpdate(
+      req.params.id,
+      { $set: { isActive: false } },
+      { new: true }
+    );
+    if (!token) return res.status(404).json({ error: "Launch token was not found." });
+    return res.json({ success: true, id: token._id, is_active: false });
+  } catch (error) {
+    return res.status(500).json({ error: true, message: error.message });
+  }
+});
+
+app.post("/api/launch/resolve", async (req, res) => {
+  try {
+    const token = extractLaunchToken(req.body.token || req.body.code || req.body.launch_uri);
+    if (!token) return res.status(400).json({ error: "A launch token is required." });
+    const launchToken = await LaunchToken.findOne({
+      tokenHash: hashLaunchToken(token),
+      isActive: true,
+    });
+    if (!launchToken) return res.status(404).json({ error: "This QR activity is invalid or inactive." });
+    if (new Date(launchToken.expiresAt).getTime() <= Date.now()) {
+      launchToken.isActive = false;
+      await launchToken.save();
+      return res.status(410).json({ error: "This QR activity has expired." });
+    }
+    const [module, unit, page, setting] = await Promise.all([
+      LearningModule.findOne({ moduleId: launchToken.moduleId, isActive: true }).lean(),
+      LearningUnit.findOne({ unitId: launchToken.unitId, isActive: true }).lean(),
+      LearningPage.findOne({ pageId: launchToken.pageId, isActive: true }).lean(),
+      findActiveSetting(launchToken.settingId),
+    ]);
+    if (!module || !unit || !page || !setting) {
+      return res.status(409).json({ error: "The learning activity is currently unavailable." });
+    }
+    const topic = await findActiveTopic(setting.topicId);
+    if (!topic) return res.status(409).json({ error: "The linked topic is currently unavailable." });
+    launchToken.scanCount = Number(launchToken.scanCount || 0) + 1;
+    launchToken.lastScannedAt = new Date();
+    await launchToken.save();
+    return res.json({
+      success: true,
+      launch: {
+        launch_source: "module_qr",
+        module_id: module.moduleId,
+        unit_id: unit.unitId,
+        page_id: page.pageId,
+      },
+      module: serializeLearningModule(module),
+      unit: serializeLearningUnit(unit),
+      page: serializeLearningPage(page),
+      topic: serializeTopic(topic),
+      setting: serializeSetting(setting, topic),
+    });
+  } catch (error) {
+    return res.status(500).json({ error: true, message: error.message });
+  }
+});
 
 app.post("/api/chat/respond-turn", async (req, res) => {
   const {

@@ -11,6 +11,7 @@ import {
   FileText,
   Key,
   Plus,
+  QrCode,
   Search,
   Settings,
   Trash2,
@@ -493,6 +494,12 @@ export default function App() {
   const [topicStatusFilter, setTopicStatusFilter] = useState('all');
   const [selectedTopicDetail, setSelectedTopicDetail] = useState(null);
   const [selectedSettingDetail, setSelectedSettingDetail] = useState(null);
+  const [modules, setModules] = useState([]);
+  const [launchTokens, setLaunchTokens] = useState([]);
+  const [generatedLaunch, setGeneratedLaunch] = useState(null);
+  const [moduleForm, setModuleForm] = useState({ moduleId: '', title: '', description: '' });
+  const [unitForm, setUnitForm] = useState({ moduleId: '', unitId: '', title: '', description: '' });
+  const [pageForm, setPageForm] = useState({ unitId: '', pageId: '', title: '', instructions: '', settingId: '' });
 
   const callApi = useCallback((endpoint, method = 'GET', body = null, options = {}) =>
     requestJson({
@@ -572,6 +579,24 @@ export default function App() {
     }
   }, [callApi, notifyRequestError]);
 
+  const fetchLearningModules = useCallback(async (signal) => {
+    setSectionLoading('modules', true);
+    try {
+      const [moduleData, tokenData, settingData] = await Promise.all([
+        callApi('/api/admin/modules', 'GET', null, { signal }),
+        callApi('/api/admin/launch-tokens', 'GET', null, { signal }),
+        callApi('/api/admin/settings', 'GET', null, { signal }),
+      ]);
+      setModules(moduleData);
+      setLaunchTokens(tokenData);
+      setSettingsList(settingData);
+    } catch (error) {
+      notifyRequestError(error, 'Learning modules could not be loaded.');
+    } finally {
+      if (!signal?.aborted) setSectionLoading('modules', false);
+    }
+  }, [callApi, notifyRequestError]);
+
   const fetchAdminScenarios = useCallback(async (signal) => {
     setSectionLoading('scenarios', true);
     try {
@@ -645,6 +670,7 @@ export default function App() {
       void fetchAdminSettings(controller.signal);
     }
     if (activeTab === 'scenarios') void fetchAdminScenarios(controller.signal);
+    if (activeTab === 'modules') void fetchLearningModules(controller.signal);
     if (activeTab === 'lecturers') void fetchAdminLecturers(controller.signal);
     if (activeTab === 'overview') void fetchOverviewData(controller.signal);
     if (activeTab === 'students') void fetchLecturerStudents(controller.signal);
@@ -659,6 +685,7 @@ export default function App() {
     fetchAdminScenarios,
     fetchLecturerHistory,
     fetchLecturerStudents,
+    fetchLearningModules,
     fetchOverviewData,
     token,
   ]);
@@ -1124,6 +1151,76 @@ export default function App() {
     }
   };
 
+  const handleCreateModule = async (event) => {
+    event.preventDefault();
+    try {
+      await callApi('/api/admin/modules', 'POST', {
+        module_id: moduleForm.moduleId,
+        title: moduleForm.title,
+        description: moduleForm.description,
+      });
+      setModuleForm({ moduleId: '', title: '', description: '' });
+      toast.success('Learning module created.');
+      void fetchLearningModules();
+    } catch (error) {
+      notifyRequestError(error, 'Learning module could not be created.');
+    }
+  };
+
+  const handleCreateUnit = async (event) => {
+    event.preventDefault();
+    try {
+      await callApi(`/api/admin/modules/${unitForm.moduleId}/units`, 'POST', {
+        unit_id: unitForm.unitId,
+        title: unitForm.title,
+        description: unitForm.description,
+      });
+      setUnitForm({ moduleId: unitForm.moduleId, unitId: '', title: '', description: '' });
+      toast.success('Module unit created.');
+      void fetchLearningModules();
+    } catch (error) {
+      notifyRequestError(error, 'Module unit could not be created.');
+    }
+  };
+
+  const handleCreatePage = async (event) => {
+    event.preventDefault();
+    try {
+      await callApi(`/api/admin/units/${pageForm.unitId}/pages`, 'POST', {
+        page_id: pageForm.pageId,
+        title: pageForm.title,
+        instructions: pageForm.instructions,
+        setting_id: pageForm.settingId,
+      });
+      setPageForm({ unitId: pageForm.unitId, pageId: '', title: '', instructions: '', settingId: pageForm.settingId });
+      toast.success('Scannable module page created.');
+      void fetchLearningModules();
+    } catch (error) {
+      notifyRequestError(error, 'Module page could not be created.');
+    }
+  };
+
+  const handleGenerateLaunchQr = async (pageId) => {
+    try {
+      const launch = await callApi(`/api/admin/pages/${pageId}/launch-token`, 'POST', { expires_in_days: 365 });
+      setGeneratedLaunch(launch);
+      toast.success('QR launch code generated. Save it before closing this dialog.');
+      void fetchLearningModules();
+    } catch (error) {
+      notifyRequestError(error, 'QR launch code could not be generated.');
+    }
+  };
+
+  const handleDeactivateLaunch = async (id) => {
+    try {
+      await callApi(`/api/admin/launch-tokens/${id}/deactivate`, 'PATCH');
+      toast.success('QR launch code deactivated.');
+      void fetchLearningModules();
+    } catch (error) {
+      notifyRequestError(error, 'QR launch code could not be deactivated.');
+    }
+  };
+
   const exportHistoryToCSV = () => {
     const exportRows = filteredHistory.length ? filteredHistory : history;
     if (!exportRows.length) return alert('Tidak ada data riwayat untuk diekspor.');
@@ -1185,10 +1282,81 @@ export default function App() {
           <div>
             <SidebarTrigger className="sidebar-top-trigger" />
             <span>{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
-            <h1>{activeTab === 'topics' ? 'Topics & Settings' : activeTab === 'scenarios' ? 'Scenario Builder' : activeTab === 'lecturers' ? 'Lecturer Accounts' : activeTab === 'overview' ? 'Research Overview' : activeTab === 'students' ? 'Registered Students' : 'Practice History'}</h1>
+            <h1>{activeTab === 'topics' ? 'Topics & Settings' : activeTab === 'scenarios' ? 'Scenario Builder' : activeTab === 'modules' ? 'Learning Modules' : activeTab === 'lecturers' ? 'Lecturer Accounts' : activeTab === 'overview' ? 'Research Overview' : activeTab === 'students' ? 'Registered Students' : 'Practice History'}</h1>
           </div>
           <div className="search-pill"><Search size={16} /><span>{apiBaseUrl.replace(/^https?:\/\//, '')}</span></div>
         </header>
+
+        {user.role === 'admin' && activeTab === 'modules' && (
+          <section className="screen-stack">
+            <div className="action-row">
+              <p>Connect printed learning-module pages to the existing guided AR speaking settings.</p>
+              <span className="status-badge active"><QrCode size={14} /> Secure launch tokens</span>
+            </div>
+
+            <div className="module-builder-grid">
+              <form className="data-panel form-panel" onSubmit={handleCreateModule}>
+                <div className="panel-heading"><h3>1. Module</h3><span>Book or teaching module</span></div>
+                <label>Module ID<input required value={moduleForm.moduleId} onChange={(event) => setModuleForm({ ...moduleForm, moduleId: event.target.value.toUpperCase() })} placeholder="ICC-MODULE-01" /></label>
+                <label>Module title<input required value={moduleForm.title} onChange={(event) => setModuleForm({ ...moduleForm, title: event.target.value })} placeholder="Intercultural Speaking Module" /></label>
+                <label>Description<textarea rows="2" value={moduleForm.description} onChange={(event) => setModuleForm({ ...moduleForm, description: event.target.value })} /></label>
+                <button className="primary-action"><Plus size={16} /> Create Module</button>
+              </form>
+
+              <form className="data-panel form-panel" onSubmit={handleCreateUnit}>
+                <div className="panel-heading"><h3>2. Unit</h3><span>Chapter inside a module</span></div>
+                <label>Parent module<select required value={unitForm.moduleId} onChange={(event) => setUnitForm({ ...unitForm, moduleId: event.target.value })}><option value="">Select module</option>{modules.filter((item) => item.is_active).map((item) => <option key={item.module_id} value={item.module_id}>{item.title}</option>)}</select></label>
+                <label>Unit ID<input required value={unitForm.unitId} onChange={(event) => setUnitForm({ ...unitForm, unitId: event.target.value.toUpperCase() })} placeholder="ICC-UNIT-01" /></label>
+                <label>Unit title<input required value={unitForm.title} onChange={(event) => setUnitForm({ ...unitForm, title: event.target.value })} placeholder="Academic Communication" /></label>
+                <label>Description<textarea rows="2" value={unitForm.description} onChange={(event) => setUnitForm({ ...unitForm, description: event.target.value })} /></label>
+                <button className="primary-action"><Plus size={16} /> Create Unit</button>
+              </form>
+
+              <form className="data-panel form-panel" onSubmit={handleCreatePage}>
+                <div className="panel-heading"><h3>3. Scannable Page</h3><span>Maps directly to one setting</span></div>
+                <label>Parent unit<select required value={pageForm.unitId} onChange={(event) => setPageForm({ ...pageForm, unitId: event.target.value })}><option value="">Select unit</option>{modules.flatMap((module) => module.units || []).filter((unit) => unit.is_active).map((unit) => <option key={unit.unit_id} value={unit.unit_id}>{unit.title}</option>)}</select></label>
+                <label>Page ID<input required value={pageForm.pageId} onChange={(event) => setPageForm({ ...pageForm, pageId: event.target.value.toUpperCase() })} placeholder="ICC-PAGE-01" /></label>
+                <label>Page title<input required value={pageForm.title} onChange={(event) => setPageForm({ ...pageForm, title: event.target.value })} placeholder="Meet a Foreign Lecturer" /></label>
+                <label>Speaking setting<select required value={pageForm.settingId} onChange={(event) => setPageForm({ ...pageForm, settingId: event.target.value })}><option value="">Select setting</option>{settingsList.filter((item) => item.isActive).map((item) => <option key={item.settingId} value={item.settingId}>{item.title}</option>)}</select></label>
+                <label>Printed-page instruction<textarea rows="2" value={pageForm.instructions} onChange={(event) => setPageForm({ ...pageForm, instructions: event.target.value })} placeholder="Scan the QR code and begin the role-play." /></label>
+                <button className="primary-action"><Plus size={16} /> Create Page</button>
+              </form>
+            </div>
+
+            <div className="data-panel">
+              <div className="panel-heading"><h3>Module Structure</h3><span>{modules.length} modules</span></div>
+              <div className="module-tree">
+                {modules.map((module) => (
+                  <section key={module.module_id} className="module-node">
+                    <div><strong>{module.title}</strong><span>{module.module_id}</span></div>
+                    {(module.units || []).map((unit) => (
+                      <div key={unit.unit_id} className="unit-node">
+                        <div><strong>{unit.title}</strong><span>{unit.unit_id}</span></div>
+                        {(unit.pages || []).map((page) => (
+                          <div key={page.page_id} className="page-node">
+                            <div><strong>{page.title}</strong><span>{page.setting_id}</span></div>
+                            <button type="button" className="secondary-action" onClick={() => handleGenerateLaunchQr(page.page_id)}><QrCode size={15} /> Generate QR</button>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </section>
+                ))}
+                {!modules.length && <p className="empty-note">{loadingSections.modules ? 'Loading modules...' : 'No learning modules have been created.'}</p>}
+              </div>
+            </div>
+
+            <div className="data-panel">
+              <div className="panel-heading"><h3>QR Scan Analytics</h3><span>{launchTokens.reduce((sum, item) => sum + Number(item.scan_count || 0), 0)} scans</span></div>
+              <div className="table-scroll">
+                <table className="custom-table"><thead><tr><th>Page</th><th>Setting</th><th>Token</th><th>Expires</th><th>Scans</th><th>Status</th><th>Action</th></tr></thead><tbody>
+                  {launchTokens.map((item) => <tr key={item.id}><td>{item.page_id}</td><td>{item.setting_id}</td><td>{item.token_prefix}...</td><td>{new Date(item.expires_at).toLocaleDateString('en-US')}</td><td>{item.scan_count}</td><td><span className={`status-badge ${item.is_active ? 'active' : 'inactive'}`}>{item.is_active ? 'Active' : 'Inactive'}</span></td><td><button type="button" className="btn-table-action" disabled={!item.is_active} onClick={() => handleDeactivateLaunch(item.id)}>Deactivate</button></td></tr>)}
+                  {!launchTokens.length && <TableStatusRow colSpan={7} loading={loadingSections.modules} emptyText="No QR launch codes generated." />}
+                </tbody></table>
+              </div>
+            </div>
+          </section>
+        )}
 
         {user.role === 'admin' && activeTab === 'topics' && (
           <section className="screen-stack">
@@ -1802,6 +1970,17 @@ export default function App() {
               <button className="text-button" onClick={() => setSelectedSession(null)}>Close</button>
             </div>
 
+            <div className="session-attribution">
+              <span><strong>Source:</strong> {selectedSession.launch_source || 'legacy'}</span>
+              <span><strong>Topic:</strong> {selectedSession.topic_id || '-'}</span>
+              <span><strong>Setting:</strong> {selectedSession.setting_id || '-'}</span>
+              {selectedSession.launch_source === 'module_qr' && <>
+                <span><strong>Module:</strong> {selectedSession.module_id || '-'}</span>
+                <span><strong>Unit:</strong> {selectedSession.unit_id || '-'}</span>
+                <span><strong>Page:</strong> {selectedSession.page_id || '-'}</span>
+              </>}
+            </div>
+
             <div className="modal-tab-bar">
               <button
                 type="button"
@@ -2099,6 +2278,24 @@ export default function App() {
               <button type="button" className="primary-action" onClick={() => { setSelectedSettingDetail(null); openEditSetting(selectedSettingDetail); }}><Edit2 size={15} /> Edit Setting</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {generatedLaunch && (
+        <div className="modal-backdrop">
+          <section className="qr-modal" role="dialog" aria-modal="true" aria-label="Generated module QR code">
+            <div className="panel-heading">
+              <div><h3>Module QR Code</h3><span>{generatedLaunch.page?.title}</span></div>
+              <button type="button" className="text-button" onClick={() => setGeneratedLaunch(null)}>Close</button>
+            </div>
+            <img src={generatedLaunch.qr_data_url} alt={`QR code for ${generatedLaunch.page?.title || 'module page'}`} />
+            <div className="qr-token-copy">
+              <span>Launch URI</span>
+              <code>{generatedLaunch.launch_uri}</code>
+            </div>
+            <p>This secret QR value is shown once. Generate a replacement if the printed code is lost.</p>
+            <a className="primary-action" href={generatedLaunch.qr_data_url} download={`${generatedLaunch.page?.page_id || 'module-page'}-qr.png`}><Download size={16} /> Download QR</a>
+          </section>
         </div>
       )}
 

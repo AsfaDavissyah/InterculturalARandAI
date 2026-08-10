@@ -6,6 +6,7 @@ import {
   GraduationCap,
   Layers,
   LogOut,
+  QrCode,
   ShieldCheck,
   Users,
 } from "lucide-react"
@@ -33,6 +34,7 @@ export function AppSidebar({
     ? [
         { id: "topics", icon: Layers, label: "Topics & Settings" },
         { id: "scenarios", icon: BookOpen, label: "Scenario Builder" },
+        { id: "modules", icon: QrCode, label: "Learning Modules" },
         { id: "lecturers", icon: Users, label: "Lecturers" },
       ]
     : [

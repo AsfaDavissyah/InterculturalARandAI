@@ -9,11 +9,23 @@ import 'ar_speaking_screen.dart';
 class GuidedSettingBriefingScreen extends StatelessWidget {
   final GuidedTopic topic;
   final GuidedSetting setting;
+  final String launchSource;
+  final String? moduleId;
+  final String? unitId;
+  final String? pageId;
+  final String? moduleTitle;
+  final String? pageInstructions;
 
   const GuidedSettingBriefingScreen({
     super.key,
     required this.topic,
     required this.setting,
+    this.launchSource = 'browse',
+    this.moduleId,
+    this.unitId,
+    this.pageId,
+    this.moduleTitle,
+    this.pageInstructions,
   });
 
   static const Color _orange = Color(0xFFD4842A);
@@ -45,7 +57,10 @@ class GuidedSettingBriefingScreen extends StatelessWidget {
           stickerAssetKey: setting.stickerAssetKey,
           guidedSetting: setting,
           experienceType: 'guided_topic',
-          launchSource: 'browse',
+          launchSource: launchSource,
+          moduleId: moduleId,
+          unitId: unitId,
+          pageId: pageId,
         ),
       ),
     );
@@ -85,6 +100,45 @@ class GuidedSettingBriefingScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (launchSource == 'module_qr') ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: _orange.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.qr_code_2_rounded, color: _orange),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    moduleTitle ?? 'Learning Module',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      color: _orange,
+                                    ),
+                                  ),
+                                  if ((pageInstructions ?? '').isNotEmpty)
+                                    Text(
+                                      pageInstructions!,
+                                      style: TextStyle(
+                                        color: primaryColor.withValues(alpha: 0.7),
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     // Topic Tag
                     Container(
                       padding: const EdgeInsets.symmetric(

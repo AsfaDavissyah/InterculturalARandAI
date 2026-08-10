@@ -11,6 +11,7 @@ import '../services/chat_service.dart';
 import 'ar_speaking_screen.dart';
 import 'guided_settings_screen.dart';
 import 'login_screen.dart';
+import 'module_qr_scanner_screen.dart';
 import 'onboarding_screen.dart';
 import '../main.dart';
 import '../services/page_transitions.dart';
@@ -341,6 +342,22 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
                       fontWeight: FontWeight.w800,
                       height: 1.15,
                       letterSpacing: -0.5,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: 'Scan learning module',
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        SlideUpRoute(page: const ModuleQrScannerScreen()),
+                      );
+                    },
+                    icon: const Icon(Icons.qr_code_scanner_rounded),
+                    style: IconButton.styleFrom(
+                      foregroundColor: primaryColor,
+                      backgroundColor: primaryColor.withValues(alpha: 0.08),
+                      minimumSize: const Size(48, 48),
                     ),
                   ),
                 ],

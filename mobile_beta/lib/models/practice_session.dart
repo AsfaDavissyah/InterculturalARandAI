@@ -36,6 +36,9 @@ class PracticeSession {
   final String? settingTitle;
   final String? avatarKey;
   final String launchSource;
+  final String? moduleId;
+  final String? unitId;
+  final String? pageId;
 
   const PracticeSession({
     required this.sessionId,
@@ -60,6 +63,9 @@ class PracticeSession {
     this.settingTitle,
     this.avatarKey,
     this.launchSource = 'legacy',
+    this.moduleId,
+    this.unitId,
+    this.pageId,
   });
 
   static String createSessionId({DateTime? now, Random? random}) {
@@ -84,6 +90,9 @@ class PracticeSession {
     String? settingTitle,
     String? avatarKey,
     String launchSource = 'legacy',
+    String? moduleId,
+    String? unitId,
+    String? pageId,
   }) {
     final averages = <String, double>{};
     for (final key in scoreKeys) {
@@ -124,6 +133,9 @@ class PracticeSession {
       settingTitle: settingTitle,
       avatarKey: avatarKey,
       launchSource: launchSource,
+      moduleId: moduleId,
+      unitId: unitId,
+      pageId: pageId,
     );
   }
 
@@ -166,6 +178,9 @@ class PracticeSession {
       settingTitle: json['setting_title'] as String?,
       avatarKey: json['avatar_key'] as String?,
       launchSource: json['launch_source'] as String? ?? 'legacy',
+      moduleId: json['module_id'] as String?,
+      unitId: json['unit_id'] as String?,
+      pageId: json['page_id'] as String?,
     );
   }
 
@@ -192,6 +207,9 @@ class PracticeSession {
     if (settingTitle != null) 'setting_title': settingTitle,
     if (avatarKey != null) 'avatar_key': avatarKey,
     'launch_source': launchSource,
+    if (moduleId != null) 'module_id': moduleId,
+    if (unitId != null) 'unit_id': unitId,
+    if (pageId != null) 'page_id': pageId,
   };
 
   Map<String, dynamic> toDashboardRecord() => {
@@ -219,5 +237,8 @@ class PracticeSession {
     if (settingTitle != null) 'setting_title': settingTitle,
     if (avatarKey != null) 'avatar_key': avatarKey,
     'launch_source': launchSource,
+    if (moduleId != null) 'module_id': moduleId,
+    if (unitId != null) 'unit_id': unitId,
+    if (pageId != null) 'page_id': pageId,
   };
 }
