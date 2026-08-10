@@ -133,7 +133,13 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     ) {
       if (!mounted) return;
       setState(() {
-        if (state == PlayerState.completed || state == PlayerState.stopped) {
+        if (state == PlayerState.playing) {
+          _activity = AvatarActivity.speaking;
+          if (_messages.isNotEmpty && _messages.last.speaker == 'AI') {
+            _activeSubtitle = _messages.last;
+          }
+        } else if (state == PlayerState.completed ||
+            state == PlayerState.stopped) {
           if (!_sessionLoading && _sessionError == null) {
             _activity = AvatarActivity.idle;
           }
@@ -165,16 +171,19 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       });
     }
 
-    final baseUrl = await AppSettings.getBaseUrl();
+    final baseUrlFuture = AppSettings.getBaseUrl();
+    final profileFuture = AuthService.getProfile();
+    final baseUrl = await baseUrlFuture;
     _chatService = ChatService(baseUrl: baseUrl);
-    _profile = await AuthService.getProfile();
-
-    await _initializeCamera();
-    await _initializeSpeech();
-    await _initializeTts();
+    _profile = await profileFuture;
 
     try {
-      final openingMessage = await _loadOpeningMessage();
+      final openingFuture = _loadOpeningMessage();
+      final ttsInitialization = _initializeTts();
+      final captureInitialization = _initializeCaptureDevices();
+      final openingMessage = await openingFuture;
+      final openingAudio = _requestNeuralAudioUrl(openingMessage);
+      await ttsInitialization;
 
       if (!mounted) return;
       setState(() {
@@ -182,9 +191,11 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
           ..clear()
           ..add(ConversationMessage(speaker: 'AI', message: openingMessage));
         _sessionLoading = false;
-        _activity = AvatarActivity.idle;
+        _activity = AvatarActivity.loading;
+        _activeSubtitle = null;
       });
-      await _speak(openingMessage);
+      unawaited(captureInitialization);
+      await _speak(openingMessage, preparedAudioUrl: openingAudio);
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -194,6 +205,11 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         _activity = AvatarActivity.error;
       });
     }
+  }
+
+  Future<void> _initializeCaptureDevices() async {
+    await _initializeCamera();
+    await _initializeSpeech();
   }
 
   Future<String> _loadOpeningMessage() async {
@@ -304,7 +320,43 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     } catch (_) {}
   }
 
-  Future<void> _speak(String text) async {
+  String _voiceGender() {
+    final aiRoleLower = widget.scenario.aiRole.toLowerCase();
+    if (aiRoleLower.contains('david') ||
+        aiRoleLower.contains('michael') ||
+        aiRoleLower.contains('male') ||
+        aiRoleLower.contains('man') ||
+        aiRoleLower.contains('mr.')) {
+      return 'male';
+    }
+    return 'female';
+  }
+
+  Future<String?> _requestNeuralAudioUrl(String text) async {
+    try {
+      final service = _chatService;
+      if (service == null) return null;
+      final response = await http
+          .post(
+            Uri.parse('${service.baseUrl}/api/tts'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'text': text,
+              'gender': _voiceGender(),
+              'ai_role': widget.scenario.aiRole,
+            }),
+          )
+          .timeout(const Duration(seconds: 5));
+      if (response.statusCode != 200) return null;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return data['audio_url']?.toString();
+    } catch (error) {
+      debugPrint('Neural TTS failed, falling back to local TTS. Error: $error');
+      return null;
+    }
+  }
+
+  Future<void> _speak(String text, {Future<String?>? preparedAudioUrl}) async {
     if (text.trim().isEmpty || !mounted) {
       if (mounted) setState(() => _activity = AvatarActivity.idle);
       return;
@@ -318,59 +370,27 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     } catch (_) {}
 
     setState(() {
-      _activity = AvatarActivity.speaking;
-      if (_messages.isNotEmpty && _messages.last.speaker == 'AI') {
-        _activeSubtitle = _messages.last;
-      }
+      _activity = AvatarActivity.loading;
+      _activeSubtitle = null;
     });
-
-    String gender = "female";
-    final aiRoleLower = widget.scenario.aiRole.toLowerCase();
-    if (aiRoleLower.contains("david") ||
-        aiRoleLower.contains("male") ||
-        aiRoleLower.contains("man") ||
-        aiRoleLower.contains("mr.")) {
-      gender = "male";
-    }
 
     bool success = false;
 
     try {
-      if (_chatService != null) {
-        final baseUrl = _chatService!.baseUrl;
-        final response = await http
-            .post(
-              Uri.parse('$baseUrl/api/tts'),
-              headers: {'Content-Type': 'application/json'},
-              body: jsonEncode({
-                'text': text,
-                'gender': gender,
-                'ai_role': widget.scenario.aiRole,
-              }),
-            )
-            .timeout(const Duration(seconds: 8));
-
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          final audioUrl = data['audio_url'];
-
-          if (audioUrl != null && mounted) {
-            await _audioPlayer.play(UrlSource(audioUrl));
-            success = true;
-          }
-        }
+      final audioUrl = await (preparedAudioUrl ?? _requestNeuralAudioUrl(text));
+      if (audioUrl != null && audioUrl.isNotEmpty && mounted) {
+        await _audioPlayer.play(UrlSource(audioUrl));
+        success = true;
       }
-    } catch (e) {
-      debugPrint("Neural TTS failed, falling back to local TTS. Error: $e");
+    } catch (error) {
+      debugPrint('Unable to play neural TTS audio. Error: $error');
     }
 
     if (!success) {
       if (!mounted) return;
       setState(() {
-        _activity = AvatarActivity.speaking;
-        if (_messages.isNotEmpty && _messages.last.speaker == 'AI') {
-          _activeSubtitle = _messages.last;
-        }
+        _activity = AvatarActivity.loading;
+        _activeSubtitle = null;
       });
       try {
         await _tts.stop();

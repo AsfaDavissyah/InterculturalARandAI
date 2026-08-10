@@ -84,6 +84,7 @@ class GuidedSetting {
   final String studentRole;
   final GuidedAiCharacter aiCharacter;
   final String taskInstruction;
+  final String openingMessage;
   final GuidedSessionRules sessionRules;
   final int displayOrder;
   final bool isActive;
@@ -98,6 +99,7 @@ class GuidedSetting {
     required this.studentRole,
     required this.aiCharacter,
     required this.taskInstruction,
+    this.openingMessage = '',
     required this.sessionRules,
     required this.displayOrder,
     required this.isActive,
@@ -120,6 +122,7 @@ class GuidedSetting {
       ),
       taskInstruction:
           json['taskInstruction'] ?? json['task_instruction'] ?? '',
+      openingMessage: json['openingMessage'] ?? json['opening_message'] ?? '',
       sessionRules: GuidedSessionRules.fromJson(
         Map<String, dynamic>.from(
           json['sessionRules'] ?? json['session_rules'] ?? {},
@@ -131,6 +134,25 @@ class GuidedSetting {
   }
 
   String buildOpeningMessage() {
+    final configuredOpening = openingMessage.trim();
+    if (configuredOpening.isNotEmpty) return configuredOpening;
+
+    const fallbackOpenings = <String, String>{
+      'ACADEMIC-LECTURER-OFFICE':
+          'Good morning. Please come in. How can I help you today?',
+      'ACADEMIC-AFTER-CLASS':
+          "Hello. Do you have a question about today's class?",
+      'SOCIAL-LONDON-RESTAURANT': 'Good evening. Welcome. How may I help you?',
+      'SOCIAL-MELBOURNE-CAFE':
+          'Hi there. What can I get started for you today?',
+      'PROFESSIONAL-INTERVIEW-ROOM':
+          'Good morning. Thank you for coming in today. Could you begin by introducing yourself?',
+      'PROFESSIONAL-CAREER-FAIR':
+          'Hello. Welcome to our booth. What brings you to the career fair today?',
+    };
+    final settingOpening = fallbackOpenings[settingId];
+    if (settingOpening != null) return settingOpening;
+
     final name = aiCharacter.displayName.trim();
     if (name.isEmpty || name == 'AI Partner') {
       return 'Hello. It is nice to meet you. Whenever you are ready, please begin.';

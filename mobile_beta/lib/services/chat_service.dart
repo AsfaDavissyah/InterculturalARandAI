@@ -41,7 +41,9 @@ class ChatService {
         .get(Uri.parse('$baseUrl/api/topics/$topicId/settings'))
         .timeout(const Duration(seconds: 8));
     if (response.statusCode != 200) {
-      throw Exception('Failed to load settings for topic $topicId: ${response.body}');
+      throw Exception(
+        'Failed to load settings for topic $topicId: ${response.body}',
+      );
     }
     final data = jsonDecode(response.body) as List<dynamic>;
     return data
@@ -54,11 +56,28 @@ class ChatService {
         .get(Uri.parse('$baseUrl/api/settings/$settingId'))
         .timeout(const Duration(seconds: 8));
     if (response.statusCode != 200) {
-      throw Exception('Failed to load setting detail $settingId: ${response.body}');
+      throw Exception(
+        'Failed to load setting detail $settingId: ${response.body}',
+      );
     }
     return GuidedSetting.fromJson(
       jsonDecode(response.body) as Map<String, dynamic>,
     );
+  }
+
+  Future<void> prepareTts({
+    required String text,
+    required String gender,
+    required String aiRole,
+  }) async {
+    if (text.trim().isEmpty) return;
+    await http
+        .post(
+          Uri.parse('$baseUrl/api/tts'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'text': text, 'gender': gender, 'ai_role': aiRole}),
+        )
+        .timeout(const Duration(seconds: 8));
   }
 
   Future<List<ScenarioTopic>> getScenarios() async {

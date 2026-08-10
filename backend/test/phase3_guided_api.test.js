@@ -75,10 +75,29 @@ test("setting detail inherits topic objectives and exposes runtime assets", asyn
     assert.equal(body.ai_character.display_name, "Dr Emma Collins");
     assert.equal(body.avatar_key, "female_lecturer_v1");
     assert.equal(body.sticker_asset_key, "sticker_lecturer_office");
+    assert.equal(
+      body.opening_message,
+      "Good morning. Please come in. How can I help you today?"
+    );
     assert.ok(body.language_objectives.length >= 5);
     assert.ok(body.icc_objectives.length >= 5);
     assert.equal(body.session_rules.maximum_student_responses, 10);
   });
+});
+
+test("all six guided settings expose distinct context-specific openings", () => {
+  const openings = settingsData.map((setting) => {
+    const topic = topicsData.find((item) => item.topicId === setting.topicId);
+    return buildGuidedScenarioData(setting, topic).initial_conversation_state
+      .ai_opening_message;
+  });
+
+  assert.equal(new Set(openings).size, settingsData.length);
+  assert.match(openings[0], /come in/i);
+  assert.match(openings[2], /good evening/i);
+  assert.match(openings[3], /get started/i);
+  assert.match(openings[4], /introducing yourself/i);
+  assert.match(openings[5], /career fair/i);
 });
 
 test("unknown topics and settings return 404", async () => {

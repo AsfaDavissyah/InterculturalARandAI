@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/guided_setting.dart';
 import '../models/guided_topic.dart';
 import '../models/scenario_topic.dart';
+import '../services/app_settings.dart';
+import '../services/chat_service.dart';
 import '../services/page_transitions.dart';
 import 'ar_speaking_screen.dart';
 
@@ -94,6 +98,7 @@ class GuidedSettingBriefingScreen extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
+            _OpeningVoiceWarmup(setting: setting),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
@@ -127,7 +132,9 @@ class GuidedSettingBriefingScreen extends StatelessWidget {
                                     Text(
                                       pageInstructions!,
                                       style: TextStyle(
-                                        color: primaryColor.withValues(alpha: 0.7),
+                                        color: primaryColor.withValues(
+                                          alpha: 0.7,
+                                        ),
                                         fontSize: 13,
                                       ),
                                     ),
@@ -448,4 +455,49 @@ class GuidedSettingBriefingScreen extends StatelessWidget {
       ],
     );
   }
+}
+
+class _OpeningVoiceWarmup extends StatefulWidget {
+  final GuidedSetting setting;
+
+  const _OpeningVoiceWarmup({required this.setting});
+
+  @override
+  State<_OpeningVoiceWarmup> createState() => _OpeningVoiceWarmupState();
+}
+
+class _OpeningVoiceWarmupState extends State<_OpeningVoiceWarmup> {
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_prepareOpeningVoice());
+  }
+
+  Future<void> _prepareOpeningVoice() async {
+    final character = widget.setting.aiCharacter;
+    final identity =
+        '${character.displayName} ${character.role} ${character.avatarKey}'
+            .toLowerCase();
+    final gender =
+        identity.contains('michael') ||
+            identity.contains('hr_manager') ||
+            identity.contains('male') ||
+            identity.contains('mr.')
+        ? 'male'
+        : 'female';
+
+    try {
+      final baseUrl = await AppSettings.getBaseUrl();
+      await ChatService(baseUrl: baseUrl).prepareTts(
+        text: widget.setting.buildOpeningMessage(),
+        gender: gender,
+        aiRole: '${character.displayName} (${character.role})',
+      );
+    } catch (_) {
+      // AR startup still has neural and local TTS fallbacks.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }

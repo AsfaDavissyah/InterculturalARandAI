@@ -83,6 +83,7 @@ function serializeSetting(setting, topic = null) {
   const parent = plain(topic) || {};
   const character = item.aiCharacter || {};
   const rules = item.sessionRules || {};
+  const dialogue = SETTING_DIALOGUE[item.settingId];
   return {
     setting_id: item.settingId,
     topic_id: item.topicId,
@@ -99,6 +100,9 @@ function serializeSetting(setting, topic = null) {
       avatar_key: character.avatar_key || "default_avatar",
     },
     task_instruction: item.taskInstruction || "",
+    opening_message:
+      dialogue?.opening ||
+      `Hello. Welcome to ${item.location || "this setting"}. How may I help you?`,
     conversation_stages: item.conversationStages || [],
     constraints: item.constraints || [],
     language_objectives: parent.languageObjectives || [],

@@ -120,7 +120,7 @@ void main() {
       expect(setting.sessionRules.maximumStudentResponses, 10);
       expect(
         setting.buildOpeningMessage(),
-        "Hello. I'm Dr. Jenkins. It's nice to meet you. Whenever you're ready, please begin.",
+        'Good morning. Please come in. How can I help you today?',
       );
     });
 
@@ -140,9 +140,38 @@ void main() {
       });
 
       final opening = setting.buildOpeningMessage();
-      expect(opening, contains('Sarah Bennett'));
+      expect(opening, 'Good evening. Welcome. How may I help you?');
       expect(opening, isNot(contains('Rina')));
       expect(opening, isNot(contains('David')));
+    });
+
+    test('all guided settings have distinct context-specific openings', () {
+      const expected = <String, String>{
+        'ACADEMIC-LECTURER-OFFICE':
+            'Good morning. Please come in. How can I help you today?',
+        'ACADEMIC-AFTER-CLASS':
+            "Hello. Do you have a question about today's class?",
+        'SOCIAL-LONDON-RESTAURANT':
+            'Good evening. Welcome. How may I help you?',
+        'SOCIAL-MELBOURNE-CAFE':
+            'Hi there. What can I get started for you today?',
+        'PROFESSIONAL-INTERVIEW-ROOM':
+            'Good morning. Thank you for coming in today. Could you begin by introducing yourself?',
+        'PROFESSIONAL-CAREER-FAIR':
+            'Hello. Welcome to our booth. What brings you to the career fair today?',
+      };
+
+      final openings = expected.entries.map((entry) {
+        final setting = GuidedSetting.fromJson({
+          'setting_id': entry.key,
+          'ai_character': {'display_name': 'AI Partner'},
+        });
+        final opening = setting.buildOpeningMessage();
+        expect(opening, entry.value);
+        return opening;
+      }).toSet();
+
+      expect(openings, hasLength(expected.length));
     });
 
     test('PracticeSession preserves guided topic and setting metadata', () {
