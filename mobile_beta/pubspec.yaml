@@ -32,3 +32,6 @@ flutter:
     - assets/models/male_char.glb
     - assets/models/female_char.glb
     - assets/models/olivia_animated.glb
+    - assets/models/sarah_animated.glb
+    - assets/models/dr_emma_animated.glb
+    - assets/models/hr_animated.glb

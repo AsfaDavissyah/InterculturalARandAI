@@ -1,6 +1,6 @@
 # Phase 5 Asset-Pending Work
 
-**Status:** Technical mobile flow uses prototype avatars. Final visual completion is waiting for client-approved assets.
+**Status:** Technical mobile flow and final animated character integration are complete. Only the six client-approved 2D setting stickers remain as visual finishing work.
 
 ## Completed Without Final Assets
 
@@ -13,14 +13,14 @@
 - Guided session metadata is sent to chat and stored in practice history.
 - Fallback topic content matches the approved backend seed.
 
-## Waiting for Final Character Assets
+## Completed Character Assets
 
-- Obtain client approval and a distribution-compatible license for the final characters.
-- Deliver final GLB files for Dr Emma Collins, Sarah Bennett, Olivia Reed, and Michael Harris.
-- Keep embedded textures and the exact animation names `Idle` and `Talking`.
-- Optimize each GLB for Android performance and package size.
-- Replace prototype paths in `AvatarRegistry` without changing setting data.
-- Verify scale, origin, framing, animation transitions, and device performance for every character.
+- Dr Emma Collins, Sarah Bennett, Olivia Reed, and Michael Harris use dedicated GLB assets.
+- Every GLB embeds a 2K texture and exposes the exact animation names `Idle` and `Talking`.
+- Character scale and origin are normalized for the shared AR runtime.
+- `AvatarRegistry` maps all six guided settings without changing backend setting records.
+- Flutter analysis, guided-flow tests, GLB re-import validation, and Android debug build pass.
+- Final appearance and performance acceptance remains part of physical-device client QA.
 
 ## Waiting for Final 2D Sticker Assets
 
@@ -33,7 +33,7 @@
 
 ## Final Asset Acceptance
 
-- Confirm visual style consistency across all characters and stickers.
+- Confirm visual style consistency across all characters and the future stickers.
 - Test all six settings on the target phone.
 - Obtain client approval for character appearance, sticker composition, avatar scale, and AR placement.
 - Produce the final signed client acceptance build after the assets pass QA.
