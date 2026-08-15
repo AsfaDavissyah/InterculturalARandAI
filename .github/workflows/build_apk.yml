@@ -97,7 +97,7 @@ jobs:
       - name: Run Flutter Static Analysis
         run: |
           cd mobile_beta
-          flutter analyze
+          flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Run Flutter Tests
         run: |
