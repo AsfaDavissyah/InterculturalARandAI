@@ -20,6 +20,7 @@ import '../services/auth_service.dart';
 import '../services/avatar_registry.dart';
 import '../services/chat_service.dart';
 import '../services/practice_history_store.dart';
+import '../services/pilot_evidence_service.dart';
 import '../widgets/ar_avatar.dart';
 import '../widgets/ar_avatar_3d.dart';
 import 'result_screen.dart';
@@ -749,6 +750,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
           (message) => {'speaker': message.speaker, 'message': message.message},
         )
         .toList();
+    final pilotMetadata = await PilotEvidenceService.capture(context);
+    if (!mounted) return;
     final session = PracticeSession.fromPractice(
       sessionId: _sessionId,
       scenario: widget.scenario,
@@ -771,6 +774,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       unitId: widget.unitId,
       pageId: widget.pageId,
       latencyMetrics: List.unmodifiable(_latencyMetrics),
+      pilotMetadata: pilotMetadata,
     );
     await _historyStore.saveSession(session);
     if (!mounted) return;

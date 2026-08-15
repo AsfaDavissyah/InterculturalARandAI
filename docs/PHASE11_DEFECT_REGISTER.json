@@ -1,0 +1,16 @@
+{
+  "phase": 11,
+  "updated_at": "2026-08-15",
+  "policy": {
+    "blocker": "Core flow cannot be completed or research data is lost/exposed.",
+    "high": "Major user or lecturer workflow fails without a practical workaround.",
+    "medium": "Workflow remains usable with a documented workaround.",
+    "low": "Cosmetic or minor usability issue."
+  },
+  "release_gate": {
+    "open_blocker": 0,
+    "open_high": 0,
+    "satisfied": true
+  },
+  "defects": []
+}

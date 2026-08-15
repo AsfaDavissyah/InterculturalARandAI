@@ -5,10 +5,11 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test",
+    "test": "node --test test/*.js",
     "backup": "node scripts/backup_database.js",
     "seed": "node scripts/seed_topics_and_settings.js",
-    "seed:verify": "node scripts/verify_phase2_seed.js"
+    "seed:verify": "node scripts/verify_phase2_seed.js",
+    "smoke:phase11": "node scripts/phase11_smoke_test.js"
   },
   "keywords": [],
   "author": "",

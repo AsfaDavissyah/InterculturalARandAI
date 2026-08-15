@@ -141,6 +141,10 @@ const PracticeSessionSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.Mixed,
     default: {},
   },
+  pilotMetadata: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
+  },
 });
 
 module.exports = mongoose.model("PracticeSession", PracticeSessionSchema);

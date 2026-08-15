@@ -1,0 +1,17 @@
+{
+  "phase": 11,
+  "target": "https://interculturalarandai-production.up.railway.app",
+  "executed_at": "2026-08-15T16:15:09.476Z",
+  "result": "pass",
+  "guided_topic_count": 3,
+  "guided_setting_count": 6,
+  "legacy_scenario_count": 10,
+  "checks": [
+    { "name": "three guided topics", "path": "/api/topics", "status": 200, "duration_ms": 297 },
+    { "name": "academic settings", "path": "/api/topics/academic-communication/settings", "status": 200, "duration_ms": 150, "count": 2 },
+    { "name": "social settings", "path": "/api/topics/social-communication/settings", "status": 200, "duration_ms": 53, "count": 2 },
+    { "name": "professional settings", "path": "/api/topics/professional-communication/settings", "status": 200, "duration_ms": 56, "count": 2 },
+    { "name": "legacy scenarios", "path": "/api/scenarios", "status": 200, "duration_ms": 106, "count": 10 },
+    { "name": "invalid QR rejected safely", "path": "/api/launch/resolve", "status": 404, "duration_ms": 69 }
+  ]
+}

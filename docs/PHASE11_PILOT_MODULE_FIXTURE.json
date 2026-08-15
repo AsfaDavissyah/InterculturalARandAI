@@ -1,0 +1,17 @@
+{
+  "module_id": "ICC-PILOT-01",
+  "title": "ICC Pilot Module",
+  "unit": {
+    "unit_id": "UNIT-ACADEMIC-01",
+    "title": "Academic Communication",
+    "page": {
+      "page_id": "PAGE-LECTURER-OFFICE-01",
+      "title": "Meeting a Foreign Lecturer",
+      "setting_id": "ACADEMIC-LECTURER-OFFICE"
+    }
+  },
+  "launch_token": {
+    "status": "pending_external_creation",
+    "reason": "Create through the authenticated admin dashboard immediately before printing so expiry and revocation remain controlled."
+  }
+}

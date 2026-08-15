@@ -265,6 +265,125 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
     await _loadScenarios();
   }
 
+  Future<void> _openPilotSettings() async {
+    final current = await AppSettings.getPilotTestContext();
+    if (!mounted) return;
+
+    final deviceController = TextEditingController(text: current.deviceLabel);
+    var networkProfile = current.networkProfile;
+    var installType = current.installType;
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: _cream,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          title: const Text(
+            'Pilot Test Context',
+            style: TextStyle(color: _black, fontWeight: FontWeight.w800),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: deviceController,
+                  decoration: const InputDecoration(
+                    labelText: 'Device label',
+                    hintText: 'Samsung Galaxy A52',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  initialValue: networkProfile,
+                  decoration: const InputDecoration(
+                    labelText: 'Network profile',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'unreported',
+                      child: Text('Not specified'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'approved_wifi',
+                      child: Text('Approved Wi-Fi'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'mobile_data',
+                      child: Text('Mobile data'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'slow_network',
+                      child: Text('Slower network'),
+                    ),
+                  ],
+                  onChanged: (value) => setDialogState(
+                    () => networkProfile = value ?? 'unreported',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  initialValue: installType,
+                  decoration: const InputDecoration(
+                    labelText: 'Install type',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'unreported',
+                      child: Text('Not specified'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'fresh_install',
+                      child: Text('Fresh install'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'update_install',
+                      child: Text('Update install'),
+                    ),
+                  ],
+                  onChanged: (value) =>
+                      setDialogState(() => installType = value ?? 'unreported'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: FilledButton.styleFrom(backgroundColor: _orange),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final deviceLabel = deviceController.text;
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => deviceController.dispose(),
+    );
+    if (saved != true) return;
+
+    await AppSettings.setPilotTestContext(
+      PilotTestContext(
+        deviceLabel: deviceLabel,
+        networkProfile: networkProfile,
+        installType: installType,
+      ),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Pilot test context saved.')));
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -974,6 +1093,27 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
                       onTap: () {
                         Navigator.pop(context);
                         _openBackendSettings();
+                      },
+                    ),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        Icons.science_outlined,
+                        color: currentIsDark ? Colors.white : Colors.black,
+                      ),
+                      title: Text(
+                        'Pilot Test Context',
+                        style: TextStyle(
+                          color: currentIsDark ? Colors.white : Colors.black,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      subtitle: const Text(
+                        'Record device, network, and install type',
+                      ),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _openPilotSettings();
                       },
                     ),
                     const SizedBox(height: 16),

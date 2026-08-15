@@ -2,10 +2,11 @@ import 'dart:math';
 
 import 'ai_response.dart';
 import 'conversation_latency.dart';
+import 'pilot_metadata.dart';
 import 'scenario_topic.dart';
 
 class PracticeSession {
-  static const schemaVersion = 2;
+  static const schemaVersion = 3;
   static const scoreKeys = [
     'grammar',
     'vocabulary',
@@ -41,6 +42,7 @@ class PracticeSession {
   final String? unitId;
   final String? pageId;
   final List<ConversationLatencyTrace> latencyMetrics;
+  final PilotMetadata? pilotMetadata;
 
   const PracticeSession({
     required this.sessionId,
@@ -69,6 +71,7 @@ class PracticeSession {
     this.unitId,
     this.pageId,
     this.latencyMetrics = const [],
+    this.pilotMetadata,
   });
 
   static String createSessionId({DateTime? now, Random? random}) {
@@ -97,6 +100,7 @@ class PracticeSession {
     String? unitId,
     String? pageId,
     List<ConversationLatencyTrace> latencyMetrics = const [],
+    PilotMetadata? pilotMetadata,
   }) {
     final averages = <String, double>{};
     for (final key in scoreKeys) {
@@ -141,6 +145,7 @@ class PracticeSession {
       unitId: unitId,
       pageId: pageId,
       latencyMetrics: List.unmodifiable(latencyMetrics),
+      pilotMetadata: pilotMetadata,
     );
   }
 
@@ -193,6 +198,11 @@ class PracticeSession {
             ),
           )
           .toList(),
+      pilotMetadata: json['pilot_metadata'] is Map
+          ? PilotMetadata.fromJson(
+              Map<String, dynamic>.from(json['pilot_metadata'] as Map),
+            )
+          : null,
     );
   }
 
@@ -226,6 +236,7 @@ class PracticeSession {
     'latency_summary': ConversationLatencySummary.fromTraces(
       latencyMetrics,
     ).toJson(),
+    if (pilotMetadata != null) 'pilot_metadata': pilotMetadata!.toJson(),
   };
 
   Map<String, dynamic> toDashboardRecord() => {
@@ -260,5 +271,6 @@ class PracticeSession {
     'latency_summary': ConversationLatencySummary.fromTraces(
       latencyMetrics,
     ).toJson(),
+    if (pilotMetadata != null) 'pilot_metadata': pilotMetadata!.toJson(),
   };
 }

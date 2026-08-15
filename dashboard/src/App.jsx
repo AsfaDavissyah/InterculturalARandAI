@@ -10,6 +10,7 @@ import {
   Eye,
   FileText,
   Key,
+  MonitorSmartphone,
   Plus,
   QrCode,
   Search,
@@ -2010,6 +2011,13 @@ export default function App() {
               >
                 <Award size={15} /> Rubric & Score Breakdown
               </button>
+              <button
+                type="button"
+                className={`tab-btn ${sessionTab === 'pilot' ? 'active' : ''}`}
+                onClick={() => setSessionTab('pilot')}
+              >
+                <MonitorSmartphone size={15} /> Pilot Evidence
+              </button>
             </div>
 
             {sessionTab === 'turns' ? (
@@ -2065,7 +2073,7 @@ export default function App() {
                   <p className="empty-note">No pragmatic friction coaching events recorded for this session.</p>
                 )}
               </div>
-            ) : (
+            ) : sessionTab === 'rubric' ? (
               <div className="transcript-grid">
                 <div className="session-summary-box">
                   <div className="score-hero-card">
@@ -2085,6 +2093,39 @@ export default function App() {
                     <ProgressMetric key={key} label={label} value={selectedSession.average_scores?.[key]} />
                   ))}
                 </div>
+              </div>
+            ) : (
+              <div className="pilot-evidence-panel">
+                <div className="detail-grid pilot-evidence-grid">
+                  <div><span>Device</span><strong>{selectedSession.pilot_metadata?.device_label || 'Not reported'}</strong></div>
+                  <div><span>Platform</span><strong>{selectedSession.pilot_metadata?.platform || '-'}</strong></div>
+                  <div><span>OS version</span><strong>{selectedSession.pilot_metadata?.os_version || '-'}</strong></div>
+                  <div><span>App build</span><strong>{selectedSession.pilot_metadata?.app_build || '-'}</strong></div>
+                  <div><span>Viewport</span><strong>{selectedSession.pilot_metadata ? `${selectedSession.pilot_metadata.viewport_width} x ${selectedSession.pilot_metadata.viewport_height}` : '-'}</strong></div>
+                  <div><span>Pixel ratio</span><strong>{selectedSession.pilot_metadata?.pixel_ratio || '-'}</strong></div>
+                  <div><span>Network</span><strong>{String(selectedSession.pilot_metadata?.network_profile || 'unreported').replaceAll('_', ' ')}</strong></div>
+                  <div><span>Install type</span><strong>{String(selectedSession.pilot_metadata?.install_type || 'unreported').replaceAll('_', ' ')}</strong></div>
+                  <div><span>Captured at</span><strong>{selectedSession.pilot_metadata?.captured_at ? new Date(selectedSession.pilot_metadata.captured_at).toLocaleString('en-US') : '-'}</strong></div>
+                  <div><span>Latency samples</span><strong>{selectedSession.latency_summary?.sample_count || 0}</strong></div>
+                  <div><span>Median first audio</span><strong>{selectedSession.latency_summary?.median_first_audio_ms ? `${selectedSession.latency_summary.median_first_audio_ms} ms` : '-'}</strong></div>
+                  <div><span>P95 first audio</span><strong>{selectedSession.latency_summary?.p95_first_audio_ms ? `${selectedSession.latency_summary.p95_first_audio_ms} ms` : '-'}</strong></div>
+                </div>
+                {(selectedSession.latency_metrics || []).length > 0 && (
+                  <div className="latency-trace-list">
+                    <h4>Conversation latency traces</h4>
+                    {(selectedSession.latency_metrics || []).map((trace, index) => (
+                      <div key={`${trace.turn_number || index}-${index}`} className="latency-trace-row">
+                        <strong>Turn {trace.turn_number || index + 1}</strong>
+                        <span>AI text: {trace.ai_text_received_ms || 0} ms</span>
+                        <span>First audio: {trace.first_audio_started_ms || 0} ms</span>
+                        <span>{trace.used_fallback ? 'Fallback used' : 'Primary response'}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!selectedSession.pilot_metadata && (
+                  <p className="empty-note">This session predates Phase 11 pilot evidence capture.</p>
+                )}
               </div>
             )}
           </div>

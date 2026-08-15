@@ -257,6 +257,8 @@ Decision rule:
 
 ## 9. Phase 11: Device Pilot and Client Acceptance
 
+**Implementation status (2026-08-15):** Engineering support, automated regression coverage, online smoke verification, pilot evidence capture, lecturer evidence display/export, split release APKs, and acceptance templates are complete. Physical two-device execution, printed-QR evidence, real-account ownership verification, and client sign-off remain external acceptance activities. See `PHASE11_ACCEPTANCE_MATRIX.json` and `PHASE11_DEVICE_AND_CLIENT_ACCEPTANCE.md`.
+
 ### Objective
 
 Validate the entire product in realistic student and lecturer conditions.

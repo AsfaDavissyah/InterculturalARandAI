@@ -134,8 +134,9 @@ class ConversationLatencyDraft {
   });
 
   ConversationLatencyTrace? complete(DateTime audioPlaybackStartedAt) {
-    if (completed || aiTextReceivedAt == null || ttsReadyAt == null)
+    if (completed || aiTextReceivedAt == null || ttsReadyAt == null) {
       return null;
+    }
     completed = true;
     return ConversationLatencyTrace(
       turnNumber: turnNumber,

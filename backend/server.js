@@ -1648,6 +1648,8 @@ function normalizePracticeSessionPayload(rawSession, userId) {
       : [],
     latencySummary:
       rawSession.latencySummary || rawSession.latency_summary || {},
+    pilotMetadata:
+      rawSession.pilotMetadata || rawSession.pilot_metadata || null,
   };
 }
 
@@ -1655,7 +1657,7 @@ function serializePracticeSession(session) {
   const data = typeof session.toObject === "function" ? session.toObject() : session;
 
   return {
-    schema_version: 2,
+    schema_version: 3,
     session_id: data.sessionId,
     student: data.student || {
       student_id: "local_student",
@@ -1692,6 +1694,42 @@ function serializePracticeSession(session) {
     coaching_events: data.coachingEvents || [],
     latency_metrics: data.latencyMetrics || [],
     latency_summary: data.latencySummary || {},
+    pilot_metadata: data.pilotMetadata || null,
+  };
+}
+
+function serializeLecturerSession(session) {
+  const data = typeof session.toObject === "function" ? session.toObject() : session;
+  return {
+    session_id: data.sessionId,
+    student_id: data.student?.student_id || "local_student",
+    student_name: data.student?.display_name || "Student",
+    scenario_id: data.scenario?.scenario_id,
+    scenario_title: data.scenario?.title,
+    scenario: data.scenario || {},
+    experience_type: data.experienceType || "legacy_scenario",
+    topic_id: data.topicId || null,
+    topic_title: data.topicTitle || null,
+    setting_id: data.settingId || null,
+    setting_title: data.settingTitle || null,
+    avatar_key: data.avatarKey || null,
+    launch_source: data.launchSource || "legacy",
+    module_id: data.moduleId || null,
+    unit_id: data.unitId || null,
+    page_id: data.pageId || null,
+    status: data.status,
+    end_reason: data.endReason || null,
+    overall_score: data.overallScore,
+    average_scores: data.averageScores || {},
+    duration_seconds: data.durationSeconds || 0,
+    student_response_count: data.studentResponseCount || 0,
+    completed_objective_ids: data.completedObjectiveIds || [],
+    completed_at: data.completedAt,
+    coaching_events: data.coachingEvents || [],
+    transcript: data.transcript || [],
+    latency_metrics: data.latencyMetrics || [],
+    latency_summary: data.latencySummary || {},
+    pilot_metadata: data.pilotMetadata || null,
   };
 }
 
@@ -3356,28 +3394,7 @@ app.get("/api/lecturer/sessions", authenticateJWT, requireRole(["admin", "lectur
     return res.json({
       success: true,
       count: sessions.length,
-      sessions: (sessions || []).map((s) => ({
-        session_id: s.sessionId,
-        student_id: s.student?.student_id || "local_student",
-        student_name: s.student?.display_name || "Student",
-        scenario_id: s.scenario?.scenario_id,
-        scenario_title: s.scenario?.title,
-        experience_type: s.experienceType || "legacy_scenario",
-        topic_id: s.topicId,
-        topic_title: s.topicTitle,
-        setting_id: s.settingId,
-        setting_title: s.settingTitle,
-        avatar_key: s.avatarKey,
-        launch_source: s.launchSource || "legacy",
-        status: s.status,
-        overall_score: s.overallScore,
-        average_scores: s.averageScores,
-        duration_seconds: s.durationSeconds,
-        student_response_count: s.studentResponseCount,
-        completed_at: s.completedAt,
-        coaching_events: s.coachingEvents || [],
-        transcript: s.transcript || [],
-      })),
+      sessions: (sessions || []).map(serializeLecturerSession),
     });
   } catch (err) {
     return res.status(500).json({ error: true, message: err.message });
@@ -3451,13 +3468,26 @@ app.get("/api/lecturer/export/csv", authenticateJWT, requireRole(["admin", "lect
       "student_id",
       "student_name",
       "experience_type",
+      "scenario_id",
       "topic_id",
       "setting_id",
+      "launch_source",
+      "module_id",
+      "unit_id",
+      "page_id",
       "overall_score",
       "duration_seconds",
       "student_response_count",
       "status",
       "completed_at",
+      "median_first_audio_ms",
+      "p95_first_audio_ms",
+      "device_label",
+      "platform",
+      "os_version",
+      "network_profile",
+      "install_type",
+      "app_build",
     ];
 
     const rows = [headers.join(",")];
@@ -3467,13 +3497,26 @@ app.get("/api/lecturer/export/csv", authenticateJWT, requireRole(["admin", "lect
         `"${s.student?.student_id || ""}"`,
         `"${(s.student?.display_name || "").replace(/"/g, '""')}"`,
         `"${s.experienceType || "legacy"}"`,
+        `"${s.scenario?.scenario_id || ""}"`,
         `"${s.topicId || ""}"`,
         `"${s.settingId || ""}"`,
+        `"${s.launchSource || "legacy"}"`,
+        `"${s.moduleId || ""}"`,
+        `"${s.unitId || ""}"`,
+        `"${s.pageId || ""}"`,
         s.overallScore || 0,
         s.durationSeconds || 0,
         s.studentResponseCount || 0,
         `"${s.status || ""}"`,
         `"${s.completedAt ? new Date(s.completedAt).toISOString() : ""}"`,
+        s.latencySummary?.median_first_audio_ms || 0,
+        s.latencySummary?.p95_first_audio_ms || 0,
+        `"${String(s.pilotMetadata?.device_label || "").replace(/"/g, '""')}"`,
+        `"${s.pilotMetadata?.platform || ""}"`,
+        `"${String(s.pilotMetadata?.os_version || "").replace(/"/g, '""')}"`,
+        `"${s.pilotMetadata?.network_profile || ""}"`,
+        `"${s.pilotMetadata?.install_type || ""}"`,
+        `"${s.pilotMetadata?.app_build || ""}"`,
       ].join(","));
     });
 
@@ -3502,6 +3545,7 @@ module.exports = {
   validateScenarioData,
   normalizePracticeSessionPayload,
   serializePracticeSession,
+  serializeLecturerSession,
   normalizeRuntimeContext,
   connectDatabase,
   validateSecurityConfig,

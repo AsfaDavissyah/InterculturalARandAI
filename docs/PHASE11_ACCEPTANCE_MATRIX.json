@@ -1,0 +1,32 @@
+{
+  "phase": 11,
+  "generated_at": "2026-08-15",
+  "status": "engineering_complete_external_acceptance_pending",
+  "summary": {
+    "automated_pass": 12,
+    "pending_external_evidence": 7,
+    "open_blocker": 0,
+    "open_high": 0
+  },
+  "requirements": [
+    { "id": "P11-STU-01", "requirement": "Session identity, scenario, transcript, score, duration, and attribution persist", "status": "automated_pass", "evidence": "mobile_beta/test/phase11_pilot_acceptance_test.dart; backend/test/phase11_pilot_acceptance.test.js" },
+    { "id": "P11-STU-02", "requirement": "Duplicate save does not create duplicate local history", "status": "automated_pass", "evidence": "phase11_pilot_acceptance_test.dart" },
+    { "id": "P11-STU-03", "requirement": "Three topics and six settings remain available", "status": "automated_pass", "evidence": "backend/scripts/phase11_smoke_test.js" },
+    { "id": "P11-STU-04", "requirement": "Ten legacy scenarios remain backward compatible", "status": "automated_pass", "evidence": "backend/scripts/phase11_smoke_test.js and Phase 5 tests" },
+    { "id": "P11-STU-05", "requirement": "Valid, invalid, inactive, and retry QR contracts are protected", "status": "automated_pass", "evidence": "backend/test/phase7_module_qr.test.js; mobile_beta/test/phase7_module_qr_test.dart" },
+    { "id": "P11-STU-06", "requirement": "Conversation response limits and natural/manual completion are protected", "status": "automated_pass", "evidence": "backend/test/session_flow.test.js" },
+    { "id": "P11-STU-07", "requirement": "Timeout, response fallback, and local visual/audio fallback paths exist", "status": "automated_pass", "evidence": "backend chat tests; mobile stabilization and Phase 10 tests" },
+    { "id": "P11-RES-01", "requirement": "Lecturer ownership prevents cross-roster access", "status": "automated_pass", "evidence": "backend/test/phase6_coaching_lecturer_test.js and phase9_security.test.js" },
+    { "id": "P11-RES-02", "requirement": "Lecturer record includes topic, setting, source, module, device, and latency evidence", "status": "automated_pass", "evidence": "backend/test/phase11_pilot_acceptance.test.js" },
+    { "id": "P11-RES-03", "requirement": "Research CSV includes consent-scoped attribution and pilot evidence columns", "status": "automated_pass", "evidence": "GET /api/lecturer/export/csv contract" },
+    { "id": "P11-RES-04", "requirement": "Archived scenario snapshots remain readable in historical sessions", "status": "automated_pass", "evidence": "backend/test/phase11_pilot_acceptance.test.js" },
+    { "id": "P11-OPS-01", "requirement": "CI runs backend, dashboard, and mobile verification before APK build", "status": "automated_pass", "evidence": ".github/workflows/build_apk.yml" },
+    { "id": "P11-EXT-01", "requirement": "Primary Android device full pass", "status": "pending_external_evidence", "owner": "research team" },
+    { "id": "P11-EXT-02", "requirement": "Second Android device with different size/version full pass", "status": "pending_external_evidence", "owner": "research team" },
+    { "id": "P11-EXT-03", "requirement": "Approved Wi-Fi, mobile data, and slower network observations", "status": "pending_external_evidence", "owner": "research team" },
+    { "id": "P11-EXT-04", "requirement": "Fresh install and update install observations", "status": "pending_external_evidence", "owner": "research team" },
+    { "id": "P11-EXT-05", "requirement": "Camera and microphone denial/recovery on physical Android", "status": "pending_external_evidence", "owner": "research team" },
+    { "id": "P11-EXT-06", "requirement": "Printed module QR end-to-end session", "status": "pending_external_evidence", "owner": "research team" },
+    { "id": "P11-EXT-07", "requirement": "Client approval and dated sign-off", "status": "pending_external_evidence", "owner": "client" }
+  ]
+}
