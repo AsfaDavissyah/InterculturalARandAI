@@ -52,7 +52,7 @@ jobs:
       - name: Install Dashboard Dependencies
         run: |
           cd dashboard
-          npm ci
+          npm ci --include=optional --legacy-peer-deps
 
       - name: Run Dashboard Tests
         run: |

@@ -3,6 +3,14 @@ import { cleanup } from '@testing-library/react';
 import { afterEach, beforeEach } from 'vitest';
 import { clearAuthSession } from '../lib/auth-session';
 
+class ResizeObserverMock {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+globalThis.ResizeObserver = ResizeObserverMock;
+
 beforeEach(() => {
   clearAuthSession();
   localStorage.clear();
