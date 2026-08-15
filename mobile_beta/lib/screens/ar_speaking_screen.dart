@@ -11,6 +11,7 @@ import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import '../models/ai_response.dart';
+import '../models/conversation_latency.dart';
 import '../models/guided_setting.dart';
 import '../models/practice_session.dart';
 import '../models/scenario_topic.dart';
@@ -84,6 +85,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   final FlutterTts _tts = FlutterTts();
   final List<ConversationMessage> _messages = [];
   final List<AiResponse> _evaluationResults = [];
+  final List<ConversationLatencyTrace> _latencyMetrics = [];
   final PracticeHistoryStore _historyStore = const PracticeHistoryStore();
   late final String _sessionId = PracticeSession.createSessionId();
   late final DateTime _sessionStartedAt = DateTime.now().toUtc();
@@ -115,6 +117,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   String? _sessionError;
   CoachingEvent? _activeCoachingEvent;
   Timer? _coachingTimer;
+  ConversationLatencyDraft? _activeLatencyDraft;
 
   @override
   void initState() {
@@ -134,6 +137,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       if (!mounted) return;
       setState(() {
         if (state == PlayerState.playing) {
+          _recordAudioPlaybackStart();
           _activity = AvatarActivity.speaking;
           if (_messages.isNotEmpty && _messages.last.speaker == 'AI') {
             _activeSubtitle = _messages.last;
@@ -150,6 +154,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     _positionSubscription = _audioPlayer.onPositionChanged.listen((position) {
       if (!mounted) return;
       if (_activity == AvatarActivity.loading && position > Duration.zero) {
+        _recordAudioPlaybackStart();
         setState(() {
           _activity = AvatarActivity.speaking;
           if (_messages.isNotEmpty && _messages.last.speaker == 'AI') {
@@ -303,6 +308,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
       _tts.setStartHandler(() {
         if (!mounted) return;
+        _recordAudioPlaybackStart();
         setState(() {
           _activity = AvatarActivity.speaking;
           if (_messages.isNotEmpty && _messages.last.speaker == 'AI') {
@@ -379,6 +385,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     try {
       final audioUrl = await (preparedAudioUrl ?? _requestNeuralAudioUrl(text));
       if (audioUrl != null && audioUrl.isNotEmpty && mounted) {
+        _markTtsReady('neural');
         await _audioPlayer.play(UrlSource(audioUrl));
         success = true;
       }
@@ -394,6 +401,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       });
       try {
         await _tts.stop();
+        _markTtsReady('local');
         await _tts.speak(text);
       } finally {
         if (mounted && !_sessionLoading && _sessionError == null) {
@@ -401,6 +409,28 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         }
       }
     }
+  }
+
+  void _markTtsReady(String source) {
+    final draft = _activeLatencyDraft;
+    if (draft == null || draft.completed) return;
+    draft
+      ..ttsReadyAt = DateTime.now().toUtc()
+      ..audioSource = source;
+  }
+
+  void _recordAudioPlaybackStart() {
+    final draft = _activeLatencyDraft;
+    if (draft == null) return;
+    final trace = draft.complete(DateTime.now().toUtc());
+    if (trace == null) return;
+    _latencyMetrics.add(trace);
+    _activeLatencyDraft = null;
+    debugPrint(
+      'Phase10 latency turn=${trace.turnNumber} '
+      'first_audio_ms=${trace.firstAudioLatencyMs} '
+      'ai_text_ms=${trace.aiTextLatencyMs} source=${trace.audioSource}',
+    );
   }
 
   Future<void> _toggleListening() async {
@@ -490,7 +520,9 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       final words = _recognizedWords.trim();
       if (words.isNotEmpty) {
         _submissionStarted = true;
-        unawaited(_submitResponse(words));
+        unawaited(
+          _submitResponse(words, speechFinalAt: DateTime.now().toUtc()),
+        );
       } else {
         setState(() => _activity = AvatarActivity.idle);
       }
@@ -527,12 +559,13 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       return;
     }
     _submissionStarted = true;
-    await _submitResponse(words);
+    await _submitResponse(words, speechFinalAt: DateTime.now().toUtc());
   }
 
   Future<void> _submitResponse(
     String text, {
     bool addStudentMessage = true,
+    DateTime? speechFinalAt,
   }) async {
     if (text.trim().isEmpty || _chatService == null || !mounted) return;
     _pulsingController.stop();
@@ -551,6 +584,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       }
       _activity = AvatarActivity.thinking;
     });
+    final thinkingVisibleAt = DateTime.now().toUtc();
 
     try {
       final historyMessages =
@@ -568,6 +602,13 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
           )
           .toList();
       final turnNumber = _studentResponseCount + 1;
+      final chatRequestStartedAt = DateTime.now().toUtc();
+      _activeLatencyDraft = ConversationLatencyDraft(
+        turnNumber: turnNumber,
+        speechFinalAt: (speechFinalAt ?? thinkingVisibleAt).toUtc(),
+        thinkingVisibleAt: thinkingVisibleAt,
+        chatRequestStartedAt: chatRequestStartedAt,
+      );
       final result = await _chatService!.respondTurn(
         sessionId: _sessionId,
         scenarioId: widget.scenario.id,
@@ -579,6 +620,10 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         studentDisplayName: _profile?.name,
         studentId: _profile?.studentId,
       );
+      final aiTextReceivedAt = DateTime.now().toUtc();
+      if (_activeLatencyDraft?.turnNumber == turnNumber) {
+        _activeLatencyDraft!.aiTextReceivedAt = aiTextReceivedAt;
+      }
 
       if (!mounted) return;
       setState(() {
@@ -613,7 +658,13 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
             label: 'Retry',
             onPressed: () {
               _submissionStarted = true;
-              unawaited(_submitResponse(text, addStudentMessage: false));
+              unawaited(
+                _submitResponse(
+                  text,
+                  addStudentMessage: false,
+                  speechFinalAt: DateTime.now().toUtc(),
+                ),
+              );
             },
           ),
         ),
@@ -719,6 +770,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       moduleId: widget.moduleId,
       unitId: widget.unitId,
       pageId: widget.pageId,
+      latencyMetrics: List.unmodifiable(_latencyMetrics),
     );
     await _historyStore.saveSession(session);
     if (!mounted) return;
@@ -730,6 +782,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
           finalResponse: _lastResponse!,
           evaluationResults: _evaluationResults,
           conversationHistory: history,
+          latencyMetrics: List.unmodifiable(_latencyMetrics),
         ),
       ),
     );

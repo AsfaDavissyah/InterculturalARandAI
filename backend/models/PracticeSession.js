@@ -133,6 +133,14 @@ const PracticeSessionSchema = new mongoose.Schema({
     type: [mongoose.Schema.Types.Mixed],
     default: [],
   },
+  latencyMetrics: {
+    type: [mongoose.Schema.Types.Mixed],
+    default: [],
+  },
+  latencySummary: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {},
+  },
 });
 
 module.exports = mongoose.model("PracticeSession", PracticeSessionSchema);

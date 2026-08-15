@@ -485,6 +485,19 @@ test("guided session metadata survives history normalization and serialization",
           hint: "Use a formal academic greeting.",
         },
       ],
+      latency_metrics: [
+        {
+          turn_number: 1,
+          thinking_delay_ms: 80,
+          first_audio_latency_ms: 1850,
+          audio_source: "neural",
+        },
+      ],
+      latency_summary: {
+        sample_count: 1,
+        median_first_audio_ms: 1850,
+        p95_first_audio_ms: 1850,
+      },
       completed_at: "2026-08-04T02:00:00.000Z",
       overall_score: 4.2,
     },
@@ -497,6 +510,8 @@ test("guided session metadata survives history normalization and serialization",
   assert.equal(normalized.avatarKey, "female_lecturer_v1");
   assert.equal(normalized.launchSource, "module_qr");
   assert.equal(normalized.coachingEvents.length, 1);
+  assert.equal(normalized.latencyMetrics.length, 1);
+  assert.equal(normalized.latencySummary.median_first_audio_ms, 1850);
 
   const PracticeSession = require("../models/PracticeSession");
   const sessionDocument = new PracticeSession(normalized);
@@ -517,6 +532,9 @@ test("guided session metadata survives history normalization and serialization",
   assert.equal(serialized.unit_id, "unit_01");
   assert.equal(serialized.page_id, "page_12");
   assert.equal(serialized.coaching_events.length, 1);
+  assert.equal(serialized.latency_metrics.length, 1);
+  assert.equal(serialized.latency_metrics[0].first_audio_latency_ms, 1850);
+  assert.equal(serialized.latency_summary.p95_first_audio_ms, 1850);
   assert.equal(
     serialized.coaching_events[0].hint,
     "Use a formal academic greeting."

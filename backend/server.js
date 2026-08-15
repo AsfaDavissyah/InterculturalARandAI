@@ -1641,6 +1641,13 @@ function normalizePracticeSessionPayload(rawSession, userId) {
     )
       ? rawSession.coachingEvents || rawSession.coaching_events
       : [],
+    latencyMetrics: Array.isArray(
+      rawSession.latencyMetrics || rawSession.latency_metrics
+    )
+      ? rawSession.latencyMetrics || rawSession.latency_metrics
+      : [],
+    latencySummary:
+      rawSession.latencySummary || rawSession.latency_summary || {},
   };
 }
 
@@ -1648,7 +1655,7 @@ function serializePracticeSession(session) {
   const data = typeof session.toObject === "function" ? session.toObject() : session;
 
   return {
-    schema_version: 1,
+    schema_version: 2,
     session_id: data.sessionId,
     student: data.student || {
       student_id: "local_student",
@@ -1683,6 +1690,8 @@ function serializePracticeSession(session) {
     unit_id: data.unitId || null,
     page_id: data.pageId || null,
     coaching_events: data.coachingEvents || [],
+    latency_metrics: data.latencyMetrics || [],
+    latency_summary: data.latencySummary || {},
   };
 }
 

@@ -131,19 +131,20 @@ jobs:
           cd mobile_beta
           flutter pub get
 
-      - name: Build Release APK
+      - name: Build Split Release APKs
         run: |
           cd mobile_beta
-          flutter build apk --release --dart-define=API_BASE_URL=https://interculturalarandai-production.up.railway.app
+          flutter build apk --release --split-per-abi --dart-define=API_BASE_URL=https://interculturalarandai-production.up.railway.app
 
       - name: Record Build Metadata
         shell: bash
         run: |
-          printf 'commit_sha=%s\nworkflow_run=%s\nbuild_time_utc=%s\napi_base_url=%s\n' \
+          printf 'commit_sha=%s\nworkflow_run=%s\nbuild_time_utc=%s\napi_base_url=%s\nbuild_mode=%s\n' \
             '${{ github.sha }}' \
             '${{ github.run_id }}' \
             "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
             'https://interculturalarandai-production.up.railway.app' \
+            'release-split-per-abi' \
             > mobile_beta/build/app/outputs/flutter-apk/build-metadata.txt
 
       - name: Upload APK Artifact
@@ -151,5 +152,7 @@ jobs:
         with:
           name: intercultural-ai-app-release-${{ github.sha }}
           path: |
-            mobile_beta/build/app/outputs/flutter-apk/app-release.apk
+            mobile_beta/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            mobile_beta/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            mobile_beta/build/app/outputs/flutter-apk/app-x86_64-release.apk
             mobile_beta/build/app/outputs/flutter-apk/build-metadata.txt

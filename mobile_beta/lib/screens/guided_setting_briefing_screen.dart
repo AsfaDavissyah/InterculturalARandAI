@@ -8,6 +8,7 @@ import '../models/scenario_topic.dart';
 import '../services/app_settings.dart';
 import '../services/chat_service.dart';
 import '../services/page_transitions.dart';
+import '../widgets/setting_visual.dart';
 import 'ar_speaking_screen.dart';
 
 class GuidedSettingBriefingScreen extends StatelessWidget {
@@ -196,6 +197,13 @@ class GuidedSettingBriefingScreen extends StatelessWidget {
                           ),
                         ),
                       ],
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    SettingVisual(
+                      stickerKey: setting.stickerAssetKey,
+                      label: setting.location,
                     ),
 
                     const SizedBox(height: 20),

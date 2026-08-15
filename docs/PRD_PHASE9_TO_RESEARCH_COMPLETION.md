@@ -146,6 +146,8 @@ CI must not contain production OpenAI, MongoDB, JWT, or signing secrets unless a
 
 ## 8. Phase 10: Experience and Asset Finishing
 
+> Scope amendment (2026-08-15): facial animation is excluded by product decision. Final 2D stickers are deferred as finishing assets; keyed nonblank fallbacks are accepted for Phase 10 closure. See `PHASE10_EXPERIENCE_AND_ASSET_CLOSURE.md`.
+
 ### Objective
 
 Finish the visible learner experience without changing the completed conversation architecture.
@@ -439,4 +441,3 @@ The project is complete for research when:
 7. Research data access, consent, ownership, backup, and rollback are verified.
 8. Documentation and credential ownership are handed over.
 9. The client signs the research release acceptance record.
-

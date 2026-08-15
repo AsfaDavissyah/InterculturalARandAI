@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/ai_response.dart';
+import '../models/conversation_latency.dart';
 import '../models/scenario_topic.dart';
 
 class ResultScreen extends StatelessWidget {
@@ -8,6 +9,7 @@ class ResultScreen extends StatelessWidget {
   final AiResponse finalResponse;
   final List<AiResponse> evaluationResults;
   final List<Map<String, String>> conversationHistory;
+  final List<ConversationLatencyTrace> latencyMetrics;
 
   const ResultScreen({
     super.key,
@@ -15,6 +17,7 @@ class ResultScreen extends StatelessWidget {
     required this.finalResponse,
     required this.evaluationResults,
     required this.conversationHistory,
+    this.latencyMetrics = const [],
   });
 
   static const Color _cream = Color(0xFFFFFCF4);
@@ -173,7 +176,11 @@ class ResultScreen extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.lightbulb_rounded, color: _orange, size: 20),
+                    const Icon(
+                      Icons.lightbulb_rounded,
+                      color: _orange,
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -302,7 +309,8 @@ class ResultScreen extends StatelessWidget {
     for (int i = 0; i < conversationHistory.length; i++) {
       final item = conversationHistory[i];
       if (item['speaker'] == 'Student') {
-        final precedingAi = (i > 0 && conversationHistory[i - 1]['speaker'] == 'AI')
+        final precedingAi =
+            (i > 0 && conversationHistory[i - 1]['speaker'] == 'AI')
             ? conversationHistory[i - 1]['message']
             : null;
         studentExchanges.add({
@@ -376,7 +384,10 @@ class ResultScreen extends StatelessWidget {
             children: [
               // Round Header
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 10,
+                ),
                 decoration: const BoxDecoration(
                   color: Color(0xFFF8F5EE),
                   borderRadius: BorderRadius.only(
@@ -395,7 +406,8 @@ class ResultScreen extends StatelessWidget {
                         fontSize: 13,
                       ),
                     ),
-                    if (eval != null) _buildCategoryBadge(eval.detectedCategory),
+                    if (eval != null)
+                      _buildCategoryBadge(eval.detectedCategory),
                   ],
                 ),
               ),
@@ -405,7 +417,8 @@ class ResultScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // AI Message
-                    if (exchange['ai'] != null && exchange['ai']!.isNotEmpty) ...[
+                    if (exchange['ai'] != null &&
+                        exchange['ai']!.isNotEmpty) ...[
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -701,6 +714,18 @@ class ResultScreen extends StatelessWidget {
                     'Remaining: ${remainingObjectives.map(_objectiveLabel).join(', ')}',
                 ].join('\n'),
               ),
+
+              if (latencyMetrics.isNotEmpty) ...[
+                _sectionTitle('Response Timing'),
+                _infoBox(() {
+                  final summary = ConversationLatencySummary.fromTraces(
+                    latencyMetrics,
+                  );
+                  return 'Measured turns: ${summary.sampleCount}\n'
+                      'Median response audio: ${(summary.medianFirstAudioMs / 1000).toStringAsFixed(2)} s\n'
+                      'P95 response audio: ${(summary.p95FirstAudioMs / 1000).toStringAsFixed(2)} s';
+                }()),
+              ],
 
               _sectionTitle('Scores'),
               _scoreItem('Grammar', _averageFor('grammar')),

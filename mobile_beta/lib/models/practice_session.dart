@@ -1,10 +1,11 @@
 import 'dart:math';
 
 import 'ai_response.dart';
+import 'conversation_latency.dart';
 import 'scenario_topic.dart';
 
 class PracticeSession {
-  static const schemaVersion = 1;
+  static const schemaVersion = 2;
   static const scoreKeys = [
     'grammar',
     'vocabulary',
@@ -39,6 +40,7 @@ class PracticeSession {
   final String? moduleId;
   final String? unitId;
   final String? pageId;
+  final List<ConversationLatencyTrace> latencyMetrics;
 
   const PracticeSession({
     required this.sessionId,
@@ -66,6 +68,7 @@ class PracticeSession {
     this.moduleId,
     this.unitId,
     this.pageId,
+    this.latencyMetrics = const [],
   });
 
   static String createSessionId({DateTime? now, Random? random}) {
@@ -93,6 +96,7 @@ class PracticeSession {
     String? moduleId,
     String? unitId,
     String? pageId,
+    List<ConversationLatencyTrace> latencyMetrics = const [],
   }) {
     final averages = <String, double>{};
     for (final key in scoreKeys) {
@@ -136,6 +140,7 @@ class PracticeSession {
       moduleId: moduleId,
       unitId: unitId,
       pageId: pageId,
+      latencyMetrics: List.unmodifiable(latencyMetrics),
     );
   }
 
@@ -181,6 +186,13 @@ class PracticeSession {
       moduleId: json['module_id'] as String?,
       unitId: json['unit_id'] as String?,
       pageId: json['page_id'] as String?,
+      latencyMetrics: (json['latency_metrics'] as List<dynamic>? ?? const [])
+          .map(
+            (item) => ConversationLatencyTrace.fromJson(
+              Map<String, dynamic>.from(item as Map),
+            ),
+          )
+          .toList(),
     );
   }
 
@@ -210,6 +222,10 @@ class PracticeSession {
     if (moduleId != null) 'module_id': moduleId,
     if (unitId != null) 'unit_id': unitId,
     if (pageId != null) 'page_id': pageId,
+    'latency_metrics': latencyMetrics.map((item) => item.toJson()).toList(),
+    'latency_summary': ConversationLatencySummary.fromTraces(
+      latencyMetrics,
+    ).toJson(),
   };
 
   Map<String, dynamic> toDashboardRecord() => {
@@ -240,5 +256,9 @@ class PracticeSession {
     if (moduleId != null) 'module_id': moduleId,
     if (unitId != null) 'unit_id': unitId,
     if (pageId != null) 'page_id': pageId,
+    'latency_metrics': latencyMetrics.map((item) => item.toJson()).toList(),
+    'latency_summary': ConversationLatencySummary.fromTraces(
+      latencyMetrics,
+    ).toJson(),
   };
 }
