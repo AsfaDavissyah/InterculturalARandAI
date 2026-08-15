@@ -1,8 +1,16 @@
 const OpenAI = require("openai");
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+let client = null;
+
+function getOpenAIClient() {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY is required when OpenAI evaluation is enabled.");
+  }
+  if (!client) {
+    client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return client;
+}
 
 function buildLearnerPrompt(learnerProfile = {}) {
   const displayName = String(learnerProfile.displayName || "").trim();
@@ -302,7 +310,7 @@ async function generateChatResponseWithOpenAI({
     learnerProfile
   );
 
-  const response = await client.responses.create({
+  const response = await getOpenAIClient().responses.create({
     model,
     input: [
       {
@@ -406,7 +414,7 @@ Do not include "For example" or a model sentence in ai_message.
 Return only valid JSON using the required output format.
 `;
 
-  const response = await client.responses.create({
+  const response = await getOpenAIClient().responses.create({
     model,
     input: [
       {

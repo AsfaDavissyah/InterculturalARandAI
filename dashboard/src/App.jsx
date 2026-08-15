@@ -1222,8 +1222,15 @@ export default function App() {
   };
 
   const exportHistoryToCSV = () => {
-    const exportRows = filteredHistory.length ? filteredHistory : history;
-    if (!exportRows.length) return alert('Tidak ada data riwayat untuk diekspor.');
+    const candidateRows = filteredHistory.length ? filteredHistory : history;
+    const exportRows = candidateRows.filter((item) => item.student_details?.consent === true);
+    const excludedRows = candidateRows.length - exportRows.length;
+    if (!exportRows.length) {
+      return toast.error('Tidak ada data mahasiswa ber-consent untuk diekspor.');
+    }
+    if (excludedRows > 0) {
+      toast.warning(`${excludedRows} sesi tanpa consent tidak disertakan dalam ekspor.`);
+    }
     const headers = ['NIM', 'Nama', 'Consent', 'Scenario ID', 'Judul', 'Selesai', 'Durasi', 'Respons', 'Status', 'Skor', ...Object.values(scoreLabels)];
     const rows = exportRows.map((item) => [
       item.student_details?.student_id || '',

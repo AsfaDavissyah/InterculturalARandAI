@@ -1,14 +1,77 @@
-name: Build Release APK
+name: Delivery Pipeline & Build Release APK
+
+permissions:
+  contents: read
 
 on:
   push:
     branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
-  build:
+  backend-quality:
+    name: Backend Tests
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'backend/package-lock.json'
+
+      - name: Install Backend Dependencies
+        run: |
+          cd backend
+          npm ci
+
+      - name: Run Backend Tests
+        run: |
+          cd backend
+          npm test
+
+  dashboard-quality:
+    name: Dashboard Tests, Lint & Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'dashboard/package-lock.json'
+
+      - name: Install Dashboard Dependencies
+        run: |
+          cd dashboard
+          npm ci
+
+      - name: Run Dashboard Tests
+        run: |
+          cd dashboard
+          npm test
+
+      - name: Run Dashboard Lint
+        run: |
+          cd dashboard
+          npm run lint
+
+      - name: Build Dashboard Production Bundle
+        run: |
+          cd dashboard
+          npm run build
+
+  mobile-quality:
+    name: Mobile Analysis & Tests
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -25,7 +88,43 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Install Dependencies
+      - name: Install Mobile Dependencies
+        run: |
+          cd mobile_beta
+          flutter pub get
+
+      - name: Run Flutter Static Analysis
+        run: |
+          cd mobile_beta
+          flutter analyze
+
+      - name: Run Flutter Tests
+        run: |
+          cd mobile_beta
+          flutter test
+
+  build-release-apk:
+    name: Build & Package Android APK
+    needs: [backend-quality, dashboard-quality, mobile-quality]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Mobile Dependencies
         run: |
           cd mobile_beta
           flutter pub get
@@ -35,8 +134,20 @@ jobs:
           cd mobile_beta
           flutter build apk --release --dart-define=API_BASE_URL=https://interculturalarandai-production.up.railway.app
 
+      - name: Record Build Metadata
+        shell: bash
+        run: |
+          printf 'commit_sha=%s\nworkflow_run=%s\nbuild_time_utc=%s\napi_base_url=%s\n' \
+            '${{ github.sha }}' \
+            '${{ github.run_id }}' \
+            "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            'https://interculturalarandai-production.up.railway.app' \
+            > mobile_beta/build/app/outputs/flutter-apk/build-metadata.txt
+
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: intercultural-ai-app-release.apk
-          path: mobile_beta/build/app/outputs/flutter-apk/app-release.apk
+          name: intercultural-ai-app-release-${{ github.sha }}
+          path: |
+            mobile_beta/build/app/outputs/flutter-apk/app-release.apk
+            mobile_beta/build/app/outputs/flutter-apk/build-metadata.txt

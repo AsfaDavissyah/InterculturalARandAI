@@ -48,7 +48,7 @@ function leanResult(value) {
   return { lean: async () => value };
 }
 
-const secret = process.env.JWT_SECRET || "intercultural_ai_secret_key_2026";
+const secret = process.env.JWT_SECRET || "intercultural_ai_dev_secret_key_2026_at_least_32_bytes";
 const adminToken = jwt.sign(
   { userId: "507f1f77bcf86cd799439011", email: "admin@icc.com", role: "admin" },
   secret

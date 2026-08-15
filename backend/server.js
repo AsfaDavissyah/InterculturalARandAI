@@ -31,26 +31,98 @@ const {
 } = require("./services/guided_scenario_service");
 
 const MONGODB_URI = process.env.MONGODB_URI;
-const JWT_SECRET = process.env.JWT_SECRET || "intercultural_ai_secret_key_2026";
 
-async function seedAdmin() {
+function validateSecurityConfig({
+  nodeEnv = process.env.NODE_ENV || "development",
+  jwtSecret = process.env.JWT_SECRET,
+  corsOrigin = process.env.CORS_ORIGIN,
+} = {}) {
+  const isProd = nodeEnv === "production";
+
+  if (isProd) {
+    if (!jwtSecret || typeof jwtSecret !== "string" || jwtSecret.trim().length < 32) {
+      throw new Error(
+        "[Security] JWT_SECRET must be defined and at least 32 characters in production mode."
+      );
+    }
+    const origins = (corsOrigin || "")
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean);
+    if (origins.length === 0) {
+      throw new Error(
+        "[Security] CORS_ORIGIN must be configured with approved origin(s) in production mode."
+      );
+    }
+    return {
+      isValid: true,
+      jwtSecret: jwtSecret.trim(),
+      allowedOrigins: origins,
+      isProduction: true,
+    };
+  }
+
+  const fallbackSecret =
+    jwtSecret && typeof jwtSecret === "string" && jwtSecret.trim().length > 0
+      ? jwtSecret.trim()
+      : "intercultural_ai_dev_secret_key_2026_at_least_32_bytes";
+  const origins = (corsOrigin || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  return {
+    isValid: true,
+    jwtSecret: fallbackSecret,
+    allowedOrigins: origins,
+    isProduction: false,
+  };
+}
+
+const securityConfig = validateSecurityConfig({
+  nodeEnv: process.env.NODE_ENV || "development",
+  jwtSecret: process.env.JWT_SECRET,
+  corsOrigin: process.env.CORS_ORIGIN,
+});
+
+const JWT_SECRET = securityConfig.jwtSecret;
+
+async function bootstrapAdmin() {
   try {
     const adminExists = await User.findOne({ role: "admin" });
     if (adminExists) {
-      console.log("Admin account already exists. Skipping seed.");
-      return;
+      console.log("[Bootstrap] Admin account already exists. Skipping bootstrap.");
+      return { bootstrapped: false, reason: "already_exists" };
     }
+
+    const isEnabled = process.env.ADMIN_BOOTSTRAP_ENABLED === "true";
+    if (!isEnabled) {
+      console.log("[Bootstrap] Admin bootstrap is disabled (ADMIN_BOOTSTRAP_ENABLED !== 'true'). No default admin created.");
+      return { bootstrapped: false, reason: "disabled" };
+    }
+
+    const email = (process.env.ADMIN_BOOTSTRAP_EMAIL || "").trim().toLowerCase();
+    const password = process.env.ADMIN_BOOTSTRAP_PASSWORD || "";
+    const name = (process.env.ADMIN_BOOTSTRAP_NAME || "System Admin").trim();
+
+    if (!email || !password || password.length < 8) {
+      console.warn("[Bootstrap] ADMIN_BOOTSTRAP_EMAIL or ADMIN_BOOTSTRAP_PASSWORD is missing or password < 8 chars. Skipping bootstrap.");
+      return { bootstrapped: false, reason: "invalid_credentials" };
+    }
+
     const admin = new User({
-      name: "System Admin",
-      email: "admin@icc.com",
-      password: "Admin123!",
+      name,
+      email,
+      password,
       gender: "male",
       role: "admin",
     });
     await admin.save();
-    console.log("Default admin account created successfully: admin@icc.com / Admin123!");
+    console.log(`[Bootstrap] Admin account bootstrapped successfully for: ${email}`);
+    return { bootstrapped: true, email };
   } catch (err) {
-    console.error("Error seeding admin account:", err);
+    console.error("[Bootstrap] Error bootstrapping admin account:", err.message);
+    return { bootstrapped: false, error: err.message };
   }
 }
 
@@ -93,7 +165,7 @@ async function connectDatabase() {
   try {
     await mongoose.connect(MONGODB_URI);
     console.log("Connected to MongoDB Atlas successfully.");
-    await seedAdmin();
+    await bootstrapAdmin();
     await seedScenarios();
     await seedTopicsAndSettings();
   } catch (err) {
@@ -132,10 +204,13 @@ const allowedOrigins = (process.env.CORS_ORIGIN || "")
 app.use(
   cors({
     origin(origin, callback) {
-      if (!isProduction || !origin || allowedOrigins.length === 0) {
+      if (!origin) {
         return callback(null, true);
       }
-      if (allowedOrigins.includes(origin)) {
+      if (!isProduction) {
+        return callback(null, true);
+      }
+      if (allowedOrigins.length > 0 && allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
       return callback(new Error("Not allowed by CORS"));
@@ -1443,6 +1518,66 @@ function requireRole(allowedRoles = []) {
   };
 }
 
+async function resolveLecturerRoster(
+  requestUser,
+  { consentOnly = false, forceLookup = false } = {}
+) {
+  const isAdmin = requestUser?.role === "admin";
+  if (isAdmin && !consentOnly && !forceLookup) {
+    return { isAdmin: true, lecturerCode: null, students: [] };
+  }
+
+  if (mongoose.connection.readyState !== 1 && !forceLookup) {
+    return {
+      isAdmin,
+      lecturerCode: requestUser?.lecturerCode || null,
+      students: [],
+    };
+  }
+
+  let lecturerCode = null;
+  if (!isAdmin) {
+    const lecturer = await User.findById(requestUser?.userId);
+    lecturerCode = lecturer?.lecturerCode || requestUser?.lecturerCode || null;
+    if (!lecturerCode) {
+      const error = new Error("Lecturer profile is incomplete.");
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
+  const filter = {
+    role: "student",
+    ...(isAdmin ? {} : { studentLecturerCode: lecturerCode }),
+    ...(consentOnly ? { consent: true } : {}),
+  };
+  const students = await User.find(filter).sort({ name: 1 });
+
+  return { isAdmin, lecturerCode, students };
+}
+
+function buildLecturerOwnershipFilter(scope) {
+  if (scope?.isAdmin && !scope?.students?.length) return null;
+
+  const userIds = (scope?.students || []).map((student) => student._id).filter(Boolean);
+  const studentIds = (scope?.students || [])
+    .map((student) => student.studentId)
+    .filter(Boolean);
+
+  return {
+    $or: [
+      { userId: { $in: userIds } },
+      { "student.student_id": { $in: studentIds } },
+    ],
+  };
+}
+
+function combineSessionFilters(ownershipFilter, requestedFilter = {}) {
+  if (!ownershipFilter) return requestedFilter;
+  if (Object.keys(requestedFilter).length === 0) return ownershipFilter;
+  return { $and: [ownershipFilter, requestedFilter] };
+}
+
 function normalizePracticeSessionPayload(rawSession, userId) {
   const student = rawSession.student || {};
   const scenario = rawSession.scenario || {};
@@ -1577,18 +1712,16 @@ app.use("/api/openai", openAILimiter);
 
 app.get("/api/analytics/summary", authenticateJWT, requireRole(["admin", "lecturer"]), async (req, res) => {
   try {
-    let studentQuery = { role: "student" };
-    let sessionQuery = {};
-
-    if (req.user.role === "lecturer") {
-      studentQuery.studentLecturerCode = req.user.lecturerCode;
-      const linkedStudents = await User.find(studentQuery).select("_id");
-      const studentUserIds = linkedStudents.map(s => s._id);
-      sessionQuery.userId = { $in: studentUserIds };
-    }
+    const isLecturer = req.user.role === "lecturer";
+    const scope = isLecturer
+      ? await resolveLecturerRoster(req.user, { forceLookup: true })
+      : null;
+    const sessionQuery = isLecturer
+      ? combineSessionFilters(buildLecturerOwnershipFilter(scope))
+      : {};
 
     const [totalStudents, sessions] = await Promise.all([
-      User.countDocuments(studentQuery),
+      isLecturer ? scope.students.length : User.countDocuments({ role: "student" }),
       PracticeSession.find(sessionQuery).lean(),
     ]);
 
@@ -1622,11 +1755,12 @@ app.get("/api/analytics/summary", authenticateJWT, requireRole(["admin", "lectur
 
 app.get("/api/analytics/longitudinal", authenticateJWT, requireRole(["admin", "lecturer"]), async (req, res) => {
   try {
-    let sessionQuery = {};
-    if (req.user.role === "lecturer") {
-      const linkedStudents = await User.find({ role: "student", studentLecturerCode: req.user.lecturerCode }).select("_id");
-      sessionQuery.userId = { $in: linkedStudents.map(s => s._id) };
-    }
+    const scope = req.user.role === "lecturer"
+      ? await resolveLecturerRoster(req.user, { forceLookup: true })
+      : null;
+    const sessionQuery = scope
+      ? combineSessionFilters(buildLecturerOwnershipFilter(scope))
+      : {};
 
     const sessions = await PracticeSession.find(sessionQuery)
       .populate("userId", "name studentId email")
@@ -1956,18 +2090,11 @@ app.get("/api/settings/:setting_id", async (req, res) => {
   }
 });
 
-app.get("/api/lecturer/students", authenticateJWT, requireRole(["lecturer"]), async (req, res) => {
+app.get("/api/lecturer/students", authenticateJWT, requireRole(["admin", "lecturer"]), async (req, res) => {
   try {
-    const lecturer = await User.findById(req.user.userId);
-    if (!lecturer || !lecturer.lecturerCode) {
-      return res.status(400).json({ error: "Lecturer profile is incomplete." });
-    }
-    const students = await User.find({
-      role: "student",
-      studentLecturerCode: lecturer.lecturerCode
-    }).sort({ name: 1 });
+    const scope = await resolveLecturerRoster(req.user, { forceLookup: true });
 
-    res.json(students.map(s => ({
+    res.json(scope.students.map(s => ({
       id: s._id,
       name: s.name,
       email: s.email,
@@ -1978,7 +2105,7 @@ app.get("/api/lecturer/students", authenticateJWT, requireRole(["lecturer"]), as
       createdAt: s.createdAt
     })));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.statusCode || 500).json({ error: err.message });
   }
 });
 
@@ -3176,53 +3303,39 @@ app.post("/api/tts", async (req, res) => {
 
 // --- Lecturer Research Endpoints ---
 
-app.get("/api/lecturer/students", authenticateJWT, requireRole(["admin", "lecturer"]), async (req, res) => {
-  try {
-    let filter = { role: "student" };
-    if (req.user.role === "lecturer" && req.user.lecturerCode) {
-      filter.studentLecturerCode = req.user.lecturerCode;
-    }
-
-    let students = [];
-    if (mongoose.connection.readyState === 1) {
-      try {
-        students = await User.find(filter, "-password").sort({ name: 1 }).lean();
-      } catch (_) {}
-    }
-
-    return res.json({
-      success: true,
-      students: (students || []).map((s) => ({
-        user_id: s._id,
-        name: s.name,
-        email: s.email,
-        student_id: s.studentId,
-        student_lecturer_code: s.studentLecturerCode,
-        consent: Boolean(s.consent),
-        created_at: s.createdAt,
-      })),
-    });
-  } catch (err) {
-    return res.status(500).json({ error: true, message: err.message });
-  }
-});
-
 app.get("/api/lecturer/sessions", authenticateJWT, requireRole(["admin", "lecturer"]), async (req, res) => {
   try {
     const { student_id, startDate, endDate, topic_id, setting_id, status, launch_source } = req.query;
 
-    const query = {};
-    if (student_id) query["student.student_id"] = student_id;
-    if (topic_id) query.topicId = topic_id;
-    if (setting_id) query.settingId = setting_id;
-    if (status) query.status = status;
-    if (launch_source) query.launchSource = launch_source;
+    const scope = await resolveLecturerRoster(req.user);
+    const requestedFilter = {};
+    if (student_id) {
+      const ownsStudent = scope.isAdmin || scope.students.some(
+        (student) => String(student._id) === String(student_id) || student.studentId === student_id
+      );
+      if (!ownsStudent) {
+        return res.status(403).json({ error: true, message: "Student is not linked to this lecturer." });
+      }
+      requestedFilter.$or = [
+        { userId: student_id },
+        { "student.student_id": student_id },
+      ];
+    }
+    if (topic_id) requestedFilter.topicId = topic_id;
+    if (setting_id) requestedFilter.settingId = setting_id;
+    if (status) requestedFilter.status = status;
+    if (launch_source) requestedFilter.launchSource = launch_source;
 
     if (startDate || endDate) {
-      query.completedAt = {};
-      if (startDate) query.completedAt.$gte = new Date(startDate);
-      if (endDate) query.completedAt.$lte = new Date(endDate);
+      requestedFilter.completedAt = {};
+      if (startDate) requestedFilter.completedAt.$gte = new Date(startDate);
+      if (endDate) requestedFilter.completedAt.$lte = new Date(endDate);
     }
+
+    const query = combineSessionFilters(
+      buildLecturerOwnershipFilter(scope),
+      requestedFilter
+    );
 
     let sessions = [];
     if (mongoose.connection.readyState === 1) {
@@ -3264,10 +3377,12 @@ app.get("/api/lecturer/sessions", authenticateJWT, requireRole(["admin", "lectur
 
 app.get("/api/lecturer/analytics", authenticateJWT, requireRole(["admin", "lecturer"]), async (req, res) => {
   try {
+    const scope = await resolveLecturerRoster(req.user);
+    const query = combineSessionFilters(buildLecturerOwnershipFilter(scope));
     let sessions = [];
     if (mongoose.connection.readyState === 1) {
       try {
-        sessions = await PracticeSession.find().lean();
+        sessions = await PracticeSession.find(query).lean();
       } catch (_) {}
     }
 
@@ -3313,10 +3428,12 @@ app.get("/api/lecturer/analytics", authenticateJWT, requireRole(["admin", "lectu
 
 app.get("/api/lecturer/export/csv", authenticateJWT, requireRole(["admin", "lecturer"]), async (req, res) => {
   try {
+    const scope = await resolveLecturerRoster(req.user, { consentOnly: true });
+    const query = combineSessionFilters(buildLecturerOwnershipFilter(scope));
     let sessions = [];
     if (mongoose.connection.readyState === 1) {
       try {
-        sessions = await PracticeSession.find().lean();
+        sessions = await PracticeSession.find(query).lean();
       } catch (_) {}
     }
 
@@ -3378,6 +3495,10 @@ module.exports = {
   serializePracticeSession,
   normalizeRuntimeContext,
   connectDatabase,
+  validateSecurityConfig,
+  bootstrapAdmin,
+  buildLecturerOwnershipFilter,
+  combineSessionFilters,
   Topic,
   Setting,
 };

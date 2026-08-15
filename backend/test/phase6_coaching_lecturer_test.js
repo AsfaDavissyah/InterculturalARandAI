@@ -53,7 +53,7 @@ function request(app, method, path, body = null, headers = {}) {
 
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
-const JWT_SECRET = process.env.JWT_SECRET || "intercultural_ai_secret_key_2026";
+const JWT_SECRET = process.env.JWT_SECRET || "intercultural_ai_dev_secret_key_2026_at_least_32_bytes";
 const lecturerToken = jwt.sign(
   { userId: "507f1f77bcf86cd799439011", email: "lecturer@icc.com", role: "lecturer", lecturerCode: "LEC-101" },
   JWT_SECRET
