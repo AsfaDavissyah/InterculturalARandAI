@@ -12,9 +12,14 @@ class AvatarRegistry {
     'barista_v1': olivia,
     'hr_manager_v1': hr,
     'dr_emma': drEmma,
+    'emma': drEmma,
     'sarah_bennett': sarah,
+    'sarah': sarah,
     'olivia_reed': olivia,
+    'olivia': olivia,
     'michael_harris': hr,
+    'michael': hr,
+    'hr': hr,
   };
 
   static String modelPathFor({String? avatarKey, String aiRole = ''}) {

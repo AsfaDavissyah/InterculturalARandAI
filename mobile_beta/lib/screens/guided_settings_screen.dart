@@ -5,6 +5,7 @@ import '../models/guided_topic.dart';
 import '../services/app_settings.dart';
 import '../services/chat_service.dart';
 import '../services/page_transitions.dart';
+import '../services/setting_sticker_registry.dart';
 import 'guided_setting_briefing_screen.dart';
 
 class GuidedSettingsScreen extends StatefulWidget {
@@ -102,68 +103,85 @@ class _GuidedSettingsScreenState extends State<GuidedSettingsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Select a Practice Setting',
+                    'Practice Settings',
                     style: TextStyle(
                       color: primaryColor,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
                       letterSpacing: -0.5,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Choose a specific environment to begin your AR practice.',
+                    'Choose a specific environment to begin immersive practice.',
                     style: TextStyle(
                       color: primaryColor.withValues(alpha: 0.6),
                       fontSize: 13.5,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
               ),
             ),
-            Expanded(child: _buildContent(context, primaryColor, isDark)),
+            Expanded(child: _buildBody(primaryColor, isDark)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildContent(BuildContext context, Color primaryColor, bool isDark) {
+  Widget _buildBody(Color primaryColor, bool isDark) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: _orange));
+      return Center(
+        child: CircularProgressIndicator(color: _orange, strokeWidth: 3),
+      );
     }
 
     if (_errorMessage != null) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.wifi_off_rounded, size: 48, color: Colors.grey),
-              const SizedBox(height: 12),
+              Icon(
+                Icons.cloud_off_rounded,
+                size: 48,
+                color: Colors.red.shade400,
+              ),
+              const SizedBox(height: 16),
               Text(
-                'Could not load settings',
+                'Failed to load settings',
                 style: TextStyle(
                   color: primaryColor,
                   fontWeight: FontWeight.w700,
                   fontSize: 16,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 8),
               Text(
                 _errorMessage!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.grey, fontSize: 12),
+                style: TextStyle(
+                  color: primaryColor.withValues(alpha: 0.6),
+                  fontSize: 12,
+                ),
               ),
               const SizedBox(height: 16),
               ElevatedButton.icon(
                 onPressed: _fetchSettings,
-                icon: const Icon(Icons.refresh),
+                icon: const Icon(Icons.refresh_rounded, size: 18),
                 label: const Text('Try Again'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _orange,
                   foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
                 ),
               ),
             ],
@@ -174,9 +192,23 @@ class _GuidedSettingsScreenState extends State<GuidedSettingsScreen> {
 
     if (_settings.isEmpty) {
       return Center(
-        child: Text(
-          'No settings found for this topic.',
-          style: TextStyle(color: primaryColor.withValues(alpha: 0.5)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.inbox_outlined,
+              size: 48,
+              color: primaryColor.withValues(alpha: 0.3),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'No settings available for this topic yet.',
+              style: TextStyle(
+                color: primaryColor.withValues(alpha: 0.6),
+                fontSize: 14,
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -251,36 +283,58 @@ class _GuidedSettingsScreenState extends State<GuidedSettingsScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  setting.title,
-                  style: TextStyle(
-                    color: primaryColor,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 14),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.location_on_outlined,
-                      size: 14,
-                      color: primaryColor.withValues(alpha: 0.5),
+                    SettingStickerView(
+                      stickerKey: setting.stickerAssetKey,
+                      size: 52,
+                      borderRadius: 12,
+                      showShadow: true,
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      setting.location,
-                      style: TextStyle(
-                        color: primaryColor.withValues(alpha: 0.6),
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            setting.title,
+                            style: TextStyle(
+                              color: primaryColor,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.location_on_outlined,
+                                size: 14,
+                                color: primaryColor.withValues(alpha: 0.5),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  setting.location,
+                                  style: TextStyle(
+                                    color: primaryColor.withValues(alpha: 0.6),
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
                 if (setting.briefing.isNotEmpty) ...[
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 14),
                   Text(
                     setting.briefing,
                     maxLines: 2,

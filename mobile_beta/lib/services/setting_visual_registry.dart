@@ -20,31 +20,37 @@ class SettingVisualRegistry {
       stickerKey: 'sticker_lecturer_office',
       fallbackKind: 'academic',
       fallbackLabel: 'Lecturer office',
+      assetPath: 'assets/stickers/sticker_lecturer_office.png',
     ),
     'sticker_after_class': SettingVisualSpec(
       stickerKey: 'sticker_after_class',
       fallbackKind: 'academic',
       fallbackLabel: 'International classroom',
+      assetPath: 'assets/stickers/sticker_after_class.png',
     ),
     'sticker_london_restaurant': SettingVisualSpec(
       stickerKey: 'sticker_london_restaurant',
       fallbackKind: 'restaurant',
       fallbackLabel: 'London restaurant',
+      assetPath: 'assets/stickers/sticker_london_restaurant.png',
     ),
     'sticker_melbourne_cafe': SettingVisualSpec(
       stickerKey: 'sticker_melbourne_cafe',
       fallbackKind: 'cafe',
       fallbackLabel: 'Melbourne cafe',
+      assetPath: 'assets/stickers/sticker_melbourne_cafe.png',
     ),
     'sticker_interview_room': SettingVisualSpec(
       stickerKey: 'sticker_interview_room',
       fallbackKind: 'professional',
       fallbackLabel: 'Interview room',
+      assetPath: 'assets/stickers/sticker_interview_room.png',
     ),
     'sticker_career_fair': SettingVisualSpec(
       stickerKey: 'sticker_career_fair',
       fallbackKind: 'professional',
       fallbackLabel: 'International career fair',
+      assetPath: 'assets/stickers/sticker_career_fair.png',
     ),
   };
 

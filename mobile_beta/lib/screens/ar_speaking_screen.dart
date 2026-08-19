@@ -21,6 +21,7 @@ import '../services/avatar_registry.dart';
 import '../services/chat_service.dart';
 import '../services/practice_history_store.dart';
 import '../services/pilot_evidence_service.dart';
+import '../services/setting_sticker_registry.dart';
 import '../widgets/ar_avatar.dart';
 import '../widgets/ar_avatar_3d.dart';
 import 'result_screen.dart';
@@ -1278,24 +1279,42 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                                 ),
                               ],
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            child: Row(
                               children: [
-                                Text(
-                                  widget.scenario.id,
-                                  style: TextStyle(
-                                    color: _black.withValues(alpha: 0.55),
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 12,
+                                if (SettingStickerRegistry.hasSticker(
+                                  widget.stickerAssetKey,
+                                )) ...[
+                                  SettingStickerView(
+                                    stickerKey: widget.stickerAssetKey,
+                                    size: 34,
+                                    borderRadius: 8,
                                   ),
-                                ),
-                                Text(
-                                  widget.scenario.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: _black,
-                                    fontWeight: FontWeight.w700,
+                                  const SizedBox(width: 10),
+                                ],
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        widget.scenario.id,
+                                        style: TextStyle(
+                                          color: _black.withValues(alpha: 0.55),
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                      Text(
+                                        widget.scenario.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: _black,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13.5,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],

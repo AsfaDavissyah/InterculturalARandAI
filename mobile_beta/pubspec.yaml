@@ -36,3 +36,5 @@ flutter:
     - assets/models/sarah_animated.glb
     - assets/models/dr_emma_animated.glb
     - assets/models/hr_animated.glb
+    - assets/stickers/
+

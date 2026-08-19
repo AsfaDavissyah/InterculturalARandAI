@@ -42,22 +42,30 @@ void main() {
     expect(summary.p95FirstAudioMs, 3000);
   });
 
-  test('all six guided settings have a safe visual fallback', () {
-    expect(
-      SettingVisualRegistry.registeredKeys,
-      containsAll({
-        'sticker_lecturer_office',
-        'sticker_after_class',
-        'sticker_london_restaurant',
-        'sticker_melbourne_cafe',
-        'sticker_interview_room',
-        'sticker_career_fair',
-      }),
-    );
-    for (final key in SettingVisualRegistry.registeredKeys) {
-      final visual = SettingVisualRegistry.resolve(key);
-      expect(visual.fallbackLabel, isNotEmpty);
-      expect(visual.hasAsset, isFalse);
-    }
-  });
+  test(
+    'all six guided settings have an asset and retain safe fallback metadata',
+    () {
+      expect(
+        SettingVisualRegistry.registeredKeys,
+        containsAll({
+          'sticker_lecturer_office',
+          'sticker_after_class',
+          'sticker_london_restaurant',
+          'sticker_melbourne_cafe',
+          'sticker_interview_room',
+          'sticker_career_fair',
+        }),
+      );
+      for (final key in SettingVisualRegistry.registeredKeys) {
+        final visual = SettingVisualRegistry.resolve(key);
+        expect(visual.fallbackLabel, isNotEmpty);
+        expect(visual.hasAsset, isTrue);
+        expect(visual.assetPath, startsWith('assets/stickers/'));
+      }
+
+      final unknown = SettingVisualRegistry.resolve('unknown-setting');
+      expect(unknown.hasAsset, isFalse);
+      expect(unknown.fallbackLabel, isNotEmpty);
+    },
+  );
 }

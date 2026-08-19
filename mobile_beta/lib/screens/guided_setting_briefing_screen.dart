@@ -147,7 +147,6 @@ class GuidedSettingBriefingScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                     ],
-                    // Topic Tag
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -168,15 +167,12 @@ class GuidedSettingBriefingScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
-
-                    // Title & Location
                     Text(
                       setting.title,
                       style: TextStyle(
                         color: primaryColor,
                         fontSize: 26,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -188,12 +184,14 @@ class GuidedSettingBriefingScreen extends StatelessWidget {
                           color: primaryColor.withValues(alpha: 0.6),
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          setting.location,
-                          style: TextStyle(
-                            color: primaryColor.withValues(alpha: 0.6),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                        Expanded(
+                          child: Text(
+                            setting.location,
+                            style: TextStyle(
+                              color: primaryColor.withValues(alpha: 0.6),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
