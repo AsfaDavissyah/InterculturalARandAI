@@ -115,11 +115,52 @@ class GuidedSetting {
       stickerAssetKey:
           json['stickerAssetKey'] ?? json['sticker_asset_key'] ?? '',
       studentRole: json['studentRole'] ?? json['student_role'] ?? '',
-      aiCharacter: GuidedAiCharacter.fromJson(
-        Map<String, dynamic>.from(
+      aiCharacter: () {
+        final rawCharacter = Map<String, dynamic>.from(
           json['aiCharacter'] ?? json['ai_character'] ?? {},
-        ),
-      ),
+        );
+        if (rawCharacter.isNotEmpty &&
+            (rawCharacter['display_name'] != null ||
+                rawCharacter['displayName'] != null)) {
+          return GuidedAiCharacter.fromJson(rawCharacter);
+        }
+        final sId = (json['settingId'] ?? json['setting_id'] ?? '').toString();
+        if (sId == 'PROFESSIONAL-INTERVIEW-ROOM' ||
+            sId == 'PROFESSIONAL-CAREER-FAIR') {
+          return GuidedAiCharacter(
+            displayName: 'Michael Harris',
+            role: 'International HR manager',
+            culture: 'United States',
+            avatarKey: 'hr_manager_v1',
+          );
+        }
+        if (sId == 'SOCIAL-MELBOURNE-CAFE') {
+          return GuidedAiCharacter(
+            displayName: 'Olivia Reed',
+            role: 'Australian cafe staff member',
+            culture: 'Australia',
+            avatarKey: 'barista_v1',
+          );
+        }
+        if (sId == 'SOCIAL-LONDON-RESTAURANT') {
+          return GuidedAiCharacter(
+            displayName: 'Sarah Bennett',
+            role: 'British restaurant waitress',
+            culture: 'United Kingdom',
+            avatarKey: 'waitress_v1',
+          );
+        }
+        if (sId == 'ACADEMIC-LECTURER-OFFICE' ||
+            sId == 'ACADEMIC-AFTER-CLASS') {
+          return GuidedAiCharacter(
+            displayName: 'Dr Emma Collins',
+            role: 'Foreign lecturer',
+            culture: 'United Kingdom',
+            avatarKey: 'female_lecturer_v1',
+          );
+        }
+        return GuidedAiCharacter.fromJson(rawCharacter);
+      }(),
       taskInstruction:
           json['taskInstruction'] ?? json['task_instruction'] ?? '',
       openingMessage: json['openingMessage'] ?? json['opening_message'] ?? '',

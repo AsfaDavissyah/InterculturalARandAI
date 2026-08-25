@@ -3,9 +3,15 @@ const path = require("path");
 const crypto = require("crypto");
 const OpenAI = require("openai");
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+let client;
+
+function getClient() {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY is required for TTS generation.");
+  }
+  client ??= new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return client;
+}
 
 const CACHE_DIR = path.join(__dirname, "..", "public", "audio_cache");
 
@@ -24,15 +30,19 @@ function getVoiceName(gender, aiRole) {
   const roleLower = String(aiRole || "").toLowerCase();
   const genderLower = String(gender || "").toLowerCase();
 
+  const roleSuggestsMale =
+    roleLower.includes("david") ||
+    roleLower.includes("michael") ||
+    roleLower.includes("mr.") ||
+    /\bmale\b/.test(roleLower) ||
+    /\bman\b/.test(roleLower) ||
+    /\bboy\b/.test(roleLower);
   const isMale =
     genderLower === "male" ||
-    roleLower.includes("david") ||
-    roleLower.includes("mr.") ||
-    roleLower.includes("man") ||
-    roleLower.includes("boy");
+    (genderLower !== "female" && roleSuggestsMale);
 
   if (isMale) {
-    // Karakter pria beraksen Australia/British/UK
+    // Karakter pria beraksen Australia/British/UK vs US/International
     if (
       roleLower.includes("david") ||
       roleLower.includes("australia") ||
@@ -40,7 +50,7 @@ function getVoiceName(gender, aiRole) {
       roleLower.includes("uk") ||
       roleLower.includes("london")
     ) {
-      return "fable"; // Suara ekspresif dengan aksen British/Australian vibe
+      return "fable"; // Suara pria ekspresif dengan aksen British/Australian vibe
     }
     return "onyx"; // Suara pria US yang berwibawa dan natural (default male)
   } else {
@@ -48,9 +58,11 @@ function getVoiceName(gender, aiRole) {
     if (
       roleLower.includes("british") ||
       roleLower.includes("uk") ||
-      roleLower.includes("australia")
+      roleLower.includes("australia") ||
+      roleLower.includes("london") ||
+      roleLower.includes("melbourne")
     ) {
-      return "alloy"; // Suara netral yang cocok untuk aksen internasional
+      return "shimmer"; // Suara wanita clear & international
     }
     return "nova"; // Suara wanita US yang ramah dan hangat (default female)
   }
@@ -87,7 +99,7 @@ async function generateTTS(text, gender, aiRole) {
   console.log(`Generating new TTS for: "${text.substring(0, 20)}..." using voice ${voice} (${aiRole || 'default'})`);
 
   // Panggil OpenAI TTS API
-  const mp3 = await client.audio.speech.create({
+  const mp3 = await getClient().audio.speech.create({
     model: "tts-1",
     voice: voice,
     input: text,
@@ -102,5 +114,6 @@ async function generateTTS(text, gender, aiRole) {
 
 module.exports = {
   generateTTS,
+  getVoiceName,
   CACHE_DIR,
 };

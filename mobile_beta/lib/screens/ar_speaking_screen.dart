@@ -304,7 +304,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     try {
       await _tts.setLanguage('en-US');
       await _tts.setSpeechRate(0.45);
-      await _tts.setPitch(1.0);
+      final isMaleVoice = _voiceGender() == 'male';
+      await _tts.setPitch(isMaleVoice ? 0.85 : 1.1);
       await _tts.setVolume(1.0);
       await _tts.awaitSpeakCompletion(true);
 
@@ -329,12 +330,51 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   }
 
   String _voiceGender() {
+    final settingId =
+        (widget.settingId ?? widget.guidedSetting?.settingId ?? '')
+            .toUpperCase();
+    if (settingId == 'PROFESSIONAL-INTERVIEW-ROOM' ||
+        settingId == 'PROFESSIONAL-CAREER-FAIR') {
+      return 'male';
+    }
+    if (settingId == 'SOCIAL-MELBOURNE-CAFE' ||
+        settingId == 'SOCIAL-LONDON-RESTAURANT' ||
+        settingId == 'ACADEMIC-LECTURER-OFFICE' ||
+        settingId == 'ACADEMIC-AFTER-CLASS') {
+      return 'female';
+    }
+
+    if (widget.guidedSetting != null) {
+      final character = widget.guidedSetting!.aiCharacter;
+      final nameLower = character.displayName.toLowerCase();
+      final roleLower = character.role.toLowerCase();
+      final avatarLower = character.avatarKey.toLowerCase();
+
+      if (nameLower.contains('michael') ||
+          roleLower.contains('michael') ||
+          avatarLower.contains('hr_manager')) {
+        return 'male';
+      }
+      if (nameLower.contains('olivia') ||
+          nameLower.contains('emma') ||
+          nameLower.contains('sarah') ||
+          avatarLower.contains('waitress') ||
+          avatarLower.contains('barista')) {
+        return 'female';
+      }
+    }
+
+    final scenarioId = widget.scenario.id.toUpperCase();
+    if (scenarioId == 'G-ICC-008' || scenarioId == 'N-ICC-005') {
+      return 'male';
+    }
+
     final aiRoleLower = widget.scenario.aiRole.toLowerCase();
     if (aiRoleLower.contains('david') ||
         aiRoleLower.contains('michael') ||
+        aiRoleLower.contains('mr.') ||
         aiRoleLower.contains('male') ||
-        aiRoleLower.contains('man') ||
-        aiRoleLower.contains('mr.')) {
+        RegExp(r'\bman\b').hasMatch(aiRoleLower)) {
       return 'male';
     }
     return 'female';
@@ -383,12 +423,13 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     });
 
     bool success = false;
-
     try {
-      final audioUrl = await (preparedAudioUrl ?? _requestNeuralAudioUrl(text));
-      if (audioUrl != null && audioUrl.isNotEmpty && mounted) {
+      final url = preparedAudioUrl != null
+          ? await preparedAudioUrl
+          : await _requestNeuralAudioUrl(text);
+      if (url != null && url.isNotEmpty) {
         _markTtsReady('neural');
-        await _audioPlayer.play(UrlSource(audioUrl));
+        await _audioPlayer.play(UrlSource(url));
         success = true;
       }
     } catch (error) {
@@ -403,6 +444,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       });
       try {
         await _tts.stop();
+        final isMaleVoice = _voiceGender() == 'male';
+        await _tts.setPitch(isMaleVoice ? 0.85 : 1.1);
         _markTtsReady('local');
         await _tts.speak(text);
       } finally {
