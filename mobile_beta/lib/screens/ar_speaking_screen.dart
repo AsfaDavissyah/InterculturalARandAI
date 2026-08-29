@@ -199,7 +199,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
           ..add(ConversationMessage(speaker: 'AI', message: openingMessage));
         _sessionLoading = false;
         _activity = AvatarActivity.loading;
-        _activeSubtitle = null;
+        _activeSubtitle = _messages.last;
       });
       unawaited(captureInitialization);
       await _speak(openingMessage, preparedAudioUrl: openingAudio);
@@ -419,7 +419,9 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
     setState(() {
       _activity = AvatarActivity.loading;
-      _activeSubtitle = null;
+      if (_messages.isNotEmpty && _messages.last.speaker == 'AI') {
+        _activeSubtitle = _messages.last;
+      }
     });
 
     bool success = false;
@@ -440,7 +442,9 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       if (!mounted) return;
       setState(() {
         _activity = AvatarActivity.loading;
-        _activeSubtitle = null;
+        if (_messages.isNotEmpty && _messages.last.speaker == 'AI') {
+          _activeSubtitle = _messages.last;
+        }
       });
       try {
         await _tts.stop();
@@ -674,9 +678,12 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       setState(() {
         _lastResponse = result;
         _evaluationResults.add(result);
-        _messages.add(
-          ConversationMessage(speaker: 'AI', message: result.aiMessage),
+        final aiMessage = ConversationMessage(
+          speaker: 'AI',
+          message: result.aiMessage,
         );
+        _messages.add(aiMessage);
+        _activeSubtitle = aiMessage;
         _studentResponseCount++;
       });
 
