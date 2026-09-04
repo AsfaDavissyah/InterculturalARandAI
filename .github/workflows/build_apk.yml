@@ -145,7 +145,7 @@ jobs:
       - name: Build Split Release APKs
         run: |
           cd mobile_beta
-          flutter build apk --release --split-per-abi --dart-define=API_BASE_URL=https://engora-api.vercel.app
+          flutter build apk --release --split-per-abi --dart-define=API_BASE_URL=https://api.202-10-37-3.sslip.io
 
       - name: Record Build Metadata
         shell: bash

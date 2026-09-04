@@ -33,15 +33,16 @@ flutter pub get
 flutter run
 ```
 
-For Android Emulator, the default backend address is:
+The default backend is the online Engora VPS:
 
 ```text
-http://10.0.2.2:3000
+https://api.202-10-37-3.sslip.io
 ```
 
-For a physical phone, connect the phone and laptop to the same Wi-Fi. Start
-the backend, find the laptop's IPv4 address with `ipconfig`, then open the
-backend settings button in the app and enter an address such as:
+For local development on a physical phone, connect the phone and laptop to
+the same Wi-Fi. Start the backend, find the laptop's IPv4 address with
+`ipconfig`, then open the backend settings button and enter an address such
+as:
 
 ```text
 http://192.168.1.8:3000

@@ -43,6 +43,27 @@ void main() {
     });
   });
 
+  group('AppSettings.getBaseUrl', () {
+    test('migrates the retired Railway endpoint to the VPS', () async {
+      SharedPreferences.setMockInitialValues({
+        'api_base_url':
+            'https://interculturalarandai-production.up.railway.app',
+      });
+
+      expect(await AppSettings.getBaseUrl(), AppSettings.defaultBaseUrl);
+      final preferences = await SharedPreferences.getInstance();
+      expect(preferences.getString('api_base_url'), AppSettings.defaultBaseUrl);
+    });
+
+    test('preserves a custom test endpoint', () async {
+      SharedPreferences.setMockInitialValues({
+        'api_base_url': 'http://192.168.1.8:3000/',
+      });
+
+      expect(await AppSettings.getBaseUrl(), 'http://192.168.1.8:3000');
+    });
+  });
+
   test('AiResponse reads objective and session progress metadata', () {
     final response = AiResponse.fromJson({
       'scenario_id': 'G-ICC-008',

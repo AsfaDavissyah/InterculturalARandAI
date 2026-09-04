@@ -14,18 +14,31 @@ class PilotTestContext {
 
 class AppSettings {
   static const _baseUrlKey = 'api_base_url';
+  static const _productionBaseUrl = 'https://api.202-10-37-3.sslip.io';
+  static const _legacyBaseUrls = {
+    'https://interculturalarandai-production.up.railway.app',
+    'https://engora-api.vercel.app',
+  };
   static const _pilotDeviceLabelKey = 'pilot_device_label';
   static const _pilotNetworkProfileKey = 'pilot_network_profile';
   static const _pilotInstallTypeKey = 'pilot_install_type';
   static const defaultBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://interculturalarandai-production.up.railway.app',
+    defaultValue: _productionBaseUrl,
   );
 
   static Future<String> getBaseUrl() async {
     try {
       final preferences = await SharedPreferences.getInstance();
-      return preferences.getString(_baseUrlKey) ?? defaultBaseUrl;
+      final storedBaseUrl = preferences.getString(_baseUrlKey);
+      if (storedBaseUrl == null) return defaultBaseUrl;
+
+      final normalizedBaseUrl = normalizeBaseUrl(storedBaseUrl);
+      if (_legacyBaseUrls.contains(normalizedBaseUrl)) {
+        await preferences.setString(_baseUrlKey, defaultBaseUrl);
+        return defaultBaseUrl;
+      }
+      return normalizedBaseUrl;
     } catch (_) {
       return defaultBaseUrl;
     }
