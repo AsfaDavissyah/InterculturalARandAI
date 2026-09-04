@@ -269,6 +269,21 @@ const allowedOrigins = (process.env.CORS_ORIGIN || "")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+if (process.env.VERCEL) {
+  app.use(async (req, res, next) => {
+    try {
+      await connectDatabase({ throwOnError: true });
+      next();
+    } catch (error) {
+      console.error("Serverless database initialization error:", error.message);
+      return res.status(503).json({
+        error: true,
+        message: "The database is temporarily unavailable.",
+      });
+    }
+  });
+}
+
 app.use(
   cors({
     origin(origin, callback) {

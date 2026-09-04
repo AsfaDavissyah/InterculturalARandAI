@@ -8,15 +8,4 @@ if (require.main === module) {
   );
 }
 
-module.exports = async function engoraServer(req, res, next) {
-  try {
-    await connectDatabase({ throwOnError: true });
-    return app(req, res, next);
-  } catch (error) {
-    console.error("Serverless database initialization error:", error.message);
-    return res.status(503).json({
-      error: true,
-      message: "The database is temporarily unavailable.",
-    });
-  }
-};
+module.exports = app;

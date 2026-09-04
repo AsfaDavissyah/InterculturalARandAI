@@ -18,7 +18,9 @@ test("Vercel configuration routes requests through one serverless function", () 
   assert.equal(config.rewrites[0].destination, "/api");
   assert.equal(config.functions["api/index.js"].maxDuration, 60);
   assert.equal(typeof vercelHandler, "function");
-  assert.equal(typeof require("../server"), "function");
+  const exportedApp = require("../server");
+  assert.equal(typeof exportedApp, "function");
+  assert.equal(typeof exportedApp.use, "function");
 });
 
 test("audio cache records expire automatically", () => {
