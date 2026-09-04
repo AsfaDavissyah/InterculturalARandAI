@@ -1,18 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { toast, Toaster } from 'sonner';
 import { LoginForm } from './components/engora-login-form';
-import { AppSidebar } from './components/app-sidebar';
+import Header from './components/shadcn-space/blocks/topbar-02/header';
 import { requestJson } from './lib/api-client';
 import {
   clearAuthSession,
   getAuthSession,
   setAuthSession,
 } from './lib/auth-session';
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from './components/ui/sidebar';
 import { OverviewView } from './views/OverviewView';
 import { ScenariosView } from './views/ScenariosView';
 import { ScenarioDetailView } from './views/ScenarioDetailView';
@@ -155,46 +150,23 @@ export default function App() {
   const isAdmin = user.role === 'admin';
 
   return (
-    <SidebarProvider>
+    <div className="min-h-screen w-full bg-background text-foreground">
       <Toaster position="bottom-right" richColors />
-      <div className="flex min-h-screen w-full bg-background text-foreground">
-        <AppSidebar
-          user={user}
-          activeTab={activeTab}
-          setActiveTab={(tab) => {
-            handleNavigate(tab);
-          }}
-          handleLogout={handleLogout}
-        />
+      <Header
+        user={user}
+        activeTab={activeTab}
+        onNavigate={handleNavigate}
+        onLogout={handleLogout}
+      />
 
-        <SidebarInset className="flex-1 flex flex-col min-w-0">
-          {/* Top Bar with Sidebar Trigger */}
-          <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b border-border bg-card/95 px-4 backdrop-blur-sm sm:px-6">
-            <div className="flex items-center gap-3">
-              <SidebarTrigger />
-              <div className="h-4 w-px bg-border" />
-              <div className="text-xs font-semibold uppercase text-muted-foreground capitalize">
-                {activeTab.replace('-', ' ')}
-                {activeTab === 'scenarios' && scenarioMode !== 'list' ? ` / ${scenarioMode}` : ''}
-              </div>
-            </div>
+      <main className="min-w-0 pb-12">
+        <DashboardErrorBoundary key={`${activeTab}:${scenarioMode}:${activeScenarioId || ''}`}>
+          {activeTab === 'overview' && (
+            <OverviewView user={user} onNavigate={handleNavigate} />
+          )}
 
-            <div className="flex items-center gap-3">
-              <span className="hidden rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground sm:inline-block">
-                {user.name} / <span className="capitalize text-primary">{user.role}</span>
-              </span>
-            </div>
-          </header>
-
-          {/* Main Content Area */}
-          <main className="flex-1 pb-12">
-            <DashboardErrorBoundary key={`${activeTab}:${scenarioMode}:${activeScenarioId || ''}`}>
-            {activeTab === 'overview' && (
-              <OverviewView user={user} onNavigate={handleNavigate} />
-            )}
-
-            {activeTab === 'scenarios' && (
-              <>
+          {activeTab === 'scenarios' && (
+            <>
                 {scenarioMode === 'list' && (
                   <ScenariosView
                     user={user}
@@ -234,36 +206,34 @@ export default function App() {
                     }}
                   />
                 )}
-              </>
-            )}
+            </>
+          )}
 
-            {activeTab === 'categories' && isAdmin && (
-              <CategoriesView user={user} />
-            )}
+          {activeTab === 'categories' && isAdmin && (
+            <CategoriesView user={user} />
+          )}
 
-            {activeTab === 'lecturers' && isAdmin && (
-              <LecturersView user={user} />
-            )}
+          {activeTab === 'lecturers' && isAdmin && (
+            <LecturersView user={user} />
+          )}
 
-            {activeTab === 'students' && !isAdmin && (
-              <StudentsView user={user} />
-            )}
+          {activeTab === 'students' && !isAdmin && (
+            <StudentsView user={user} />
+          )}
 
-            {activeTab === 'practice-results' && (
-              <PracticeResultsView user={user} />
-            )}
+          {activeTab === 'practice-results' && (
+            <PracticeResultsView user={user} />
+          )}
 
-            {activeTab === 'system-settings' && isAdmin && (
-              <SystemSettingsView user={user} />
-            )}
+          {activeTab === 'system-settings' && isAdmin && (
+            <SystemSettingsView user={user} />
+          )}
 
-            {activeTab === 'profile' && (
-              <ProfileView user={user} onProfileUpdated={handleProfileUpdated} />
-            )}
-            </DashboardErrorBoundary>
-          </main>
-        </SidebarInset>
-      </div>
-    </SidebarProvider>
+          {activeTab === 'profile' && (
+            <ProfileView user={user} onProfileUpdated={handleProfileUpdated} />
+          )}
+        </DashboardErrorBoundary>
+      </main>
+    </div>
   );
 }
