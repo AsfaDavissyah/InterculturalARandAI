@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   LogOut,
   Settings,
-  ShieldCheck,
   User,
   Users,
 } from "lucide-react"
@@ -55,11 +54,9 @@ export function AppSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" className="h-12 rounded-lg hover:bg-transparent cursor-default">
-              <div className="flex aspect-square size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                {user.role === "admin" ? <ShieldCheck className="size-5" /> : <GraduationCap className="size-5" />}
-              </div>
+              <img src="/engora-logo.svg" alt="" className="size-9 shrink-0 rounded-lg border border-sidebar-border" />
               <div className="flex flex-col gap-0.5 leading-none pl-1">
-                <span className="font-semibold text-sm tracking-tight text-foreground">Engora Dashboard</span>
+                <span className="font-semibold text-sm text-foreground">Engora</span>
                 <span className="text-xs text-muted-foreground">
                   {user.role === "admin" ? "Admin Console" : "Lecturer Portal"}
                 </span>

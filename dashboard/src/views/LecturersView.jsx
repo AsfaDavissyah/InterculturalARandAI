@@ -164,7 +164,7 @@ export function LecturersView() {
   });
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto">
+    <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border pb-5">
         <div>

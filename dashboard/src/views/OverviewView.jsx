@@ -64,9 +64,9 @@ export function OverviewView({ user, onNavigate }) {
   const summary = data.summary || {};
 
   return (
-    <div className="p-6 space-y-8 max-w-7xl mx-auto">
+    <div className="mx-auto max-w-7xl space-y-7 px-4 py-6 sm:px-6 lg:px-8">
       {/* Welcome Banner & Quick Actions */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border pb-6">
+      <div className="flex flex-col items-start justify-between gap-5 border-b border-border pb-6 xl:flex-row xl:items-center">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             {isAdmin ? 'Admin Console Overview' : 'Lecturer Research Dashboard'}
@@ -77,7 +77,7 @@ export function OverviewView({ user, onNavigate }) {
               : `Welcome back, ${user.name}. Track your connected student cohort and manage customized practice scenarios.`}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:justify-end">
           <button
             type="button"
             onClick={() => onNavigate('scenarios', { action: 'create' })}
@@ -110,7 +110,7 @@ export function OverviewView({ user, onNavigate }) {
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         {isAdmin ? (
           <>
             <KpiCard
@@ -401,12 +401,12 @@ function KpiCard({ label, value, icon: Icon, color = 'primary', suffix = '', hig
 
   return (
     <div
-      className={`p-4 rounded-xl border bg-card transition-all ${
+      className={`min-h-28 border bg-card p-4 transition-colors ${
         highlight ? 'border-amber-500 shadow-sm' : 'border-border'
       }`}
     >
       <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider line-clamp-1">
+        <span className="min-h-8 text-[11px] font-semibold leading-4 text-muted-foreground">
           {label}
         </span>
         <div className={`p-1.5 rounded-lg border shrink-0 ${colorStyles}`}>

@@ -93,12 +93,12 @@ export function ScenarioDetailView({ scenarioId, user, onBack, onEdit, onRefresh
   };
 
   if (loading) {
-    return <LoadingSkeleton rows={8} className="p-6 max-w-5xl mx-auto" />;
+    return <LoadingSkeleton rows={8} className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8" />;
   }
 
   if (error || !scenario) {
     return (
-      <div className="p-6 max-w-5xl mx-auto space-y-4">
+      <div className="mx-auto max-w-5xl space-y-4 px-4 py-6 sm:px-6 lg:px-8">
         <button
           type="button"
           onClick={onBack}
@@ -116,7 +116,7 @@ export function ScenarioDetailView({ scenarioId, user, onBack, onEdit, onRefresh
   const canEdit = isAdmin || (isOwner && scenario.status === 'draft');
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       {/* Top Navigation & Status Banner */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border pb-5">
         <div className="flex items-center gap-3">

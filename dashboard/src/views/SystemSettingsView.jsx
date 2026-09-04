@@ -32,19 +32,19 @@ export function SystemSettingsView() {
   }, []);
 
   if (loading) {
-    return <LoadingSkeleton rows={6} className="p-6 max-w-5xl mx-auto" />;
+    return <LoadingSkeleton rows={6} className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8" />;
   }
 
   if (error || !settings) {
     return (
-      <div className="p-6 max-w-5xl mx-auto">
+      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
         <ErrorBanner message={error || 'Settings unavailable.'} onRetry={fetchSettings} />
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="border-b border-border pb-5">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">System Settings</h1>

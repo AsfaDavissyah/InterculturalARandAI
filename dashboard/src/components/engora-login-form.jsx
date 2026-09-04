@@ -1,11 +1,10 @@
-import { BookOpen, Loader2 } from "lucide-react"
+import { Loader2, LockKeyhole } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
   Field,
-  FieldDescription,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
@@ -17,28 +16,32 @@ export function LoginForm({
   password,
   loading,
   errorMessage,
-  apiBaseUrl,
   onEmailChange,
   onPasswordChange,
   onSubmit,
   ...props
 }) {
   return (
-    <div className={cn("flex w-full max-w-4xl flex-col gap-6", className)} {...props}>
-      <Card className="overflow-hidden p-0">
-        <CardContent className="grid p-0 md:grid-cols-[1.05fr_0.95fr]">
-          <form className="p-5 md:p-8" onSubmit={onSubmit}>
+    <div className={cn("flex w-full max-w-md flex-col gap-4", className)} {...props}>
+      <div className="flex items-center justify-center gap-3">
+        <img src="/engora-logo.svg" alt="Engora" className="size-12 rounded-lg border border-border bg-card" />
+        <div>
+          <div className="text-xl font-bold leading-none text-foreground">Engora</div>
+          <div className="mt-1 text-xs font-medium text-muted-foreground">Research &amp; Management Portal</div>
+        </div>
+      </div>
+
+      <Card className="overflow-hidden border-border bg-card p-0 shadow-lg shadow-primary/5">
+        <CardContent className="p-0">
+          <form className="p-6 sm:p-8" onSubmit={onSubmit}>
             <FieldGroup>
-              <div className="flex flex-col gap-3">
-                <div className="flex size-11 items-center justify-center rounded-lg border bg-background">
-                  <BookOpen className="size-5" />
+              <div className="space-y-1 border-b border-border pb-5">
+                <div className="flex items-center gap-2 text-primary">
+                  <LockKeyhole className="size-4" />
+                  <span className="text-xs font-semibold uppercase">Secure access</span>
                 </div>
-                <div className="space-y-1">
-                  <h1 className="text-2xl font-bold">Engora Portal</h1>
-                  <p className="text-sm text-muted-foreground">
-                    Log in as a lecturer or administrator to manage scenarios and practice data.
-                  </p>
-                </div>
+                <h1 className="text-2xl font-bold text-foreground">Sign in</h1>
+                <p className="text-sm text-muted-foreground">Use your administrator or lecturer account.</p>
               </div>
 
               <Field>
@@ -80,32 +83,11 @@ export function LoginForm({
                 </Button>
               </Field>
 
-              <FieldDescription>
-                API Server: <span className="font-medium text-foreground">{apiBaseUrl}</span>
-              </FieldDescription>
             </FieldGroup>
           </form>
-
-          <div className="hidden border-l bg-muted/40 p-8 md:flex md:flex-col md:justify-between">
-            <div className="space-y-2">
-              <p className="text-sm font-semibold uppercase tracking-normal text-muted-foreground">
-                Engora AR and AI
-              </p>
-              <h2 className="max-w-sm text-3xl font-bold leading-tight">
-                Research dashboard for scenario-based speaking practice.
-              </h2>
-            </div>
-            <div className="grid gap-3 text-sm text-muted-foreground">
-              <div className="rounded-lg border bg-background p-4">
-                Manage scenarios, lecturer accounts, practice history, and student observations.
-              </div>
-              <div className="rounded-lg border bg-background p-4">
-                Clean, neat layout consistent with Shadcn design.
-              </div>
-            </div>
-          </div>
         </CardContent>
       </Card>
+      <p className="text-center text-xs text-muted-foreground">Engora AR and AI</p>
     </div>
   )
 }

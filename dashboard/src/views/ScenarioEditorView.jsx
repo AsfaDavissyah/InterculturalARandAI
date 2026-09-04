@@ -294,11 +294,11 @@ export function ScenarioEditorView({ scenarioId, user, onBack, onSaved }) {
   };
 
   if (loading) {
-    return <LoadingSkeleton rows={10} className="p-6 max-w-4xl mx-auto" />;
+    return <LoadingSkeleton rows={10} className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8" />;
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border pb-5">
         <div className="flex items-center gap-3">

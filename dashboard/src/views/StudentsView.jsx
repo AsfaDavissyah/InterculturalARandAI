@@ -44,7 +44,7 @@ export function StudentsView({ user }) {
   });
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto">
+    <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="border-b border-border pb-5">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">Student Roster</h1>

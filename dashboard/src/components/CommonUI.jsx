@@ -25,8 +25,8 @@ export function EmptyState({
   className = '',
 }) {
   return (
-    <div className={`flex flex-col items-center justify-center p-12 text-center rounded-xl border border-dashed border-border bg-card/50 ${className}`}>
-      <div className="flex size-14 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground mb-4 shadow-sm">
+    <div className={`flex flex-col items-center justify-center border border-dashed border-border bg-card/50 p-6 text-center sm:p-10 ${className}`}>
+      <div className="mb-4 flex size-12 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground shadow-sm">
         <Icon className="size-7" />
       </div>
       <h3 className="text-base font-semibold text-foreground tracking-tight">{title}</h3>

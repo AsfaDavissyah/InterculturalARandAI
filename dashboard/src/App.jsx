@@ -137,13 +137,12 @@ export default function App() {
   if (!session || !session.user) {
     return (
       <div className="login-shell">
-        <Toaster position="top-right" richColors />
+        <Toaster position="bottom-right" richColors />
         <LoginForm
           email={loginEmail}
           password={loginPassword}
           loading={loginLoading}
           errorMessage={loginError}
-          apiBaseUrl={import.meta.env?.VITE_API_BASE_URL || 'http://localhost:3000'}
           onEmailChange={setLoginEmail}
           onPasswordChange={setLoginPassword}
           onSubmit={handleLoginSubmit}
@@ -157,7 +156,7 @@ export default function App() {
 
   return (
     <SidebarProvider>
-      <Toaster position="top-right" richColors />
+      <Toaster position="bottom-right" richColors />
       <div className="flex min-h-screen w-full bg-background text-foreground">
         <AppSidebar
           user={user}
@@ -170,19 +169,19 @@ export default function App() {
 
         <SidebarInset className="flex-1 flex flex-col min-w-0">
           {/* Top Bar with Sidebar Trigger */}
-          <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b border-border bg-background/95 backdrop-blur-xs px-4 sm:px-6">
+          <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b border-border bg-card/95 px-4 backdrop-blur-sm sm:px-6">
             <div className="flex items-center gap-3">
               <SidebarTrigger />
               <div className="h-4 w-px bg-border" />
-              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground capitalize">
+              <div className="text-xs font-semibold uppercase text-muted-foreground capitalize">
                 {activeTab.replace('-', ' ')}
                 {activeTab === 'scenarios' && scenarioMode !== 'list' ? ` / ${scenarioMode}` : ''}
               </div>
             </div>
 
             <div className="flex items-center gap-3">
-              <span className="text-xs text-muted-foreground hidden sm:inline-block">
-                Signed in as <strong className="text-foreground">{user.name}</strong> ({user.role})
+              <span className="hidden rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground sm:inline-block">
+                {user.name} / <span className="capitalize text-primary">{user.role}</span>
               </span>
             </div>
           </header>

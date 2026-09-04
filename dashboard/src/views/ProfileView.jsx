@@ -74,12 +74,12 @@ export function ProfileView({ user, onProfileUpdated }) {
   };
 
   if (loading) {
-    return <LoadingSkeleton rows={6} className="p-6 max-w-xl mx-auto" />;
+    return <LoadingSkeleton rows={6} className="mx-auto max-w-xl px-4 py-6 sm:px-6" />;
   }
 
   if (error || !profile) {
     return (
-      <div className="p-6 max-w-xl mx-auto">
+      <div className="mx-auto max-w-xl px-4 py-6 sm:px-6">
         <ErrorBanner message={error || 'Profile unavailable.'} onRetry={fetchProfile} />
       </div>
     );
@@ -88,7 +88,7 @@ export function ProfileView({ user, onProfileUpdated }) {
   const isLecturer = profile.role === 'lecturer';
 
   return (
-    <div className="p-6 space-y-6 max-w-2xl mx-auto">
+    <div className="mx-auto max-w-2xl space-y-6 px-4 py-6 sm:px-6">
       {/* Header */}
       <div className="border-b border-border pb-5">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">Account Profile</h1>
