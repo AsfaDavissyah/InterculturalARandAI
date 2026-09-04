@@ -22,11 +22,17 @@ const TopicSchema = new mongoose.Schema({
   iconKey: {
     type: String,
     trim: true,
-    default: "",
+    default: "book",
   },
   displayOrder: {
     type: Number,
     default: 0,
+  },
+  status: {
+    type: String,
+    enum: ["active", "archived"],
+    default: "active",
+    index: true,
   },
   isActive: {
     type: Boolean,
@@ -40,6 +46,10 @@ const TopicSchema = new mongoose.Schema({
     type: [String],
     default: [],
   },
+  archivedAt: {
+    type: Date,
+    default: null,
+  },
   createdAt: {
     type: Date,
     default: Date.now,
@@ -52,6 +62,11 @@ const TopicSchema = new mongoose.Schema({
 
 TopicSchema.pre("save", function () {
   this.updatedAt = new Date();
+  if (this.isModified("status")) {
+    this.isActive = this.status === "active";
+  } else if (this.isModified("isActive") && !this.isModified("status")) {
+    this.status = this.isActive ? "active" : "archived";
+  }
 });
 
 module.exports = mongoose.model("Topic", TopicSchema);

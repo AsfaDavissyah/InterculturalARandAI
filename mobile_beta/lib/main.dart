@@ -1,32 +1,31 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/home_shell.dart';
 import 'screens/login_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'services/auth_service.dart';
+import 'theme/engora_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final loggedIn = await AuthService.isLoggedIn();
-  runApp(InterculturalAISpeakingBetaApp(isLoggedIn: loggedIn));
+  runApp(EngoraApp(isLoggedIn: loggedIn));
 }
 
-class InterculturalAISpeakingBetaApp extends StatefulWidget {
+class EngoraApp extends StatefulWidget {
   final bool isLoggedIn;
 
-  const InterculturalAISpeakingBetaApp({super.key, required this.isLoggedIn});
+  const EngoraApp({super.key, required this.isLoggedIn});
 
   @override
-  State<InterculturalAISpeakingBetaApp> createState() =>
-      InterculturalAISpeakingBetaAppState();
+  State<EngoraApp> createState() => EngoraAppState();
 
-  static InterculturalAISpeakingBetaAppState of(BuildContext context) {
-    return context.findAncestorStateOfType<InterculturalAISpeakingBetaAppState>()!;
+  static EngoraAppState of(BuildContext context) {
+    return context.findAncestorStateOfType<EngoraAppState>()!;
   }
 }
 
-class InterculturalAISpeakingBetaAppState
-    extends State<InterculturalAISpeakingBetaApp> {
+class EngoraAppState extends State<EngoraApp> {
   ThemeMode _themeMode = ThemeMode.light;
 
   ThemeMode get themeMode => _themeMode;
@@ -55,56 +54,19 @@ class InterculturalAISpeakingBetaAppState
     });
   }
 
-  static const Color cream = Color(0xFFFFFCF4);
-  static const Color black = Color(0xFF000000);
-  static const Color slateDark = Color(0xFF0F172A);
-  static const Color slateMedium = Color(0xFF1E293B);
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Orbis',
+      title: 'Engora',
       debugShowCheckedModeBanner: false,
       themeMode: _themeMode,
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.light,
-        scaffoldBackgroundColor: cream,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFD4842A),
-          brightness: Brightness.light,
-          surface: cream,
-        ),
-        textTheme: GoogleFonts.outfitTextTheme(
-          ThemeData.light().textTheme,
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: cream,
-          foregroundColor: black,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-        ),
+      theme: EngoraTheme.light(),
+      darkTheme: EngoraTheme.light(),
+      home: OnboardingScreen(
+        destination: widget.isLoggedIn
+            ? const HomeShell()
+            : const LoginScreen(),
       ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: slateDark,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFD4842A),
-          brightness: Brightness.dark,
-          surface: slateMedium,
-        ),
-        textTheme: GoogleFonts.outfitTextTheme(
-          ThemeData.dark().textTheme,
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: slateDark,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-        ),
-      ),
-      home: widget.isLoggedIn ? const HomeShell() : const LoginScreen(),
     );
   }
 }

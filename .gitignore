@@ -35,3 +35,11 @@ Thumbs.db
 # Antigravity artifacts & logs
 .system_generated/
 *.log
+
+# Local verification artifacts
+.tmp/
+.tmp-gradle-*.txt
+dashboard/.npm-cache/
+dashboard/playwright-report/
+dashboard/test-results/
+dashboard/.playwright/

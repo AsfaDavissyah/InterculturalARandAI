@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../models/practice_session.dart';
 import '../services/practice_history_store.dart';
+import '../theme/engora_theme.dart';
+import '../widgets/app_svg_icon.dart';
+import 'practice_report_screen.dart';
 
 class PracticeHistoryScreen extends StatefulWidget {
   const PracticeHistoryScreen({super.key});
@@ -14,8 +17,6 @@ class _PracticeHistoryScreenState extends State<PracticeHistoryScreen> {
   final PracticeHistoryStore _store = const PracticeHistoryStore();
   late Future<List<PracticeSession>> _sessions;
 
-  static const Color _orange = Color(0xFFD4842A);
-
   @override
   void initState() {
     super.initState();
@@ -26,50 +27,78 @@ class _PracticeHistoryScreenState extends State<PracticeHistoryScreen> {
     _sessions = _store.loadSessions();
   }
 
-  String _dateLabel(DateTime value) {
+  DateTime _dateOnly(DateTime value) {
     final local = value.toLocal();
-    String twoDigits(int number) => number.toString().padLeft(2, '0');
-    return '${twoDigits(local.day)}/${twoDigits(local.month)}/${local.year} '
-        '${twoDigits(local.hour)}:${twoDigits(local.minute)}';
+    return DateTime(local.year, local.month, local.day);
   }
 
-  String _durationLabel(int seconds) {
-    final minutes = seconds ~/ 60;
-    final remainingSeconds = seconds % 60;
-    return '${minutes}m ${remainingSeconds}s';
+  String _groupLabel(DateTime value) {
+    final date = _dateOnly(value);
+    final today = _dateOnly(DateTime.now());
+    final difference = today.difference(date).inDays;
+    if (difference == 0) return 'Today';
+    if (difference == 1) return 'Yesterday';
+
+    const weekdays = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return '${weekdays[date.weekday - 1]}, ${date.day} '
+        '${months[date.month - 1]} ${date.year}';
+  }
+
+  String _timeLabel(DateTime value) {
+    final local = value.toLocal();
+    String twoDigits(int number) => number.toString().padLeft(2, '0');
+    return '${twoDigits(local.hour)}:${twoDigits(local.minute)}';
   }
 
   Future<void> _delete(PracticeSession session) async {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = isDark ? Colors.white : Colors.black;
-
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: theme.scaffoldBackgroundColor,
+        backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: primaryColor, width: 1.5),
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: EngoraColors.line),
         ),
-        title: Text(
-          'Delete practice record?',
-          style: TextStyle(color: primaryColor, fontWeight: FontWeight.w700),
+        title: const Text(
+          'Delete this practice?',
+          style: TextStyle(fontWeight: FontWeight.w600),
         ),
         content: Text(
-          '${session.scenario.id} - ${session.scenario.title}',
-          style: TextStyle(color: primaryColor),
+          'This will permanently remove ${_sessionTitle(session)} from your history.',
+          style: const TextStyle(color: EngoraColors.muted),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: TextStyle(color: primaryColor.withValues(alpha: 0.6))),
+            child: const Text('Cancel'),
           ),
-          FilledButton.tonal(
+          FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(
-              backgroundColor: Colors.red.shade50,
-              foregroundColor: Colors.red.shade700,
+              backgroundColor: EngoraColors.danger,
+              foregroundColor: Colors.white,
             ),
             child: const Text('Delete'),
           ),
@@ -81,35 +110,58 @@ class _PracticeHistoryScreenState extends State<PracticeHistoryScreen> {
     if (mounted) setState(_reload);
   }
 
+  String _sessionTitle(PracticeSession session) {
+    final settingTitle = session.settingTitle?.trim() ?? '';
+    return settingTitle.isEmpty ? session.scenario.title : settingTitle;
+  }
+
+  void _openDetail(PracticeSession session) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PracticeHistoryDetailScreen(session: session),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = isDark ? Colors.white : Colors.black;
-
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: EngoraColors.background,
       body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ─── Header ───
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-              child: Text(
-                'Practice\nHistory',
-                style: TextStyle(
-                  color: primaryColor,
-                  fontSize: 34,
-                  fontWeight: FontWeight.w800,
-                  height: 1.15,
-                  letterSpacing: -0.5,
+              padding: const EdgeInsets.fromLTRB(24, 18, 24, 10),
+              child: SizedBox(
+                height: 52,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    const Text(
+                      'Practice History',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(
+                        tooltip: 'Back',
+                        onPressed: () => Navigator.pop(context),
+                        icon: const AppSvgIcon(AppIcons.back, size: 26),
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: EngoraColors.ink,
+                          minimumSize: const Size(48, 48),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(height: 20),
-
-            // ─── History List ───
             Expanded(
               child: FutureBuilder<List<PracticeSession>>(
                 future: _sessions,
@@ -117,50 +169,57 @@ class _PracticeHistoryScreenState extends State<PracticeHistoryScreen> {
                   if (snapshot.connectionState != ConnectionState.done) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  final sessions = snapshot.data ?? const [];
-                  if (sessions.isEmpty) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.history_edu_outlined,
-                              size: 48,
-                              color: primaryColor.withValues(alpha: 0.25),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'No practice history yet.',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: primaryColor.withValues(alpha: 0.5),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Complete a scenario to see your results here.',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: primaryColor.withValues(alpha: 0.35),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                  final sessions = [...?snapshot.data]
+                    ..sort(
+                      (left, right) =>
+                          right.completedAt.compareTo(left.completedAt),
                     );
+                  if (sessions.isEmpty) {
+                    return const _EmptyHistory();
                   }
 
-                  return ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 90),
-                    itemCount: sessions.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final session = sessions[index];
-                      return _buildHistoryCard(session, isDark, primaryColor);
-                    },
+                  final groups = <DateTime, List<PracticeSession>>{};
+                  for (final session in sessions) {
+                    groups
+                        .putIfAbsent(
+                          _dateOnly(session.completedAt),
+                          () => <PracticeSession>[],
+                        )
+                        .add(session);
+                  }
+
+                  return ListView(
+                    padding: const EdgeInsets.fromLTRB(24, 10, 24, 30),
+                    children: [
+                      for (final group in groups.entries) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12, bottom: 7),
+                          child: Text(
+                            _groupLabel(group.key),
+                            style: const TextStyle(
+                              color: EngoraColors.muted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        for (
+                          var index = 0;
+                          index < group.value.length;
+                          index++
+                        ) ...[
+                          _HistoryCard(
+                            session: group.value[index],
+                            title: _sessionTitle(group.value[index]),
+                            time: _timeLabel(group.value[index].completedAt),
+                            onOpen: () => _openDetail(group.value[index]),
+                            onDelete: () => _delete(group.value[index]),
+                          ),
+                          if (index < group.value.length - 1)
+                            const SizedBox(height: 9),
+                        ],
+                      ],
+                    ],
                   );
                 },
               ),
@@ -170,94 +229,34 @@ class _PracticeHistoryScreenState extends State<PracticeHistoryScreen> {
       ),
     );
   }
+}
 
-  Widget _buildHistoryCard(PracticeSession session, bool isDark, Color primaryColor) {
-    final cardBgColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+class _EmptyHistory extends StatelessWidget {
+  const _EmptyHistory();
 
-    return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) =>
-              PracticeHistoryDetailScreen(session: session),
-        ),
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: cardBgColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: primaryColor.withValues(alpha: 0.1),
-            width: 1.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(34, 20, 34, 80),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Score circle
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: _orange.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(
-                  session.overallScore.toStringAsFixed(1),
-                  style: const TextStyle(
-                    color: _orange,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
+            AppSvgIcon(AppIcons.empty, size: 142, color: EngoraColors.track),
+            const SizedBox(height: 28),
+            const Text(
+              'No practice yet',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
             ),
-            const SizedBox(width: 14),
-
-            // Info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    session.scenario.title,
-                    style: TextStyle(
-                      color: primaryColor,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${_dateLabel(session.completedAt)}  ·  '
-                    '${_durationLabel(session.durationSeconds)}',
-                    style: TextStyle(
-                      color: primaryColor.withValues(alpha: 0.5),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Delete button
-            IconButton(
-              tooltip: 'Delete record',
-              onPressed: () => _delete(session),
-              icon: Icon(
-                Icons.delete_outline,
-                color: primaryColor.withValues(alpha: 0.3),
-                size: 20,
+            const SizedBox(height: 8),
+            const Text(
+              'Complete your first speaking practice and your progress will appear here.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: EngoraColors.muted,
+                fontSize: 13,
+                height: 1.35,
               ),
             ),
           ],
@@ -267,123 +266,167 @@ class _PracticeHistoryScreenState extends State<PracticeHistoryScreen> {
   }
 }
 
-class PracticeHistoryDetailScreen extends StatelessWidget {
+class _HistoryCard extends StatelessWidget {
   final PracticeSession session;
+  final String title;
+  final String time;
+  final VoidCallback onOpen;
+  final VoidCallback onDelete;
 
-  static const Color _orange = Color(0xFFD4842A);
-
-  const PracticeHistoryDetailScreen({super.key, required this.session});
-
-  String _label(String key) => key
-      .split('_')
-      .map((word) => '${word[0].toUpperCase()}${word.substring(1)}')
-      .join(' ');
+  const _HistoryCard({
+    required this.session,
+    required this.title,
+    required this.time,
+    required this.onOpen,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = isDark ? Colors.white : Colors.black;
-
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        foregroundColor: primaryColor,
-        title: Text(session.scenario.id, style: const TextStyle(fontWeight: FontWeight.w700)),
-        elevation: 0,
-        scrolledUnderElevation: 0,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Text(
-            session.scenario.title,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: primaryColor,
-            ),
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onOpen,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 122),
+          padding: const EdgeInsets.fromLTRB(15, 14, 14, 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: EngoraColors.line),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Score ${session.overallScore.toStringAsFixed(1)} / 5  ·  '
-            '${session.studentResponseCount} responses  ·  '
-            '${session.status == 'completed' ? 'Completed' : 'Ended manually'}',
-            style: TextStyle(
-              color: primaryColor.withValues(alpha: 0.5),
-              fontSize: 13,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Scores',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: primaryColor,
-            ),
-          ),
-          const Divider(),
-          ...session.averageScores.entries.map(
-            (entry) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: Text(
-                _label(entry.key),
-                style: TextStyle(color: primaryColor),
-              ),
-              trailing: Text(
-                entry.value.toStringAsFixed(1),
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: _orange,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Transcript',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: primaryColor,
-            ),
-          ),
-          const Divider(),
-          ...session.transcript.map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(bottom: 14),
-              child: Column(
+          child: Column(
+            children: [
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    item['speaker'] ?? '',
-                    style: const TextStyle(
-                      color: _orange,
-                      fontWeight: FontWeight.w700,
+                  const CircleAvatar(
+                    radius: 19,
+                    backgroundColor: EngoraColors.background,
+                    child: AppSvgIcon(
+                      AppIcons.voiceBot,
+                      color: EngoraColors.brand,
+                      size: 19,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        height: 1.15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Text(
-                    item['message'] ?? '',
-                    style: TextStyle(color: primaryColor),
+                    time,
+                    style: const TextStyle(
+                      color: EngoraColors.muted,
+                      fontSize: 11.5,
+                    ),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${session.overallScore.toStringAsFixed(1)} / 5',
+                      style: EngoraTheme.display(
+                        fontSize: 27,
+                        color: EngoraColors.brand,
+                        height: 1,
+                      ),
+                    ),
+                  ),
+                  _HistoryAction(
+                    tooltip: 'Delete practice',
+                    onTap: onDelete,
+                    borderColor: EngoraColors.danger,
+                    child: const AppSvgIcon(
+                      AppIcons.trash,
+                      color: EngoraColors.danger,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _HistoryAction(
+                    tooltip: 'View practice details',
+                    onTap: onOpen,
+                    backgroundColor: EngoraColors.brand,
+                    borderColor: EngoraColors.brand,
+                    child: const AppSvgIcon(
+                      AppIcons.open,
+                      color: Colors.white,
+                      size: 17,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          SelectableText(
-            'Session ID: ${session.sessionId}',
-            style: TextStyle(
-              fontSize: 12,
-              color: primaryColor.withValues(alpha: 0.3),
-            ),
-          ),
-        ],
+        ),
       ),
+    );
+  }
+}
+
+class _HistoryAction extends StatelessWidget {
+  final String tooltip;
+  final VoidCallback onTap;
+  final Widget child;
+  final Color backgroundColor;
+  final Color borderColor;
+
+  const _HistoryAction({
+    required this.tooltip,
+    required this.onTap,
+    required this.child,
+    required this.borderColor,
+    this.backgroundColor = Colors.white,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkResponse(
+        onTap: onTap,
+        radius: 24,
+        child: Container(
+          width: 38,
+          height: 38,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            shape: BoxShape.circle,
+            border: Border.all(color: borderColor),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+class PracticeHistoryDetailScreen extends StatelessWidget {
+  final PracticeSession session;
+
+  const PracticeHistoryDetailScreen({super.key, required this.session});
+
+  @override
+  Widget build(BuildContext context) {
+    return PracticeReportScreen(
+      mode: PracticeReportMode.history,
+      data: PracticeReportData.fromSession(session),
     );
   }
 }

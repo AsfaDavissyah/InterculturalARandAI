@@ -68,6 +68,25 @@ void main() {
       );
     });
 
+    test('Scenario Library always uses the male prototype', () {
+      expect(
+        AvatarRegistry.modelPathFor(
+          avatarKey: 'female_lecturer_v1',
+          aiRole: 'Female lecturer',
+          experienceType: 'legacy_scenario',
+        ),
+        AvatarRegistry.malePrototype,
+      );
+      expect(
+        AvatarRegistry.modelPathFor(
+          avatarKey: 'olivia_reed',
+          aiRole: 'Olivia Reed',
+          experienceType: 'scenario_library',
+        ),
+        AvatarRegistry.malePrototype,
+      );
+    });
+
     test('GuidedTopic parses JSON correctly', () {
       final json = {
         'topicId': 'academic-communication',

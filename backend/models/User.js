@@ -28,6 +28,12 @@ const UserSchema = new mongoose.Schema({
     enum: ["student", "lecturer", "admin"],
     default: "student",
   },
+  accountStatus: {
+    type: String,
+    enum: ["active", "inactive"],
+    default: "active",
+    index: true,
+  },
   lecturerCode: {
     type: String,
     unique: true,

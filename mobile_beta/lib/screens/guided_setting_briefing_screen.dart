@@ -8,6 +8,8 @@ import '../models/scenario_topic.dart';
 import '../services/app_settings.dart';
 import '../services/chat_service.dart';
 import '../services/page_transitions.dart';
+import '../theme/engora_theme.dart';
+import '../widgets/app_svg_icon.dart';
 import '../widgets/setting_visual.dart';
 import 'ar_speaking_screen.dart';
 
@@ -33,11 +35,8 @@ class GuidedSettingBriefingScreen extends StatelessWidget {
     this.pageInstructions,
   });
 
-  static const Color _orange = Color(0xFFD4842A);
-
   void _startPractice(BuildContext context) {
-    // Map setting to a ScenarioTopic structure for compatibility
-    final syntheticScenario = ScenarioTopic(
+    final scenario = ScenarioTopic(
       id: setting.settingId,
       title: setting.title,
       type: topic.title,
@@ -53,7 +52,7 @@ class GuidedSettingBriefingScreen extends StatelessWidget {
       context,
       SlideUpRoute(
         page: ArSpeakingScreen(
-          scenario: syntheticScenario,
+          scenario: scenario,
           topicId: topic.topicId,
           topicTitle: topic.title,
           settingId: setting.settingId,
@@ -73,392 +72,255 @@ class GuidedSettingBriefingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = isDark ? Colors.white : Colors.black;
-
+    final palette = TopicPalette.fromTopic(topic.topicId);
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_rounded, color: primaryColor),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          setting.title,
-          style: TextStyle(
-            color: primaryColor,
-            fontWeight: FontWeight.w800,
-            fontSize: 18,
+      body: Column(
+        children: [
+          _OpeningVoiceWarmup(setting: setting),
+          _BriefingHeader(
+            title: setting.title,
+            stickerKey: setting.stickerAssetKey,
+            location: setting.location,
+            palette: palette,
+            onBack: () => Navigator.pop(context),
           ),
-        ),
-        centerTitle: true,
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _OpeningVoiceWarmup(setting: setting),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (launchSource == 'module_qr') ...[
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: _orange.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.qr_code_2_rounded, color: _orange),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    moduleTitle ?? 'Learning Module',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      color: _orange,
-                                    ),
-                                  ),
-                                  if ((pageInstructions ?? '').isNotEmpty)
-                                    Text(
-                                      pageInstructions!,
-                                      style: TextStyle(
-                                        color: primaryColor.withValues(
-                                          alpha: 0.7,
-                                        ),
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _orange.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        topic.title.toUpperCase(),
-                        style: const TextStyle(
-                          color: _orange,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 11,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      setting.title,
-                      style: TextStyle(
-                        color: primaryColor,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.location_on_outlined,
-                          size: 16,
-                          color: primaryColor.withValues(alpha: 0.6),
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            setting.location,
-                            style: TextStyle(
-                              color: primaryColor.withValues(alpha: 0.6),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    SettingVisual(
-                      stickerKey: setting.stickerAssetKey,
-                      label: setting.location,
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Briefing Card
-                    if (setting.briefing.isNotEmpty) ...[
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: isDark ? Colors.grey.shade900 : Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: primaryColor.withValues(alpha: 0.08),
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.info_outline_rounded,
-                                  color: _orange,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Scenario Briefing',
-                                  style: TextStyle(
-                                    color: primaryColor,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              setting.briefing,
-                              style: TextStyle(
-                                color: primaryColor.withValues(alpha: 0.8),
-                                fontSize: 13.5,
-                                height: 1.45,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-
-                    // Roles Card
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.grey.shade900 : Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: primaryColor.withValues(alpha: 0.08),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Conversation Roles',
-                            style: TextStyle(
-                              color: primaryColor,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          _buildRoleRow(
-                            context,
-                            icon: Icons.person_outline_rounded,
-                            label: 'Your Role',
-                            value: setting.studentRole,
-                            primaryColor: primaryColor,
-                          ),
-                          const Divider(height: 20),
-                          _buildRoleRow(
-                            context,
-                            icon: Icons.smart_toy_outlined,
-                            label: 'AI Partner',
-                            value:
-                                '${setting.aiCharacter.displayName} | ${setting.aiCharacter.role} (${setting.aiCharacter.culture})',
-                            primaryColor: primaryColor,
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Task Instruction Card
-                    if (setting.taskInstruction.isNotEmpty) ...[
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: isDark ? Colors.grey.shade900 : Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: primaryColor.withValues(alpha: 0.08),
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.task_alt_rounded,
-                                  color: Colors.green,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Your Task',
-                                  style: TextStyle(
-                                    color: primaryColor,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              setting.taskInstruction,
-                              style: TextStyle(
-                                color: primaryColor.withValues(alpha: 0.8),
-                                fontSize: 13.5,
-                                height: 1.45,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-
-                    // Target Turns Card
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _orange.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: _orange.withValues(alpha: 0.2),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.timer_outlined,
-                            color: _orange,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'Target ${setting.sessionRules.targetStudentResponsesMin}-${setting.sessionRules.targetStudentResponsesMax} speaking turns to complete all learning objectives.',
-                              style: const TextStyle(
-                                color: _orange,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 12.5,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 18),
+              children: [
+                if (launchSource == 'module_qr') ...[
+                  _ModuleSourceCard(
+                    title: moduleTitle ?? 'Learning Module',
+                    instructions: pageInstructions,
+                  ),
+                  const SizedBox(height: 10),
+                ],
+                _BriefingCard(
+                  asset: AppIcons.messages,
+                  title: 'Scenario Building',
+                  description: setting.briefing.isEmpty
+                      ? setting.location
+                      : setting.briefing,
                 ),
-              ),
+                const SizedBox(height: 10),
+                _BriefingCard(
+                  asset: AppIcons.checkCircle,
+                  title: 'Your Task',
+                  description: setting.taskInstruction,
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Conversation Roles',
+                  style: TextStyle(
+                    color: EngoraColors.muted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _BriefingCard(
+                  asset: AppIcons.user,
+                  title: 'Your Role',
+                  description: setting.studentRole,
+                ),
+                const SizedBox(height: 10),
+                _BriefingCard(
+                  asset: AppIcons.userRobot,
+                  title: 'AI Partner',
+                  description:
+                      '${setting.aiCharacter.displayName}, ${setting.aiCharacter.role}',
+                ),
+              ],
             ),
-
-            // Start Button Container
-            Padding(
-              padding: const EdgeInsets.all(24),
+          ),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 10, 24, 18),
               child: SizedBox(
                 width: double.infinity,
-                height: 54,
-                child: ElevatedButton(
+                child: FilledButton(
                   onPressed: () => _startPractice(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _orange,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.videocam_rounded, size: 22),
-                      SizedBox(width: 10),
-                      Text(
-                        'Start AR Practice',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
+                  child: const Text('Start AR Practice'),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
+}
 
-  Widget _buildRoleRow(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required String value,
-    required Color primaryColor,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 18, color: primaryColor.withValues(alpha: 0.5)),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label.toUpperCase(),
-                style: TextStyle(
-                  color: primaryColor.withValues(alpha: 0.5),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
+class _BriefingHeader extends StatelessWidget {
+  final String title;
+  final String stickerKey;
+  final String location;
+  final TopicPalette palette;
+  final VoidCallback onBack;
+
+  const _BriefingHeader({
+    required this.title,
+    required this.stickerKey,
+    required this.location,
+    required this.palette,
+    required this.onBack,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(
+        24,
+        MediaQuery.paddingOf(context).top + 14,
+        24,
+        26,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 94,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                IconButton(
+                  tooltip: 'Back',
+                  onPressed: onBack,
+                  icon: const AppSvgIcon(AppIcons.back, size: 26),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: EngoraColors.ink,
+                    minimumSize: const Size(48, 48),
+                    side: BorderSide(
+                      color: EngoraColors.ink.withValues(alpha: 0.06),
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: TextStyle(
-                  color: primaryColor,
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w600,
+                const Spacer(),
+                SettingVisual(
+                  stickerKey: stickerKey,
+                  label: location,
+                  width: 118,
+                  height: 88,
+                  borderRadius: 16,
+                  showLabel: false,
+                  backgroundColor: palette.background,
+                  iconColor: palette.accent,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 10),
+          Text(title, style: EngoraTheme.display(fontSize: 30, height: 1.35)),
+        ],
+      ),
+    );
+  }
+}
+
+class _BriefingCard extends StatelessWidget {
+  final String asset;
+  final String title;
+  final String description;
+
+  const _BriefingCard({
+    required this.asset,
+    required this.title,
+    required this.description,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: EngoraColors.line),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppSvgIcon(asset, color: EngoraColors.ink, size: 26),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: const TextStyle(
+                    color: EngoraColors.muted,
+                    fontSize: 12.5,
+                    height: 1.25,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ModuleSourceCard extends StatelessWidget {
+  final String title;
+  final String? instructions;
+
+  const _ModuleSourceCard({required this.title, this.instructions});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: EngoraColors.academic,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const AppSvgIcon(AppIcons.info, color: EngoraColors.brand, size: 24),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                if ((instructions ?? '').trim().isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    instructions!,
+                    style: const TextStyle(
+                      color: EngoraColors.muted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -491,16 +353,15 @@ class _OpeningVoiceWarmupState extends State<_OpeningVoiceWarmup> {
             identity.contains('mr.')
         ? 'male'
         : 'female';
-
     try {
-      final baseUrl = await AppSettings.getBaseUrl();
-      await ChatService(baseUrl: baseUrl).prepareTts(
+      final service = ChatService(baseUrl: await AppSettings.getBaseUrl());
+      await service.prepareTts(
         text: widget.setting.buildOpeningMessage(),
         gender: gender,
         aiRole: '${character.displayName} (${character.role})',
       );
     } catch (_) {
-      // AR startup still has neural and local TTS fallbacks.
+      // AR startup has neural and local TTS fallbacks.
     }
   }
 

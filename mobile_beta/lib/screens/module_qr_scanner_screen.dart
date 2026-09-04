@@ -3,6 +3,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../services/module_launch_service.dart';
 import '../services/page_transitions.dart';
+import '../widgets/app_svg_icon.dart';
 import 'guided_setting_briefing_screen.dart';
 
 class ModuleQrScannerScreen extends StatefulWidget {
@@ -87,7 +88,7 @@ class _ModuleQrScannerScreenState extends State<ModuleQrScannerScreen> {
                       IconButton.filledTonal(
                         tooltip: 'Back',
                         onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.arrow_back_rounded),
+                        icon: const AppSvgIcon(AppIcons.back, size: 24),
                       ),
                       const Expanded(
                         child: Text(
@@ -141,11 +142,14 @@ class _ModuleQrScannerScreenState extends State<ModuleQrScannerScreen> {
                           ],
                         )
                       : Text(
-                          _error ?? 'Place the printed QR code inside the frame.',
+                          _error ??
+                              'Place the printed QR code inside the frame.',
                           key: ValueKey(_error ?? 'ready'),
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: _error == null ? Colors.white : Colors.red.shade200,
+                            color: _error == null
+                                ? Colors.white
+                                : Colors.red.shade200,
                             fontWeight: FontWeight.w600,
                           ),
                         ),

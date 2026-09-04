@@ -8,14 +8,13 @@ import '../models/scenario_topic.dart';
 import '../services/app_settings.dart';
 import '../services/auth_service.dart';
 import '../services/chat_service.dart';
+import '../services/page_transitions.dart';
+import '../theme/engora_theme.dart';
+import '../widgets/app_svg_icon.dart';
 import 'ar_speaking_screen.dart';
 import 'guided_settings_screen.dart';
-import 'login_screen.dart';
-import 'module_qr_scanner_screen.dart';
-import 'onboarding_screen.dart';
-import '../main.dart';
-import '../services/page_transitions.dart';
-import '../widgets/orbit_logo.dart';
+import 'practice_history_screen.dart';
+import 'profile_screen.dart';
 
 class ScenarioSelectionScreen extends StatefulWidget {
   const ScenarioSelectionScreen({super.key});
@@ -26,98 +25,59 @@ class ScenarioSelectionScreen extends StatefulWidget {
 }
 
 class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
-  List<ScenarioTopic> _scenarios = scenarioTopics;
   List<GuidedTopic> _guidedTopics = buildFallbackGuidedTopics();
-  int _selectedTabIndex = 0; // 0 = Guided Topics, 1 = Legacy Scenarios
-  bool _refreshing = false;
-  bool _guidedTopicsConnected = false;
-  bool _legacyScenariosConnected = false;
-
-  bool get _connected => _guidedTopicsConnected && _legacyScenariosConnected;
-
-  String get _connectionStatusMessage {
-    if (!_guidedTopicsConnected && !_legacyScenariosConnected) {
-      return 'The server is unavailable. Legacy scenarios remain available from the local backup.';
-    }
-    if (!_guidedTopicsConnected) {
-      return 'Guided topics could not be refreshed. Legacy scenarios are still available.';
-    }
-    return 'Legacy scenarios could not be refreshed. Guided topics are still available.';
-  }
-
-  // Controller for stacked card scrolling
-  late PageController _pageController;
-  double _currentPage = 0.0;
-
-  static const Color _cream = Color(0xFFFFFCF4);
-  static const Color _black = Color(0xFF000000);
-  static const Color _orange = Color(0xFFD4842A);
-
+  List<ScenarioTopic> _scenarios = scenarioTopics;
+  int _selectedTab = 0;
+  bool _loading = false;
+  bool _guidedConnected = false;
+  bool _legacyConnected = false;
   String _displayName = 'Student';
-  String _displayEmail = '';
-  String _displayGender = 'female';
+
+  bool get _fullyConnected => _guidedConnected && _legacyConnected;
 
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(viewportFraction: 0.88)
-      ..addListener(() {
-        if (mounted) {
-          setState(() {
-            _currentPage = _pageController.page ?? 0.0;
-          });
-        }
-      });
-    _loadUserProfile();
-    unawaited(_loadScenarios());
+    unawaited(_loadProfile());
+    unawaited(_loadContent());
   }
 
-  Future<void> _loadUserProfile() async {
+  Future<void> _loadProfile() async {
     final profile = await AuthService.getProfile();
-    if (profile != null && mounted) {
-      setState(() {
-        _displayName = profile.name;
-        _displayEmail = profile.email;
-        _displayGender = profile.gender;
-      });
+    if (mounted && profile != null) {
+      setState(() => _displayName = profile.name);
     }
   }
 
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadScenarios() async {
-    if (mounted) setState(() => _refreshing = true);
+  Future<void> _loadContent() async {
+    if (mounted) setState(() => _loading = true);
     try {
-      final baseUrl = await AppSettings.getBaseUrl();
-      final chatService = ChatService(baseUrl: baseUrl);
-      final results = await Future.wait<bool>([
-        _loadGuidedTopics(chatService),
-        _loadLegacyScenarios(chatService),
+      final service = ChatService(baseUrl: await AppSettings.getBaseUrl());
+      final results = await Future.wait([
+        _loadGuided(service),
+        _loadLegacy(service),
       ]);
-      if (!mounted) return;
-      setState(() {
-        _guidedTopicsConnected = results[0];
-        _legacyScenariosConnected = results[1];
-      });
+      if (mounted) {
+        setState(() {
+          _guidedConnected = results[0];
+          _legacyConnected = results[1];
+        });
+      }
     } catch (_) {
       if (mounted) {
         setState(() {
-          _guidedTopicsConnected = false;
-          _legacyScenariosConnected = false;
+          _guidedConnected = false;
+          _legacyConnected = false;
         });
       }
     } finally {
-      if (mounted) setState(() => _refreshing = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<bool> _loadGuidedTopics(ChatService chatService) async {
+  Future<bool> _loadGuided(ChatService service) async {
     try {
-      final topics = await chatService.getTopics();
+      final topics = await service.getTopics();
       if (topics.isEmpty) return false;
       if (mounted) setState(() => _guidedTopics = topics);
       return true;
@@ -126,9 +86,9 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
     }
   }
 
-  Future<bool> _loadLegacyScenarios(ChatService chatService) async {
+  Future<bool> _loadLegacy(ChatService service) async {
     try {
-      final scenarios = await chatService.getScenarios();
+      final scenarios = await service.getScenarios();
       if (scenarios.isEmpty) return false;
       if (mounted) setState(() => _scenarios = scenarios);
       return true;
@@ -137,298 +97,158 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
     }
   }
 
-  void _openScenario(BuildContext context, ScenarioTopic scenario) {
+  Future<void> _openProfile() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ProfileScreen()),
+    );
+    await _loadProfile();
+  }
+
+  void _openLegacyBriefing(ScenarioTopic scenario) {
     if (!scenario.isAvailable) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("This scenario is not connected to the backend yet."),
-        ),
+        const SnackBar(content: Text('This scenario is not available yet.')),
       );
       return;
     }
 
-    Navigator.push(
-      context,
-      SlideUpRoute(page: ArSpeakingScreen(scenario: scenario)),
-    );
-  }
-
-  Future<void> _openBackendSettings() async {
-    final currentUrl = await AppSettings.getBaseUrl();
-    if (!mounted) return;
-    final controller = TextEditingController(text: currentUrl);
-    String? connectionMessage;
-    bool checking = false;
-
-    final newUrl = await showDialog<String>(
+    showModalBottomSheet<void>(
       context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            Future<void> checkConnection() async {
-              setDialogState(() {
-                checking = true;
-                connectionMessage = null;
-              });
-              try {
-                final url = AppSettings.normalizeBaseUrl(controller.text);
-                await ChatService(baseUrl: url).checkConnection();
-                setDialogState(() => connectionMessage = 'Connected ✓');
-              } catch (_) {
-                setDialogState(() => connectionMessage = 'Cannot connect');
-              } finally {
-                setDialogState(() => checking = false);
-              }
-            }
-
-            return PopScope(
-              canPop: !checking,
-              child: AlertDialog(
-                backgroundColor: _cream,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                title: const Text(
-                  'Backend Address',
-                  style: TextStyle(color: _black, fontWeight: FontWeight.w800),
-                ),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: controller,
-                      enabled: !checking,
-                      keyboardType: TextInputType.url,
-                      autocorrect: false,
-                      style: const TextStyle(color: _black),
-                      decoration: InputDecoration(
-                        hintText: 'http://192.168.1.8:3000',
-                        hintStyle: TextStyle(
-                          color: _black.withValues(alpha: 0.3),
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                    if (connectionMessage != null) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                        connectionMessage!,
-                        style: TextStyle(
-                          color: connectionMessage!.contains('✓')
-                              ? Colors.green.shade700
-                              : Colors.red.shade700,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                actions: [
-                  TextButton.icon(
-                    onPressed: checking ? null : checkConnection,
-                    icon: checking
-                        ? const SizedBox.square(
-                            dimension: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.wifi_tethering_rounded),
-                    label: const Text('Test'),
+      isScrollControlled: true,
+      backgroundColor: EngoraColors.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            24,
+            12,
+            24,
+            24 + MediaQuery.viewInsetsOf(sheetContext).bottom,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: EngoraColors.line,
+                    borderRadius: BorderRadius.circular(99),
                   ),
-                  TextButton(
-                    onPressed: checking ? null : () => Navigator.pop(context),
-                    child: const Text('Cancel'),
-                  ),
-                  FilledButton(
-                    onPressed: checking
-                        ? null
-                        : () => Navigator.pop(context, controller.text),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: _orange,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Text('Save'),
-                  ),
-                ],
+                ),
               ),
-            );
-          },
-        );
-      },
-    );
-    WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
-    if (newUrl == null || newUrl.trim().isEmpty) return;
-    await AppSettings.setBaseUrl(newUrl);
-    await _loadScenarios();
-  }
-
-  Future<void> _openPilotSettings() async {
-    final current = await AppSettings.getPilotTestContext();
-    if (!mounted) return;
-
-    final deviceController = TextEditingController(text: current.deviceLabel);
-    var networkProfile = current.networkProfile;
-    var installType = current.installType;
-
-    final saved = await showDialog<bool>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: _cream,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          title: const Text(
-            'Pilot Test Context',
-            style: TextStyle(color: _black, fontWeight: FontWeight.w800),
+              const SizedBox(height: 20),
+              Text(scenario.title, style: EngoraTheme.display(fontSize: 24)),
+              const SizedBox(height: 8),
+              Text(
+                '${scenario.type}  •  ${scenario.level}',
+                style: const TextStyle(
+                  color: EngoraColors.brand,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 20),
+              _BriefingLine(
+                icon: Icons.location_on_outlined,
+                label: 'Setting',
+                value: scenario.arScene,
+              ),
+              _BriefingLine(
+                icon: Icons.person_outline_rounded,
+                label: 'Your role',
+                value: scenario.studentRole,
+              ),
+              _BriefingLine(
+                asset: AppIcons.voiceBot,
+                label: 'AI partner',
+                value: scenario.aiRole,
+              ),
+              _BriefingLine(
+                asset: AppIcons.finish,
+                label: 'Practice goal',
+                value: scenario.taskInstruction,
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    Navigator.pop(sheetContext);
+                    Navigator.push(
+                      context,
+                      SlideUpRoute(page: ArSpeakingScreen(scenario: scenario)),
+                    );
+                  },
+                  icon: const AppSvgIcon(AppIcons.camera, size: 20),
+                  label: const Text('Start Practice'),
+                ),
+              ),
+            ],
           ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: deviceController,
-                  decoration: const InputDecoration(
-                    labelText: 'Device label',
-                    hintText: 'Samsung Galaxy A52',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  initialValue: networkProfile,
-                  decoration: const InputDecoration(
-                    labelText: 'Network profile',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'unreported',
-                      child: Text('Not specified'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'approved_wifi',
-                      child: Text('Approved Wi-Fi'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'mobile_data',
-                      child: Text('Mobile data'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'slow_network',
-                      child: Text('Slower network'),
-                    ),
-                  ],
-                  onChanged: (value) => setDialogState(
-                    () => networkProfile = value ?? 'unreported',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  initialValue: installType,
-                  decoration: const InputDecoration(
-                    labelText: 'Install type',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'unreported',
-                      child: Text('Not specified'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'fresh_install',
-                      child: Text('Fresh install'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'update_install',
-                      child: Text('Update install'),
-                    ),
-                  ],
-                  onChanged: (value) =>
-                      setDialogState(() => installType = value ?? 'unreported'),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: FilledButton.styleFrom(backgroundColor: _orange),
-              child: const Text('Save'),
-            ),
-          ],
         ),
       ),
     );
-    final deviceLabel = deviceController.text;
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => deviceController.dispose(),
-    );
-    if (saved != true) return;
-
-    await AppSettings.setPilotTestContext(
-      PilotTestContext(
-        deviceLabel: deviceLabel,
-        networkProfile: networkProfile,
-        installType: installType,
-      ),
-    );
-    if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Pilot test context saved.')));
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = isDark ? Colors.white : Colors.black;
+    final firstName = _displayName.trim().split(RegExp(r'\s+')).first;
+    final initial = firstName.isEmpty ? 'S' : firstName[0].toUpperCase();
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ─── Header: Profile + Greeting ───
-            _buildHeader(),
-
-            if (!_connected && !_refreshing)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.red.withValues(alpha: 0.3),
-                    ),
-                  ),
+        child: RefreshIndicator(
+          color: EngoraColors.brand,
+          onRefresh: _loadContent,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
+                sliver: SliverToBoxAdapter(
                   child: Row(
                     children: [
-                      const Icon(
-                        Icons.warning_amber_rounded,
-                        color: Colors.red,
-                        size: 20,
+                      InkWell(
+                        onTap: _openProfile,
+                        borderRadius: BorderRadius.circular(99),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 25,
+                              backgroundColor: Colors.white,
+                              child: Text(
+                                initial,
+                                style: const TextStyle(
+                                  color: EngoraColors.brand,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 18,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Hiii, $firstName',
+                              style: const TextStyle(
+                                color: EngoraColors.ink,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          _connectionStatusMessage,
-                          style: TextStyle(
-                            color: Colors.red.shade800,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                      const Spacer(),
+                      _HeaderAction(
+                        tooltip: 'Practice history',
+                        asset: AppIcons.history,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const PracticeHistoryScreen(),
                           ),
                         ),
                       ),
@@ -436,986 +256,283 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
                   ),
                 ),
               ),
-
-            const SizedBox(height: 20),
-
-            // ─── Headline ───
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  OrbisLogo(
-                    size: 46,
-                    showBackground: true,
-                    backgroundColor: primaryColor,
-                    color: isDark ? Colors.black : Colors.white,
-                    borderRadius: 12,
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(24, 38, 24, 0),
+                sliver: SliverToBoxAdapter(
+                  child: Text(
+                    'What Would You\nLike to Practice?',
+                    style: EngoraTheme.display(fontSize: 31, height: 1.45),
                   ),
-                  const SizedBox(width: 14),
-                  Text(
-                    'Welcome to\nOrbis',
-                    style: TextStyle(
-                      color: primaryColor,
-                      fontSize: 34,
-                      fontWeight: FontWeight.w800,
-                      height: 1.15,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    tooltip: 'Scan learning module',
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        SlideUpRoute(page: const ModuleQrScannerScreen()),
-                      );
-                    },
-                    icon: const Icon(Icons.qr_code_scanner_rounded),
-                    style: IconButton.styleFrom(
-                      foregroundColor: primaryColor,
-                      backgroundColor: primaryColor.withValues(alpha: 0.08),
-                      minimumSize: const Size(48, 48),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // ─── Mode Selector Segmented Control ───
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.grey.shade900 : Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _selectedTabIndex = 0),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          decoration: BoxDecoration(
-                            color: _selectedTabIndex == 0
-                                ? (isDark ? Colors.grey.shade800 : Colors.white)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(10),
-                            boxShadow: _selectedTabIndex == 0
-                                ? [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.05,
-                                      ),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ]
-                                : [],
-                          ),
-                          child: Text(
-                            'Guided Topics',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: _selectedTabIndex == 0
-                                  ? primaryColor
-                                  : primaryColor.withValues(alpha: 0.5),
-                              fontWeight: _selectedTabIndex == 0
-                                  ? FontWeight.w800
-                                  : FontWeight.w600,
-                              fontSize: 13.5,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _selectedTabIndex = 1),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          decoration: BoxDecoration(
-                            color: _selectedTabIndex == 1
-                                ? (isDark ? Colors.grey.shade800 : Colors.white)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(10),
-                            boxShadow: _selectedTabIndex == 1
-                                ? [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.05,
-                                      ),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ]
-                                : [],
-                          ),
-                          child: Text(
-                            'Legacy Scenarios',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: _selectedTabIndex == 1
-                                  ? primaryColor
-                                  : primaryColor.withValues(alpha: 0.5),
-                              fontWeight: _selectedTabIndex == 1
-                                  ? FontWeight.w800
-                                  : FontWeight.w600,
-                              fontSize: 13.5,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
               ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // ─── Content Body ───
-            Expanded(
-              child: _selectedTabIndex == 0
-                  ? _buildGuidedTopicsList(primaryColor, isDark)
-                  : (_scenarios.isEmpty
-                        ? const Center(child: CircularProgressIndicator())
-                        : _buildStackedCards()),
-            ),
-            const SizedBox(height: 80),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGuidedTopicsList(Color primaryColor, bool isDark) {
-    if (_refreshing && _guidedTopics.isEmpty) {
-      return const Center(child: CircularProgressIndicator(color: _orange));
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      itemCount: _guidedTopics.length,
-      itemBuilder: (context, index) {
-        final topic = _guidedTopics[index];
-        IconData iconData = Icons.school_rounded;
-        if (topic.iconKey.contains('coffee') ||
-            topic.iconKey.contains('cafe')) {
-          iconData = Icons.local_cafe_rounded;
-        } else if (topic.iconKey.contains('work') ||
-            topic.iconKey.contains('briefcase')) {
-          iconData = Icons.work_rounded;
-        }
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          decoration: BoxDecoration(
-            color: isDark ? Colors.grey.shade900 : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: primaryColor.withValues(alpha: 0.08)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
+                sliver: SliverToBoxAdapter(child: _buildTabs()),
               ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(20),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  SlideUpRoute(page: GuidedSettingsScreen(topic: topic)),
-                );
-              },
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 52,
-                      height: 52,
+              if (!_fullyConnected && !_loading)
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+                  sliver: SliverToBoxAdapter(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
                       decoration: BoxDecoration(
-                        color: _orange.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(16),
+                        color: const Color(0xFFFFECE8),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(iconData, color: _orange, size: 26),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: const Row(
                         children: [
-                          Text(
-                            topic.title,
-                            style: TextStyle(
-                              color: primaryColor,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w800,
-                            ),
+                          Icon(
+                            Icons.cloud_off_outlined,
+                            size: 18,
+                            color: EngoraColors.danger,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            topic.description,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: primaryColor.withValues(alpha: 0.6),
-                              fontSize: 12.5,
-                              height: 1.35,
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Some content is using the local backup. Pull down to reconnect.',
+                              style: TextStyle(fontSize: 12.5),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      color: primaryColor.withValues(alpha: 0.3),
-                    ),
-                  ],
+                  ),
                 ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                sliver: _selectedTab == 0 ? _guidedList() : _scenarioLibrary(),
               ),
-            ),
+            ],
           ),
-        );
-      },
-    );
-  }
-
-  void _openEditProfileDialog() async {
-    final nameController = TextEditingController(text: _displayName);
-    String tempGender = _displayGender;
-    bool saving = false;
-
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = isDark ? Colors.white : Colors.black;
-
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return PopScope(
-              canPop: !saving,
-              child: AlertDialog(
-                backgroundColor: theme.scaffoldBackgroundColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(color: primaryColor, width: 1.5),
-                ),
-                title: Text(
-                  'Edit Profile',
-                  style: TextStyle(
-                    color: primaryColor,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Name Field
-                    TextField(
-                      controller: nameController,
-                      enabled: !saving,
-                      style: TextStyle(color: primaryColor),
-                      decoration: InputDecoration(
-                        labelText: 'Full Name',
-                        labelStyle: TextStyle(
-                          color: primaryColor.withValues(alpha: 0.6),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(
-                            color: primaryColor,
-                            width: 1.5,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: const BorderSide(
-                            color: _orange,
-                            width: 2,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Gender',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: primaryColor.withValues(alpha: 0.8),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        // Male option
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: saving
-                                ? null
-                                : () =>
-                                      setDialogState(() => tempGender = 'male'),
-                            child: Container(
-                              height: 46,
-                              decoration: BoxDecoration(
-                                color: tempGender == 'male'
-                                    ? _orange
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: primaryColor,
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  'Laki-laki',
-                                  style: TextStyle(
-                                    color: tempGender == 'male'
-                                        ? Colors.white
-                                        : primaryColor,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        // Female option
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: saving
-                                ? null
-                                : () => setDialogState(
-                                    () => tempGender = 'female',
-                                  ),
-                            child: Container(
-                              height: 46,
-                              decoration: BoxDecoration(
-                                color: tempGender == 'female'
-                                    ? _orange
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: primaryColor,
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  'Perempuan',
-                                  style: TextStyle(
-                                    color: tempGender == 'female'
-                                        ? Colors.white
-                                        : primaryColor,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: saving ? null : () => Navigator.pop(context),
-                    child: Text(
-                      'Cancel',
-                      style: TextStyle(
-                        color: primaryColor.withValues(alpha: 0.6),
-                      ),
-                    ),
-                  ),
-                  FilledButton(
-                    onPressed: saving
-                        ? null
-                        : () async {
-                            final newName = nameController.text.trim();
-                            if (newName.isEmpty) return;
-
-                            setDialogState(() => saving = true);
-                            final success = await AuthService.updateProfile(
-                              name: newName,
-                              gender: tempGender,
-                            );
-
-                            if (success) {
-                              await _loadUserProfile();
-                            }
-                            if (context.mounted) {
-                              Navigator.pop(context);
-                            }
-                          },
-                    style: FilledButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      foregroundColor: theme.scaffoldBackgroundColor,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
-                    child: saving
-                        ? const SizedBox.square(
-                            dimension: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text(
-                            'Save',
-                            style: TextStyle(fontWeight: FontWeight.w800),
-                          ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-    nameController.dispose();
-  }
-
-  void _openProfileDetails() {
-    final theme = Theme.of(context);
-    final appState = InterculturalAISpeakingBetaApp.of(context);
-
-    // Initial letter calculation
-    final initialLetter = _displayName.isNotEmpty
-        ? _displayName[0].toUpperCase()
-        : 'S';
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: theme.scaffoldBackgroundColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
       ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final currentIsDark =
-                Theme.of(context).brightness == Brightness.dark;
-
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 20,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        // Beautiful Gradient Initial Avatar
-                        Container(
-                          width: 54,
-                          height: 54,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: [Color(0xFFD4842A), Color(0xFFF2994A)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                          ),
-                          child: Center(
-                            child: Text(
-                              initialLetter,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _displayName,
-                                style: TextStyle(
-                                  color: currentIsDark
-                                      ? Colors.white
-                                      : Colors.black,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              Text(
-                                _displayEmail,
-                                style: TextStyle(
-                                  color:
-                                      (currentIsDark
-                                              ? Colors.white
-                                              : Colors.black)
-                                          .withValues(alpha: 0.6),
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    Divider(
-                      color: currentIsDark
-                          ? Colors.white24
-                          : const Color(0xFFE8E2D8),
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Edit Profile Menu
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        Icons.edit_outlined,
-                        color: currentIsDark ? Colors.white : Colors.black,
-                      ),
-                      title: Text(
-                        'Edit Profile',
-                        style: TextStyle(
-                          color: currentIsDark ? Colors.white : Colors.black,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      subtitle: const Text('Update name and gender'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _openEditProfileDialog();
-                      },
-                    ),
-
-                    // Dark Mode Switch Menu
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        currentIsDark
-                            ? Icons.dark_mode_rounded
-                            : Icons.light_mode_rounded,
-                        color: currentIsDark ? Colors.white : Colors.black,
-                      ),
-                      title: Text(
-                        'Dark Mode',
-                        style: TextStyle(
-                          color: currentIsDark ? Colors.white : Colors.black,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      subtitle: const Text(
-                        'Toggle between dark and light themes',
-                      ),
-                      trailing: Switch(
-                        value: currentIsDark,
-                        activeTrackColor: _orange,
-                        activeThumbColor: Colors.white,
-                        onChanged: (value) async {
-                          await appState.toggleTheme(value);
-                          setSheetState(() {});
-                        },
-                      ),
-                    ),
-
-                    // Onboarding & Guide option
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        Icons.help_outline_rounded,
-                        color: currentIsDark ? Colors.white : Colors.black,
-                      ),
-                      title: Text(
-                        'Panduan & Onboarding',
-                        style: TextStyle(
-                          color: currentIsDark ? Colors.white : Colors.black,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      subtitle: const Text(
-                        'Petunjuk izin kamera, mic, & cara latihan',
-                      ),
-                      onTap: () {
-                        Navigator.pop(context);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const OnboardingScreen(),
-                          ),
-                        );
-                      },
-                    ),
-
-                    // Settings option
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        Icons.settings_ethernet_rounded,
-                        color: currentIsDark ? Colors.white : Colors.black,
-                      ),
-                      title: Text(
-                        'Backend Server Settings',
-                        style: TextStyle(
-                          color: currentIsDark ? Colors.white : Colors.black,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      subtitle: const Text('Configure API server address'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _openBackendSettings();
-                      },
-                    ),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        Icons.science_outlined,
-                        color: currentIsDark ? Colors.white : Colors.black,
-                      ),
-                      title: Text(
-                        'Pilot Test Context',
-                        style: TextStyle(
-                          color: currentIsDark ? Colors.white : Colors.black,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      subtitle: const Text(
-                        'Record device, network, and install type',
-                      ),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _openPilotSettings();
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Logout button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final navigator = Navigator.of(context);
-                          await AuthService.logout();
-                          navigator.pushAndRemoveUntil(
-                            MaterialPageRoute(
-                              builder: (context) => const LoginScreen(),
-                            ),
-                            (route) => false,
-                          );
-                        },
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.red, width: 1.5),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(26),
-                          ),
-                          foregroundColor: Colors.red,
-                        ),
-                        icon: const Icon(Icons.logout_rounded, size: 20),
-                        label: const Text(
-                          'LOGOUT',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.0,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
     );
   }
 
-  Widget _buildHeader() {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = isDark ? Colors.white : Colors.black;
-    final initialLetter = _displayName.isNotEmpty
-        ? _displayName[0].toUpperCase()
-        : 'S';
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+  Widget _buildTabs() {
+    return Container(
+      height: 52,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: EngoraColors.track,
+        borderRadius: BorderRadius.circular(14),
+      ),
       child: Row(
         children: [
-          // Profile circle — tap to open details, long press opens settings
-          GestureDetector(
-            onTap: _openProfileDetails,
-            onLongPress: _openBackendSettings,
-            child: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFD4842A), Color(0xFFF2994A)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                border: Border.all(
-                  color: primaryColor.withValues(alpha: 0.15),
-                  width: 1.5,
-                ),
-              ),
-              child: Center(
-                child: Text(
-                  initialLetter,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            'Hello, $_displayName',
-            style: TextStyle(
-              color: primaryColor.withValues(alpha: 0.75),
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const Spacer(),
-          // Connection & refresh indicators (subtle)
-          if (_refreshing)
-            const SizedBox.square(
-              dimension: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          else
-            GestureDetector(
-              onTap: _loadScenarios,
-              child: Icon(
-                _connected ? Icons.cloud_done_rounded : Icons.cloud_off_rounded,
-                color: _connected
-                    ? primaryColor.withValues(alpha: 0.3)
-                    : Colors.red.withValues(alpha: 0.5),
-                size: 20,
-              ),
-            ),
+          _tabButton(0, 'Guided Topics'),
+          const SizedBox(width: 6),
+          _tabButton(1, 'Scenario Library'),
         ],
       ),
     );
   }
 
-  Widget _buildStackedCards() {
-    return PageView.builder(
-      controller: _pageController,
-      itemCount: _scenarios.length,
-      physics: const BouncingScrollPhysics(),
-      clipBehavior: Clip.none,
+  Widget _tabButton(int index, String label) {
+    final active = _selectedTab == index;
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _selectedTab = index),
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: active ? EngoraColors.brand : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: active ? Colors.white : EngoraColors.muted,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  SliverList _guidedList() {
+    return SliverList.separated(
+      itemCount: _guidedTopics.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
-        return _buildScenarioCard(index, _scenarios[index]);
+        final topic = _guidedTopics[index];
+        final palette = TopicPalette.fromTopic(topic.topicId);
+        return _TopicCard(
+          topic: topic,
+          palette: palette,
+          onTap: () => Navigator.push(
+            context,
+            SlideUpRoute(page: GuidedSettingsScreen(topic: topic)),
+          ),
+        );
       },
     );
   }
 
-  Widget _buildScenarioCard(int index, ScenarioTopic scenario) {
-    // Calculate transform values for stacked effect
-    double diff = (index - _currentPage);
+  SliverList _scenarioLibrary() {
+    return SliverList.separated(
+      itemCount: _scenarios.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final scenario = _scenarios[index];
+        final colors = const [
+          TopicPalette(
+            background: EngoraColors.academic,
+            accent: EngoraColors.academicAccent,
+            icon: Icons.school_outlined,
+          ),
+          TopicPalette(
+            background: EngoraColors.social,
+            accent: EngoraColors.socialAccent,
+            icon: Icons.forum_outlined,
+          ),
+          TopicPalette(
+            background: EngoraColors.professional,
+            accent: EngoraColors.professionalAccent,
+            icon: Icons.language_rounded,
+          ),
+        ];
+        return _ScenarioCard(
+          scenario: scenario,
+          palette: colors[index % colors.length],
+          onTap: () => _openLegacyBriefing(scenario),
+        );
+      },
+    );
+  }
+}
 
-    // Scale: active card is full size, others are slightly smaller
-    double scale = 1.0 - (diff.abs() * 0.05).clamp(0.0, 0.15);
+class _HeaderAction extends StatelessWidget {
+  final String tooltip;
+  final String asset;
+  final VoidCallback onTap;
 
-    // Vertical offset: cards behind shift downward to create stacked look
-    double translateY = diff.abs() * 16;
+  const _HeaderAction({
+    required this.tooltip,
+    required this.asset,
+    required this.onTap,
+  });
 
-    // Opacity: fade cards that are further away
-    double opacity = (1.0 - diff.abs() * 0.3).clamp(0.0, 1.0);
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onTap,
+      icon: AppSvgIcon(asset, size: 24),
+      style: IconButton.styleFrom(
+        backgroundColor: Colors.white,
+        foregroundColor: EngoraColors.ink,
+        minimumSize: const Size(50, 50),
+      ),
+    );
+  }
+}
 
-    // Slight rotation for depth effect
-    double rotateZ = diff * 0.02;
+class _TopicCard extends StatelessWidget {
+  final GuidedTopic topic;
+  final TopicPalette palette;
+  final VoidCallback onTap;
 
-    return Opacity(
-      opacity: opacity,
-      child: Transform.translate(
-        offset: Offset(0, translateY),
-        child: Transform.scale(
-          scale: scale,
-          alignment: Alignment.bottomCenter,
-          child: Transform.rotate(
-            angle: rotateZ,
-            child: GestureDetector(
-              onTap: () => _openScenario(context, scenario),
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                decoration: BoxDecoration(
-                  color: _orange,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _orange.withValues(alpha: 0.25),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
+  const _TopicCard({
+    required this.topic,
+    required this.palette,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: palette.background,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 128),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: const BoxDecoration(
+                    color: EngoraColors.background,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(palette.icon, color: palette.accent, size: 21),
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: Stack(
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Subtle decorative circles in background
-                      Positioned(
-                        right: -30,
-                        bottom: -30,
-                        child: Container(
-                          width: 120,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withValues(alpha: 0.08),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        left: -20,
-                        top: -20,
-                        child: Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withValues(alpha: 0.05),
-                          ),
-                        ),
-                      ),
-                      // Card Content
-                      Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Scenario ID badge
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                scenario.id,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 11,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Title
-                            Text(
-                              scenario.title,
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              topic.title,
                               style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                                height: 1.25,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                                height: 1.15,
                               ),
                             ),
-                            const SizedBox(height: 12),
-
-                            // Description
-                            Expanded(
-                              child: Text(
-                                scenario.taskInstruction,
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.85),
-                                  fontSize: 14,
-                                  height: 1.5,
-                                ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: palette.accent),
+                              borderRadius: BorderRadius.circular(99),
+                            ),
+                            child: Text(
+                              '2 Settings',
+                              style: TextStyle(
+                                color: palette.accent,
+                                fontSize: 10.5,
                               ),
                             ),
-
-                            const SizedBox(height: 12),
-
-                            // Bottom info row
-                            Row(
-                              children: [
-                                _InfoChip(
-                                  label: scenario.type,
-                                  color: Colors.white,
-                                ),
-                                const SizedBox(width: 8),
-                                _InfoChip(
-                                  label: scenario.level,
-                                  color: Colors.white,
-                                ),
-                                const Spacer(),
-                                // Status indicator
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: scenario.isAvailable
-                                        ? Colors.white
-                                        : Colors.white.withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  child: Text(
-                                    scenario.isAvailable ? 'Ready' : 'Soon',
-                                    style: TextStyle(
-                                      color: scenario.isAvailable
-                                          ? _orange
-                                          : Colors.white.withValues(alpha: 0.7),
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        topic.description,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: EngoraColors.muted,
+                          fontSize: 13,
+                          height: 1.25,
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
+                const SizedBox(width: 8),
+                Align(
+                  alignment: Alignment.bottomRight,
+                  child: CircleAvatar(
+                    radius: 18,
+                    backgroundColor: palette.accent,
+                    child: const AppSvgIcon(
+                      AppIcons.open,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -1424,29 +541,122 @@ class _ScenarioSelectionScreenState extends State<ScenarioSelectionScreen> {
   }
 }
 
-class _InfoChip extends StatelessWidget {
-  final String label;
-  final Color color;
+class _ScenarioCard extends StatelessWidget {
+  final ScenarioTopic scenario;
+  final TopicPalette palette;
+  final VoidCallback onTap;
 
-  const _InfoChip({required this.label, required this.color});
+  const _ScenarioCard({
+    required this.scenario,
+    required this.palette,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: color.withValues(alpha: 0.9),
+    return Material(
+      color: palette.background,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 23,
+                backgroundColor: EngoraColors.background,
+                child: Icon(palette.icon, color: palette.accent),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      scenario.title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      '${scenario.level}  •  ${scenario.arScene}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: EngoraColors.muted,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: palette.accent,
+                child: const AppSvgIcon(
+                  AppIcons.open,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ),
+            ],
+          ),
         ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+}
+
+class _BriefingLine extends StatelessWidget {
+  final IconData? icon;
+  final String? asset;
+  final String label;
+  final String value;
+
+  const _BriefingLine({
+    this.icon,
+    this.asset,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (asset != null)
+            AppSvgIcon(asset!, color: EngoraColors.brand, size: 21)
+          else
+            Icon(icon, color: EngoraColors.brand, size: 21),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: EngoraColors.muted,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

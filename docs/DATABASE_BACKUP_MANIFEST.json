@@ -1,29 +1,71 @@
 {
   "schema_version": 1,
-  "backup_id": "pre_topics_migration_2026-08-04T13-27-40-790Z",
+  "backup_id": "pre_topics_migration_2026-09-04T00-45-04-229Z",
   "purpose": "Pre-Topic and Setting migration backup for Phase 0",
-  "created_at": "2026-08-04T13:27:40.790Z",
+  "created_at": "2026-09-04T00:45:04.229Z",
   "database_name": "redacted",
-  "collection_count": 3,
-  "total_document_count": 23,
+  "collection_count": 10,
+  "total_document_count": 60,
   "collections": [
+    {
+      "name": "auditevents",
+      "document_count": 22,
+      "bytes": 7706,
+      "sha256": "86918c5b77509809def8135aecd425cc3f13b16ca4b60bf62c2bbb5a4b4d846c"
+    },
+    {
+      "name": "launchtokens",
+      "document_count": 0,
+      "bytes": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "name": "learningmodules",
+      "document_count": 0,
+      "bytes": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "name": "learningpages",
+      "document_count": 0,
+      "bytes": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "name": "learningunits",
+      "document_count": 0,
+      "bytes": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
     {
       "name": "practicesessions",
       "document_count": 7,
-      "bytes": 94804,
-      "sha256": "17e237cafe428c474e5b72ddfb7c33b679900fc819340ff8aa16f42ded17f085"
+      "bytes": 94803,
+      "sha256": "1b9599780e9783dbcbc862ff8095fb2801d7337b62f2528d59255af6c9d46841"
     },
     {
       "name": "scenarios",
-      "document_count": 10,
-      "bytes": 162331,
-      "sha256": "edde0b21f837e7e54f67eb87b832a3efb6ce2bb5505e023d84733084277e0fc1"
+      "document_count": 16,
+      "bytes": 286569,
+      "sha256": "06ccdf25a9c3bf5a38185e6a7f596214c78fcf59349090730c1dd82d530c471c"
+    },
+    {
+      "name": "settings",
+      "document_count": 6,
+      "bytes": 9478,
+      "sha256": "da825928e81bcdb35c229cc8960bb6c8b6896c9e90122a7e6568a2fe54735e0c"
+    },
+    {
+      "name": "topics",
+      "document_count": 3,
+      "bytes": 2641,
+      "sha256": "1fac7bed51cef3db470edc736859c0be72152601e476df2dadfd1d7074d096f4"
     },
     {
       "name": "users",
       "document_count": 6,
-      "bytes": 2242,
-      "sha256": "e5bdf6fef1b4eb0e62624ada4dd174690993b65c84bc69d36d8e0d1ba14e8fb3"
+      "bytes": 2304,
+      "sha256": "53fcfb932d31d29fd3bd4f1c7f3b79ca26dd08287d4d830269df2def905a9b62"
     }
   ],
   "contains_sensitive_data": true,

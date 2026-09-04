@@ -29,6 +29,55 @@ const {
   serializeSetting,
   serializeTopic,
 } = require("./services/guided_scenario_service");
+const {
+  APPROVED_AI_PARTNERS,
+  getApprovedAiPartner,
+  generateDeterministicAdvancedSettings,
+  buildRuntimeScenarioData,
+  serializeCanonicalScenario,
+} = require("./services/canonical_scenario_service");
+const { createDashboardRouter } = require("./routes/dashboard_router");
+const AuditEvent = require("./models/AuditEvent");
+
+function requireFeature(flagName) {
+  return (req, res, next) => {
+    const isEnabled =
+      flagName === "modules"
+        ? process.env.FEATURE_MODULES_ENABLED === "true"
+        : flagName === "qr"
+        ? process.env.FEATURE_QR_ENABLED === "true"
+        : false;
+    if (!isEnabled) {
+      return res.status(403).json({
+        error: "FEATURE_DISABLED",
+        message: `This feature (${flagName}) is currently unavailable.`,
+        request_id: req.requestId,
+      });
+    }
+    next();
+  };
+}
+
+function logAuditEvent({ event, actorId, role, recordId, details = {}, requestId }) {
+  const safeDetails = { ...details };
+  delete safeDetails.password;
+  delete safeDetails.transcript;
+  delete safeDetails.token;
+  delete safeDetails.secret;
+  console.log(
+    `[AUDIT] event=${event} actor_id=${actorId || "system"} role=${role || "system"} record_id=${recordId || "-"} request_id=${requestId || "-"} details=${JSON.stringify(safeDetails)}`
+  );
+  if (mongoose.connection.readyState === 1) {
+    AuditEvent.create({
+      event,
+      actorId: actorId || null,
+      role: role || "system",
+      recordId: recordId || null,
+      requestId: requestId || null,
+      details: safeDetails,
+    }).catch((error) => console.error("[AUDIT] persistence_failed", error.message));
+  }
+}
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -365,7 +414,40 @@ async function findActiveSetting(settingId) {
   const normalizedId = String(settingId || "").trim().toUpperCase();
   if (!normalizedId) return null;
   if (mongoose.connection.readyState === 1) {
-    return Setting.findOne({ settingId: normalizedId, isActive: true }).lean();
+    const settingDoc = await Setting.findOne({ settingId: normalizedId, isActive: true }).lean();
+    if (settingDoc) return settingDoc;
+    const scenarioDoc = await Scenario.findOne({
+      $or: [
+        { scenarioId: normalizedId },
+        { "legacyRefs.setting_id": normalizedId },
+      ],
+      isActive: true,
+    }).lean();
+    if (scenarioDoc && scenarioDoc.placements?.includes("guided_topics")) {
+      return {
+        settingId: scenarioDoc.scenarioId,
+        topicId: scenarioDoc.categoryIds?.[0] || scenarioDoc.legacyRefs?.topic_id || "academic-communication",
+        title: scenarioDoc.title,
+        location: scenarioDoc.practiceLocation,
+        briefing: scenarioDoc.briefing,
+        stickerAssetKey: scenarioDoc.visual?.sticker_asset_key || "",
+        studentRole: scenarioDoc.studentRole,
+        aiCharacter: {
+          display_name: scenarioDoc.aiPartner?.display_name || "AI Character",
+          role: scenarioDoc.aiPartner?.role || "Conversation partner",
+          culture: scenarioDoc.aiPartner?.culture || "International",
+          avatar_key: scenarioDoc.aiPartner?.avatar_key || "default_avatar",
+        },
+        taskInstruction: scenarioDoc.studentTask,
+        conversationStages: scenarioDoc.advanced?.conversation_stages || [],
+        constraints: scenarioDoc.advanced?.constraints || [],
+        rubric: scenarioDoc.advanced?.assessment_criteria || {},
+        sessionRules: scenarioDoc.sessionRules || {},
+        displayOrder: 0,
+        isActive: true,
+        version: scenarioDoc.version || 1,
+      };
+    }
   }
   return settingsData.find(
     (setting) => setting.settingId === normalizedId && setting.isActive !== false
@@ -1408,7 +1490,9 @@ function extractLaunchToken(value) {
     const parsed = new URL(raw);
     return String(parsed.searchParams.get("token") || "").trim();
   } catch (_) {
-    return raw.replace(/^orbis:\/\/launch\?token=/i, "").trim();
+    return raw
+      .replace(/^[a-z][a-z0-9+.-]*:\/\/launch\?token=/i, "")
+      .trim();
   }
 }
 
@@ -1754,6 +1838,7 @@ const openAILimiter = rateLimit({
 
 app.use("/api/auth", authLimiter);
 app.use("/api/openai", openAILimiter);
+app.use("/api/dashboard", createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }));
 
 // ─── Analytics Endpoints ───
 
@@ -1882,6 +1967,8 @@ app.post("/api/auth/signup", async (req, res) => {
     res.status(201).json({
       token,
       user: {
+        id: user._id,
+        userId: user._id,
         name: user.name,
         email: user.email,
         gender: user.gender,
@@ -1907,6 +1994,9 @@ app.post("/api/auth/login", async (req, res) => {
     const user = await User.findOne({ email });
     if (!user || !(await user.comparePassword(password))) {
       return res.status(400).json({ error: "Invalid email or password" });
+    }
+    if (user.accountStatus === "inactive") {
+      return res.status(403).json({ error: "This account is inactive. Contact an administrator." });
     }
     const token = jwt.sign({ userId: user._id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: "30d" });
     res.json({
@@ -2734,7 +2824,7 @@ app.delete("/api/admin/settings/:id", authenticateJWT, requireRole(["admin"]), a
 
 // --- Learning Module and QR Launch Endpoints ---
 
-app.get("/api/admin/modules", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+app.get("/api/admin/modules", authenticateJWT, requireRole(["admin"]), requireFeature("modules"), async (req, res) => {
   try {
     return res.json(await buildLearningModuleTree());
   } catch (error) {
@@ -2742,7 +2832,7 @@ app.get("/api/admin/modules", authenticateJWT, requireRole(["admin"]), async (re
   }
 });
 
-app.post("/api/admin/modules", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+app.post("/api/admin/modules", authenticateJWT, requireRole(["admin"]), requireFeature("modules"), async (req, res) => {
   try {
     const moduleId = normalizeLearningId(req.body.module_id || req.body.moduleId);
     const validationError = validateLearningId(moduleId, "module_id");
@@ -2767,7 +2857,7 @@ app.post("/api/admin/modules", authenticateJWT, requireRole(["admin"]), async (r
   }
 });
 
-app.put("/api/admin/modules/:module_id", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+app.put("/api/admin/modules/:module_id", authenticateJWT, requireRole(["admin"]), requireFeature("modules"), async (req, res) => {
   try {
     const moduleId = normalizeLearningId(req.params.module_id);
     const update = {};
@@ -2788,7 +2878,7 @@ app.put("/api/admin/modules/:module_id", authenticateJWT, requireRole(["admin"])
   }
 });
 
-app.delete("/api/admin/modules/:module_id", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+app.delete("/api/admin/modules/:module_id", authenticateJWT, requireRole(["admin"]), requireFeature("modules"), async (req, res) => {
   try {
     const moduleId = normalizeLearningId(req.params.module_id);
     const module = await LearningModule.findOneAndUpdate(
@@ -2808,7 +2898,7 @@ app.delete("/api/admin/modules/:module_id", authenticateJWT, requireRole(["admin
   }
 });
 
-app.post("/api/admin/modules/:module_id/units", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+app.post("/api/admin/modules/:module_id/units", authenticateJWT, requireRole(["admin"]), requireFeature("modules"), async (req, res) => {
   try {
     const moduleId = normalizeLearningId(req.params.module_id);
     const unitId = normalizeLearningId(req.body.unit_id || req.body.unitId);
@@ -2835,7 +2925,7 @@ app.post("/api/admin/modules/:module_id/units", authenticateJWT, requireRole(["a
   }
 });
 
-app.put("/api/admin/units/:unit_id", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+app.put("/api/admin/units/:unit_id", authenticateJWT, requireRole(["admin"]), requireFeature("modules"), async (req, res) => {
   try {
     const unitId = normalizeLearningId(req.params.unit_id);
     const update = {};
@@ -2862,7 +2952,7 @@ app.put("/api/admin/units/:unit_id", authenticateJWT, requireRole(["admin"]), as
   }
 });
 
-app.post("/api/admin/units/:unit_id/pages", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+app.post("/api/admin/units/:unit_id/pages", authenticateJWT, requireRole(["admin"]), requireFeature("modules"), async (req, res) => {
   try {
     const unitId = normalizeLearningId(req.params.unit_id);
     const pageId = normalizeLearningId(req.body.page_id || req.body.pageId);
@@ -2894,7 +2984,7 @@ app.post("/api/admin/units/:unit_id/pages", authenticateJWT, requireRole(["admin
   }
 });
 
-app.put("/api/admin/pages/:page_id", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+app.put("/api/admin/pages/:page_id", authenticateJWT, requireRole(["admin"]), requireFeature("modules"), async (req, res) => {
   try {
     const pageId = normalizeLearningId(req.params.page_id);
     const update = {};
@@ -2924,7 +3014,7 @@ app.put("/api/admin/pages/:page_id", authenticateJWT, requireRole(["admin"]), as
   }
 });
 
-app.post("/api/admin/pages/:page_id/launch-token", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+app.post("/api/admin/pages/:page_id/launch-token", authenticateJWT, requireRole(["admin"]), requireFeature("qr"), async (req, res) => {
   try {
     const pageId = normalizeLearningId(req.params.page_id);
     const page = await LearningPage.findOne({ pageId, isActive: true }).lean();
@@ -2940,7 +3030,7 @@ app.post("/api/admin/pages/:page_id/launch-token", authenticateJWT, requireRole(
     const expiresInDays = Math.min(730, Math.max(1, Number(req.body.expires_in_days || 365)));
     const token = crypto.randomBytes(32).toString("base64url");
     const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
-    const launchUri = `orbis://launch?token=${encodeURIComponent(token)}`;
+    const launchUri = `engora://launch?token=${encodeURIComponent(token)}`;
     const launchToken = await LaunchToken.create({
       tokenHash: hashLaunchToken(token),
       tokenPrefix: token.slice(0, 8),
@@ -2971,7 +3061,7 @@ app.post("/api/admin/pages/:page_id/launch-token", authenticateJWT, requireRole(
   }
 });
 
-app.get("/api/admin/launch-tokens", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+app.get("/api/admin/launch-tokens", authenticateJWT, requireRole(["admin"]), requireFeature("qr"), async (req, res) => {
   try {
     const tokens = await LaunchToken.find().sort({ createdAt: -1 }).lean();
     return res.json(tokens.map((token) => ({
@@ -2992,7 +3082,7 @@ app.get("/api/admin/launch-tokens", authenticateJWT, requireRole(["admin"]), asy
   }
 });
 
-app.patch("/api/admin/launch-tokens/:id/deactivate", authenticateJWT, requireRole(["admin"]), async (req, res) => {
+app.patch("/api/admin/launch-tokens/:id/deactivate", authenticateJWT, requireRole(["admin"]), requireFeature("qr"), async (req, res) => {
   try {
     const token = await LaunchToken.findByIdAndUpdate(
       req.params.id,
@@ -3006,7 +3096,7 @@ app.patch("/api/admin/launch-tokens/:id/deactivate", authenticateJWT, requireRol
   }
 });
 
-app.post("/api/launch/resolve", async (req, res) => {
+app.post("/api/launch/resolve", requireFeature("qr"), async (req, res) => {
   try {
     const token = extractLaunchToken(req.body.token || req.body.code || req.body.launch_uri);
     if (!token) return res.status(400).json({ error: "A launch token is required." });

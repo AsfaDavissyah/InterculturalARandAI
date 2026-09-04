@@ -10,6 +10,13 @@ const jsonResponse = (data, { ok = true, status = 200 } = {}) => ({
   json: async () => data,
 });
 
+const textResponse = (data, { ok = false, status = 404 } = {}) => ({
+  ok,
+  status,
+  headers: { get: () => 'text/html; charset=utf-8' },
+  text: async () => data,
+});
+
 describe('requestJson', () => {
   it('sends JSON and the bearer token without duplicating URL slashes', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ success: true }));
@@ -63,6 +70,20 @@ describe('requestJson', () => {
     })).rejects.toMatchObject({
       name: 'ApiError',
       message: expect.stringContaining('Tidak dapat terhubung ke server'),
+    });
+  });
+
+  it('does not expose a raw HTML Cannot GET page to the dashboard', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      textResponse('<!DOCTYPE html><html><body><pre>Cannot GET /api/dashboard/overview</pre></body></html>'),
+    );
+    await expect(requestJson({
+      baseUrl: 'http://127.0.0.1:3000',
+      endpoint: '/api/dashboard/overview',
+      fetchImpl,
+    })).rejects.toMatchObject({
+      status: 404,
+      message: expect.stringContaining('Restart the backend'),
     });
   });
 

@@ -21,9 +21,11 @@ import '../services/avatar_registry.dart';
 import '../services/chat_service.dart';
 import '../services/practice_history_store.dart';
 import '../services/pilot_evidence_service.dart';
-import '../services/setting_sticker_registry.dart';
+import '../theme/engora_theme.dart';
+import '../widgets/app_svg_icon.dart';
 import '../widgets/ar_avatar.dart';
 import '../widgets/ar_avatar_3d.dart';
+import '../widgets/setting_visual.dart';
 import 'result_screen.dart';
 
 Size cameraPreviewDisplaySize(Size previewSize, Orientation orientation) {
@@ -77,10 +79,10 @@ class ArSpeakingScreen extends StatefulWidget {
 
 class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
-  static const Color _cream = Color(0xFFFFFCF4);
-  static const Color _black = Color(0xFF000000);
-  static const Color _orange = Color(0xFFD4842A);
-  static const Color _danger = Color(0xFFD54343);
+  static const Color _cream = EngoraColors.background;
+  static const Color _black = EngoraColors.ink;
+  static const Color _orange = EngoraColors.brand;
+  static const Color _danger = EngoraColors.danger;
 
   late final AnimationController _pulsingController;
   final SpeechToText _speech = SpeechToText();
@@ -969,9 +971,9 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1C1C1E).withValues(alpha: 0.94),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _orange.withValues(alpha: 0.5), width: 1.2),
+        color: _cream.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _orange.withValues(alpha: 0.45)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.25),
@@ -1009,14 +1011,14 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                         color: _orange,
                         fontWeight: FontWeight.w800,
                         fontSize: 11,
-                        letterSpacing: 0.6,
+                        letterSpacing: 0,
                       ),
                     ),
                     GestureDetector(
                       onTap: () => setState(() => _activeCoachingEvent = null),
                       child: const Icon(
                         Icons.close_rounded,
-                        color: Colors.white54,
+                        color: EngoraColors.muted,
                         size: 16,
                       ),
                     ),
@@ -1026,7 +1028,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                 Text(
                   event.shortHint,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: _black,
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600,
                     height: 1.35,
@@ -1085,6 +1087,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     return AvatarRegistry.modelPathFor(
       avatarKey: widget.avatarKey,
       aiRole: widget.scenario.aiRole,
+      experienceType: widget.experienceType,
     );
   }
 
@@ -1161,7 +1164,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
   Widget _buildIconButton({
     required String tooltip,
-    required IconData icon,
+    required Widget icon,
     required VoidCallback? onPressed,
   }) {
     return IconButton(
@@ -1172,10 +1175,11 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         foregroundColor: _black,
         disabledBackgroundColor: _cream.withValues(alpha: 0.7),
         disabledForegroundColor: _black.withValues(alpha: 0.35),
-        side: BorderSide(color: _black.withValues(alpha: 0.14), width: 1.2),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        side: BorderSide(color: _black.withValues(alpha: 0.08)),
+        shape: const CircleBorder(),
+        minimumSize: const Size(48, 48),
       ),
-      icon: Icon(icon),
+      icon: icon,
     );
   }
 
@@ -1191,7 +1195,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: _cream,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: _black.withValues(alpha: 0.12)),
         boxShadow: [
           BoxShadow(
@@ -1283,9 +1287,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
               Positioned(
                 left: 0,
                 right: 0,
-                top: 75,
-                bottom:
-                    140, // Diperkecil agar tinggi area avatar lebih besar (melewati panel kontrol transparan)
+                top: 105,
+                bottom: 145,
                 child: Center(
                   child: AspectRatio(
                     aspectRatio: 0.7,
@@ -1297,220 +1300,206 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                 ),
               ),
             SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                child: Column(
-                  children: [
-                    Row(
+              child: Column(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+                    decoration: const BoxDecoration(
+                      color: _cream,
+                      borderRadius: BorderRadius.vertical(
+                        bottom: Radius.circular(22),
+                      ),
+                    ),
+                    child: Row(
                       children: [
                         _buildIconButton(
                           tooltip: 'Back',
-                          icon: Icons.arrow_back_rounded,
+                          icon: const AppSvgIcon(AppIcons.back, size: 24),
                           onPressed: _confirmExit,
                         ),
                         const SizedBox(width: 10),
+                        if ((widget.stickerAssetKey ?? '').isNotEmpty) ...[
+                          SettingVisual(
+                            stickerKey: widget.stickerAssetKey!,
+                            label: widget.scenario.title,
+                            width: 34,
+                            height: 34,
+                            borderRadius: 8,
+                            showLabel: false,
+                          ),
+                          const SizedBox(width: 10),
+                        ],
                         Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _cream,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: _black.withValues(alpha: 0.12),
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: _black.withValues(alpha: 0.08),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              children: [
-                                if (SettingStickerRegistry.hasSticker(
-                                  widget.stickerAssetKey,
-                                )) ...[
-                                  SettingStickerView(
-                                    stickerKey: widget.stickerAssetKey,
-                                    size: 34,
-                                    borderRadius: 8,
-                                  ),
-                                  const SizedBox(width: 10),
-                                ],
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        widget.scenario.id,
-                                        style: TextStyle(
-                                          color: _black.withValues(alpha: 0.55),
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                      Text(
-                                        widget.scenario.title,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: _black,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 13.5,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                          child: Text(
+                            widget.topicTitle ?? widget.scenario.type,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: _black,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        _buildIconButton(
-                          tooltip: _showSubtitles
-                              ? 'Hide subtitles'
-                              : 'Show subtitles',
-                          icon: _showSubtitles
-                              ? Icons.closed_caption
-                              : Icons.closed_caption_off_outlined,
-                          onPressed: () =>
-                              setState(() => _showSubtitles = !_showSubtitles),
-                        ),
-                        _buildIconButton(
-                          tooltip: 'Transcript',
-                          icon: Icons.receipt_long_outlined,
-                          onPressed: _messages.isEmpty ? null : _showTranscript,
+                        const SizedBox(width: 10),
+                        PopupMenuButton<String>(
+                          tooltip: 'Practice options',
+                          color: _cream,
+                          onSelected: (value) {
+                            if (value == 'subtitles') {
+                              setState(() => _showSubtitles = !_showSubtitles);
+                            } else if (value == 'transcript' &&
+                                _messages.isNotEmpty) {
+                              _showTranscript();
+                            }
+                          },
+                          itemBuilder: (_) => [
+                            PopupMenuItem(
+                              value: 'subtitles',
+                              child: Text(
+                                _showSubtitles
+                                    ? 'Hide subtitles'
+                                    : 'Show subtitles',
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'transcript',
+                              enabled: _messages.isNotEmpty,
+                              child: const Text('View transcript'),
+                            ),
+                          ],
+                          icon: const Icon(Icons.more_horiz_rounded),
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: _black,
+                            minimumSize: const Size(48, 48),
+                          ),
                         ),
                       ],
                     ),
-                    _buildCoachingBanner(),
-                    const Spacer(),
-                    _buildThinkingIndicator(),
-                    if (_sessionError == null)
-                      Align(
+                  ),
+                  _buildCoachingBanner(),
+                  const Spacer(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: _buildThinkingIndicator(),
+                  ),
+                  if (_sessionError == null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Align(
                         alignment: Alignment.center,
                         child: _buildSubtitle(),
                       ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-                      decoration: BoxDecoration(
-                        color: _cream,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: _black.withValues(alpha: 0.12),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _black.withValues(alpha: 0.14),
-                            blurRadius: 24,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
+                    ),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+                    decoration: const BoxDecoration(
+                      color: _cream,
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(22),
                       ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _statusLabel,
-                            style: const TextStyle(
-                              color: _black,
-                              fontWeight: FontWeight.w700,
-                            ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _statusLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: EngoraColors.muted,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 13,
                           ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              _buildIconButton(
-                                tooltip: _cameraEnabled
-                                    ? 'Turn camera off'
-                                    : 'Turn camera on',
-                                icon: _cameraEnabled
-                                    ? Icons.videocam_outlined
-                                    : Icons.videocam_off_outlined,
-                                onPressed: _toggleCamera,
-                              ),
-                              Semantics(
-                                button: true,
-                                label: _speech.isListening
-                                    ? 'Stop listening'
-                                    : 'Start speaking',
-                                child: AnimatedBuilder(
-                                  animation: _pulsingController,
-                                  builder: (context, child) {
-                                    final pulse = _pulsingController.value;
-                                    return SizedBox(
-                                      width: 92,
-                                      height: 92,
-                                      child: Stack(
-                                        alignment: Alignment.center,
-                                        children: [
-                                          if (_speech.isListening)
-                                            Container(
-                                              width: 68 + (pulse * 24),
-                                              height: 68 + (pulse * 24),
-                                              decoration: BoxDecoration(
-                                                shape: BoxShape.circle,
-                                                color: const Color(0xFFD54343)
-                                                    .withValues(
-                                                      alpha:
-                                                          0.45 * (1.0 - pulse),
-                                                    ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _buildIconButton(
+                              tooltip: _cameraEnabled
+                                  ? 'Turn camera off'
+                                  : 'Turn camera on',
+                              icon: _cameraEnabled
+                                  ? const AppSvgIcon(AppIcons.camera, size: 24)
+                                  : const Icon(Icons.videocam_off_outlined),
+                              onPressed: _toggleCamera,
+                            ),
+                            Semantics(
+                              button: true,
+                              label: _speech.isListening
+                                  ? 'Stop listening'
+                                  : 'Start speaking',
+                              child: AnimatedBuilder(
+                                animation: _pulsingController,
+                                builder: (context, child) {
+                                  final pulse = _pulsingController.value;
+                                  return SizedBox(
+                                    width: 84,
+                                    height: 84,
+                                    child: Stack(
+                                      alignment: Alignment.center,
+                                      children: [
+                                        if (_speech.isListening)
+                                          Container(
+                                            width: 62 + (pulse * 20),
+                                            height: 62 + (pulse * 20),
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: _danger.withValues(
+                                                alpha: 0.35 * (1 - pulse),
                                               ),
                                             ),
-                                          child!,
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                  child: IconButton.filled(
-                                    tooltip: _speech.isListening
-                                        ? 'Stop listening'
-                                        : 'Speak',
-                                    onPressed: canInteract
-                                        ? _toggleListening
-                                        : null,
-                                    style: IconButton.styleFrom(
-                                      minimumSize: const Size(68, 68),
-                                      backgroundColor: _speech.isListening
-                                          ? _danger
-                                          : _orange,
-                                      foregroundColor: Colors.white,
-                                      disabledBackgroundColor: _black
-                                          .withValues(alpha: 0.12),
-                                      disabledForegroundColor: _black
-                                          .withValues(alpha: 0.35),
+                                          ),
+                                        child!,
+                                      ],
                                     ),
-                                    iconSize: 31,
-                                    icon: Icon(
-                                      _speech.isListening
-                                          ? Icons.stop_rounded
-                                          : Icons.mic_rounded,
-                                    ),
+                                  );
+                                },
+                                child: IconButton.filled(
+                                  tooltip: _speech.isListening
+                                      ? 'Stop listening'
+                                      : 'Speak',
+                                  onPressed: canInteract
+                                      ? _toggleListening
+                                      : null,
+                                  style: IconButton.styleFrom(
+                                    minimumSize: const Size(64, 64),
+                                    backgroundColor: _speech.isListening
+                                        ? _danger
+                                        : _orange,
+                                    foregroundColor: Colors.white,
+                                    disabledBackgroundColor: EngoraColors.line,
+                                    disabledForegroundColor: EngoraColors.muted,
+                                  ),
+                                  iconSize: 29,
+                                  icon: AppSvgIcon(
+                                    _speech.isListening
+                                        ? AppIcons.microphoneSlash
+                                        : AppIcons.microphone,
+                                    size: 28,
                                   ),
                                 ),
                               ),
-                              _buildIconButton(
-                                tooltip: 'Finish practice',
-                                icon: Icons.flag_outlined,
-                                onPressed: _lastResponse == null
-                                    ? null
-                                    : _requestFinish,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                            ),
+                            _buildIconButton(
+                              tooltip: 'Finish practice',
+                              icon: const AppSvgIcon(AppIcons.finish, size: 24),
+                              onPressed: _lastResponse == null
+                                  ? null
+                                  : _requestFinish,
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
             _buildErrorPanel(),

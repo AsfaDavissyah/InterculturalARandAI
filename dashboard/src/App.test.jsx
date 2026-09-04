@@ -1,8 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
-import { clearAuthSession, getAuthSession } from './lib/auth-session';
+import { clearAuthSession } from './lib/auth-session';
 
 const { toastError, toastSuccess } = vi.hoisted(() => ({
   toastError: vi.fn(),
@@ -13,61 +13,86 @@ vi.mock('sonner', () => ({
   toast: {
     error: toastError,
     success: toastSuccess,
+    info: vi.fn(),
   },
+  Toaster: () => null,
 }));
 
 const adminUser = {
+  id: 'admin_1',
   name: 'System Admin',
+  email: 'admin@icc.com',
   role: 'admin',
 };
 
-const topicFixture = {
-  _id: 'topic-db-id',
-  topicId: 'academic-communication',
-  title: 'Academic Communication',
-  description: 'Academic speaking practice.',
-  iconKey: 'school',
-  displayOrder: 1,
-  isActive: true,
-  languageObjectives: ['Ask questions politely'],
-  iccObjectives: ['Use formal address'],
+const lecturerUser = {
+  id: 'lecturer_1',
+  name: 'Dr. Jane Smith',
+  email: 'lecturer@icc.com',
+  role: 'lecturer',
+  lecturerCode: 'DR-JANE-01',
 };
 
-const settingFixture = {
-  _id: 'setting-db-id',
-  settingId: 'ACADEMIC-LECTURER-OFFICE',
-  topicId: 'academic-communication',
+const categoryFixture = {
+  category_id: 'academic-communication',
+  name: 'Academic Communication',
+  description: 'Academic speaking practice.',
+  icon_key: 'school',
+  published_scenario_count: 5,
+  status: 'active',
+  display_order: 0,
+};
+
+const scenarioFixture = {
+  scenario_id: 'SCN-ACADEMIC-001',
   title: "Lecturer's Office Consultation",
-  location: "Lecturer's Office",
-  briefing: 'Ask your lecturer for guidance.',
-  stickerAssetKey: 'sticker_lecturer_office',
-  studentRole: 'Student attending a consultation',
-  aiCharacter: {
+  briefing: 'Ask your lecturer for guidance on research methodology.',
+  placements: ['guided_topics', 'scenario_library'],
+  category_ids: ['academic-communication'],
+  status: 'published',
+  student_role: 'Student attending a consultation',
+  ai_partner: {
+    profile_id: 'emma-lecturer',
     display_name: 'Dr Emma Collins',
     role: 'Foreign lecturer',
     culture: 'United Kingdom',
     avatar_key: 'female_lecturer_v1',
+    voice_profile: 'female',
   },
-  taskInstruction: 'Explain the concern and ask politely.',
-  conversationStages: ['greeting_and_introduction', 'polite_closing'],
-  constraints: ['Stay in the office.'],
-  rubric: { politeness: 5 },
-  sessionRules: {
-    minimumStudentResponses: 5,
-    targetStudentResponsesMin: 6,
-    targetStudentResponsesMax: 8,
-    maximumStudentResponses: 10,
-  },
-  isActive: true,
+  student_task: 'Explain your concern clearly and ask questions politely.',
+  practice_location: "Lecturer's Office",
+  level: 'B1',
+  owner: { type: 'admin', display_name: 'System Admin' },
   version: 1,
+  updated_at: new Date().toISOString(),
 };
 
-const moduleFixture = {
-  module_id: 'ICC-MODULE-01',
-  title: 'Intercultural Speaking Module',
-  description: 'Printed module activities.',
-  is_active: true,
-  units: [],
+const overviewFixture = {
+  role: 'admin',
+  summary: {
+    published_scenarios: 16,
+    drafts_awaiting_review: 2,
+    active_categories: 3,
+    active_lecturers: 4,
+    registered_students: 25,
+    completed_practices: 120,
+  },
+  drafts_awaiting_review: [],
+  recent_sessions: [],
+  recent_lecturers: [],
+};
+
+const lecturerOverviewFixture = {
+  role: 'lecturer',
+  summary: {
+    connected_students: 15,
+    practices_this_week: 8,
+    average_cohort_score: '4.2',
+    own_draft_scenarios: 1,
+  },
+  recent_sessions: [],
+  students_needing_attention: [],
+  own_drafts: [],
 };
 
 function jsonResponse(body, status = 200) {
@@ -79,36 +104,106 @@ function jsonResponse(body, status = 200) {
   };
 }
 
-function mockAdminApi(onRequest = () => {}) {
-  return vi.fn().mockImplementation(async (url, options = {}) => {
-    const path = new URL(String(url)).pathname;
-    onRequest(path, options);
+function mockApi(role = 'admin') {
+  return vi.fn().mockImplementation(async (url, _options = {}) => {
+    const parsedUrl = new URL(String(url));
+    const path = parsedUrl.pathname;
+
     if (path === '/api/auth/login') {
-      return jsonResponse({ token: 'dashboard-jwt', user: adminUser });
+      const user = role === 'admin' ? adminUser : lecturerUser;
+      return jsonResponse({ token: 'dashboard-jwt', user });
     }
-    if (path === '/api/admin/topics' && (!options.method || options.method === 'GET')) {
-      return jsonResponse([topicFixture]);
+
+    if (path === '/api/dashboard/overview') {
+      return jsonResponse(role === 'admin' ? overviewFixture : lecturerOverviewFixture);
     }
-    if (path === '/api/admin/settings' && (!options.method || options.method === 'GET')) {
-      return jsonResponse([settingFixture]);
+
+    if (path === '/api/dashboard/categories') {
+      return jsonResponse([categoryFixture]);
     }
-    if (path === '/api/admin/modules' && (!options.method || options.method === 'GET')) {
-      return jsonResponse([moduleFixture]);
+
+    if (path === '/api/dashboard/scenarios') {
+      return jsonResponse({
+        items: [scenarioFixture],
+        page: 1,
+        page_size: 10,
+        total_items: 1,
+        total_pages: 1,
+      });
     }
-    if (path === '/api/admin/launch-tokens' && (!options.method || options.method === 'GET')) {
-      return jsonResponse([]);
+
+    if (path === `/api/dashboard/scenarios/${scenarioFixture.scenario_id}`) {
+      return jsonResponse(scenarioFixture);
     }
-    if (path === '/api/admin/modules' && options.method === 'POST') {
-      return jsonResponse(JSON.parse(options.body), 201);
+
+    if (path === '/api/dashboard/lecturers') {
+      return jsonResponse([
+        {
+          id: 'lec_1',
+          name: 'Dr. Jane Smith',
+          email: 'lecturer@icc.com',
+          lecturer_code: 'DR-JANE-01',
+          connected_students_count: 15,
+          status: 'active',
+        },
+      ]);
     }
-    if (path === '/api/admin/topics' && options.method === 'POST') {
-      return jsonResponse(JSON.parse(options.body), 201);
+
+    if (path === '/api/dashboard/students') {
+      return jsonResponse([
+        {
+          id: 'st_1',
+          name: 'Budi Santoso',
+          email: 'budi@icc.com',
+          student_id: 'NIM-101',
+          practice_count: 6,
+          completed_count: 5,
+          average_score: 4.2,
+          last_practice: new Date().toISOString(),
+        },
+      ]);
     }
-    return jsonResponse([]);
+
+    if (path === '/api/dashboard/practice-results') {
+      return jsonResponse({
+        items: [
+          {
+            session_id: 'sess_1',
+            student: { display_name: 'Budi Santoso', student_id: 'NIM-101' },
+            scenario: { title: "Lecturer's Office Consultation" },
+            category_id: 'academic-communication',
+            duration_seconds: 240,
+            total_student_responses: 6,
+            overall_score: 4.5,
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+          },
+        ],
+        page: 1,
+        page_size: 15,
+        total_items: 1,
+        total_pages: 1,
+      });
+    }
+
+    if (path === '/api/dashboard/system-settings') {
+      return jsonResponse({
+        approved_ai_partners: [scenarioFixture.ai_partner],
+        default_session_rules: { target_duration_minutes: 5, minimum_student_responses: 5 },
+        default_criteria: [{ criterion: 'grammar', weight: 5 }],
+        feature_flags: { modules: false, qr: false },
+      });
+    }
+
+    if (path === '/api/dashboard/profile') {
+      return jsonResponse(role === 'admin' ? adminUser : lecturerUser);
+    }
+
+    return jsonResponse({});
   });
 }
 
-describe('dashboard login', () => {
+describe('Dashboard PRD Simplification', () => {
   beforeEach(() => {
     clearAuthSession();
     localStorage.clear();
@@ -117,145 +212,91 @@ describe('dashboard login', () => {
     vi.unstubAllGlobals();
   });
 
-  it('shows backend login errors in the form and as a toast', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: false,
-      status: 400,
-      headers: {
-        get: () => 'application/json',
-      },
-      json: async () => ({ error: 'Invalid email or password' }),
-    }));
+  it('Admin login shows simplified navigation and hides Modules & QR', async () => {
+    vi.stubGlobal('fetch', mockApi('admin'));
     const user = userEvent.setup();
-
     render(<App />);
-    await user.type(screen.getByLabelText('Email'), 'admin@example.com');
-    await user.type(screen.getByLabelText('Password'), 'wrong-password');
-    await user.click(screen.getByRole('button', { name: 'Log in to Portal' }));
 
-    expect(await screen.findByText('Invalid email or password')).toBeVisible();
-    expect(toastError).toHaveBeenCalledWith('Invalid email or password');
-  });
+    const emailInput = screen.getByPlaceholderText(/lecturer@university.edu/i);
+    const passwordInput = screen.getByPlaceholderText(/enter your password/i);
+    const submitBtn = screen.getByRole('button', { name: /log in to portal/i });
 
-  it('keeps a successful login in memory without persisting the JWT', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url) => {
-      if (String(url).endsWith('/api/auth/login')) {
-        return {
-          ok: true,
-          status: 200,
-          headers: {
-            get: () => 'application/json',
-          },
-          json: async () => ({
-            token: 'dashboard-jwt',
-            user: adminUser,
-          }),
-        };
-      }
+    await user.type(emailInput, 'admin@icc.com');
+    await user.type(passwordInput, 'admin123');
+    await user.click(submitBtn);
 
-      return {
-        ok: true,
-        status: 200,
-        headers: {
-          get: () => 'application/json',
-        },
-        json: async () => [],
-      };
-    }));
-    const user = userEvent.setup();
-
-    render(<App />);
-    await user.type(screen.getByLabelText('Email'), 'admin@example.com');
-    await user.type(screen.getByLabelText('Password'), 'correct-password');
-    await user.click(screen.getByRole('button', { name: 'Log in to Portal' }));
-
-    expect(await screen.findByRole('heading', { name: 'Topics & Settings' })).toBeVisible();
-    expect(getAuthSession().token).toBe('dashboard-jwt');
-    expect(localStorage.getItem('jwt_token')).toBeNull();
-    expect(localStorage.getItem('user_profile')).toBeNull();
-  });
-
-  it('creates a topic from the Topic Builder and shows success feedback', async () => {
-    const requests = [];
-    vi.stubGlobal('fetch', mockAdminApi((path, options) => requests.push({ path, options })));
-    const user = userEvent.setup();
-
-    render(<App />);
-    await user.type(screen.getByLabelText('Email'), 'admin@example.com');
-    await user.type(screen.getByLabelText('Password'), 'correct-password');
-    await user.click(screen.getByRole('button', { name: 'Log in to Portal' }));
-    await screen.findByRole('heading', { name: 'Topics & Settings' });
-
-    await user.click(screen.getByRole('button', { name: 'New Topic' }));
-    await user.type(screen.getByLabelText('Topic ID (lowercase)'), 'travel-communication');
-    await user.type(screen.getByLabelText('Title'), 'Travel Communication');
-    await user.type(screen.getByLabelText('Description'), 'Practice communication while travelling.');
-    await user.type(screen.getByLabelText('Language Objectives (one per line)'), 'Ask for directions');
-    await user.type(screen.getByLabelText('ICC Objectives (one per line)'), 'Respect local customs');
-    await user.click(screen.getByRole('button', { name: 'Save Topic' }));
-
-    expect(toastSuccess).toHaveBeenCalledWith('New topic created successfully.');
-    const createRequest = requests.find((item) => item.path === '/api/admin/topics' && item.options.method === 'POST');
-    expect(createRequest).toBeTruthy();
-    expect(JSON.parse(createRequest.options.body)).toMatchObject({
-      topicId: 'travel-communication',
-      title: 'Travel Communication',
-      languageObjectives: ['Ask for directions'],
-      iccObjectives: ['Respect local customs'],
+    // Verify Admin Navigation is rendered
+    await waitFor(() => {
+      expect(screen.getByText('Admin Console Overview')).toBeInTheDocument();
     });
+
+    expect(screen.getByRole('button', { name: /overview/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /scenarios/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /categories/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /lecturers/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /practice results/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /system settings/i })).toBeInTheDocument();
+
+    // Verify Modules and QR are NOT in navigation
+    expect(screen.queryByText(/learning modules/i)).toBeNull();
+    expect(screen.queryByText(/qr code/i)).toBeNull();
   });
 
-  it('shows complete setting detail and prevents an invalid response range', async () => {
-    vi.stubGlobal('fetch', mockAdminApi());
+  it('Lecturer login shows Lecturer navigation with Students and Profile', async () => {
+    vi.stubGlobal('fetch', mockApi('lecturer'));
     const user = userEvent.setup();
-
     render(<App />);
-    await user.type(screen.getByLabelText('Email'), 'admin@example.com');
-    await user.type(screen.getByLabelText('Password'), 'correct-password');
-    await user.click(screen.getByRole('button', { name: 'Log in to Portal' }));
-    await screen.findByRole('heading', { name: 'Topics & Settings' });
 
-    await user.click(await screen.findByRole('button', { name: `View ${settingFixture.title}` }));
-    expect(screen.getByRole('heading', { name: settingFixture.title })).toBeVisible();
-    expect(screen.getByText('sticker_lecturer_office')).toBeVisible();
-    expect(screen.getByText('greeting_and_introduction')).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Close' }));
+    const emailInput = screen.getByPlaceholderText(/lecturer@university.edu/i);
+    const passwordInput = screen.getByPlaceholderText(/enter your password/i);
+    const submitBtn = screen.getByRole('button', { name: /log in to portal/i });
 
-    await user.click(screen.getByRole('button', { name: 'New Setting' }));
-    await user.type(screen.getByLabelText('Setting ID (UPPERCASE)'), 'SOCIAL-TEST-SETTING');
-    await user.type(screen.getByLabelText('Title'), 'Test Setting');
-    await user.type(screen.getByLabelText('Location'), 'Test Location');
-    await user.type(screen.getByLabelText('Student Role'), 'Student customer');
-    await user.type(screen.getByLabelText('AI Display Name'), 'Alex Morgan');
-    await user.type(screen.getByLabelText('AI Role'), 'Service staff member');
-    await user.clear(screen.getByLabelText('Minimum responses'));
-    await user.type(screen.getByLabelText('Minimum responses'), '9');
-    await user.click(screen.getByRole('button', { name: 'Save Setting' }));
+    await user.type(emailInput, 'dr.jane@icc.com');
+    await user.type(passwordInput, 'lecturer123');
+    await user.click(submitBtn);
 
-    expect(toastError).toHaveBeenCalledWith('Invalid response count range (Minimum <= Target Min <= Target Max <= Maximum).');
+    await waitFor(() => {
+      expect(screen.getByText('Lecturer Research Dashboard')).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('button', { name: /overview/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /scenarios/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /students/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /practice results/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /profile/i })).toBeInTheDocument();
+
+    // Categories and Lecturers should not be visible for Lecturer
+    expect(screen.queryByRole('button', { name: /^categories$/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^lecturers$/i })).toBeNull();
   });
 
-  it('opens Learning Modules and creates a module', async () => {
-    const requests = [];
-    vi.stubGlobal('fetch', mockAdminApi((path, options) => requests.push({ path, options })));
+  it('Navigates to Scenarios view and opens Scenario Detail', async () => {
+    vi.stubGlobal('fetch', mockApi('admin'));
     const user = userEvent.setup();
-
     render(<App />);
-    await user.type(screen.getByLabelText('Email'), 'admin@example.com');
-    await user.type(screen.getByLabelText('Password'), 'correct-password');
-    await user.click(screen.getByRole('button', { name: 'Log in to Portal' }));
-    await user.click(await screen.findByRole('button', { name: 'Learning Modules' }));
-    expect(await screen.findByRole('heading', { name: 'Learning Modules' })).toBeVisible();
 
-    await user.type(screen.getByLabelText('Module ID'), 'ICC-MODULE-02');
-    await user.type(screen.getByLabelText('Module title'), 'Social Communication Book');
-    await user.click(screen.getByRole('button', { name: 'Create Module' }));
+    await user.type(screen.getByPlaceholderText(/lecturer@university.edu/i), 'admin@icc.com');
+    await user.type(screen.getByPlaceholderText(/enter your password/i), 'admin123');
+    await user.click(screen.getByRole('button', { name: /log in to portal/i }));
 
-    expect(toastSuccess).toHaveBeenCalledWith('Learning module created.');
-    const request = requests.find((item) => item.path === '/api/admin/modules' && item.options.method === 'POST');
-    expect(JSON.parse(request.options.body)).toMatchObject({
-      module_id: 'ICC-MODULE-02',
-      title: 'Social Communication Book',
+    await waitFor(() => {
+      expect(screen.getByText('Admin Console Overview')).toBeInTheDocument();
+    });
+
+    // Click Scenarios in sidebar
+    await user.click(screen.getByRole('button', { name: /scenarios/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Lecturer's Office Consultation")).toBeInTheDocument();
+    });
+
+    // Click to view detail
+    await user.click(screen.getByText("Lecturer's Office Consultation"));
+
+    await waitFor(() => {
+      expect(screen.getByText('Practice Briefing')).toBeInTheDocument();
+      expect(screen.getByText(/Ask your lecturer for guidance on research methodology/i)).toBeInTheDocument();
+      expect(screen.getByText(/AI Conversation Partner/i)).toBeInTheDocument();
     });
   });
 });

@@ -1,15 +1,28 @@
 import 'package:flutter/material.dart';
 
 import '../services/setting_visual_registry.dart';
+import '../theme/engora_theme.dart';
 
 class SettingVisual extends StatelessWidget {
   final String stickerKey;
   final String label;
+  final double height;
+  final double? width;
+  final double borderRadius;
+  final bool showLabel;
+  final Color backgroundColor;
+  final Color iconColor;
 
   const SettingVisual({
     super.key,
     required this.stickerKey,
     required this.label,
+    this.height = 152,
+    this.width,
+    this.borderRadius = 8,
+    this.showLabel = true,
+    this.backgroundColor = const Color(0xFFF4EFE6),
+    this.iconColor = EngoraColors.brand,
   });
 
   IconData _iconFor(String kind) => switch (kind) {
@@ -25,37 +38,39 @@ class SettingVisual extends StatelessWidget {
     final spec = SettingVisualRegistry.resolve(stickerKey, label: label);
     if (spec.hasAsset) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(borderRadius),
         child: Image.asset(
           spec.assetPath!,
-          width: double.infinity,
-          height: 152,
+          width: width ?? double.infinity,
+          height: height,
           fit: BoxFit.cover,
         ),
       );
     }
 
     return Container(
-      width: double.infinity,
-      height: 152,
+      width: width ?? double.infinity,
+      height: height,
       decoration: BoxDecoration(
-        color: const Color(0xFFF4EFE6),
-        borderRadius: BorderRadius.circular(8),
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(borderRadius),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
             _iconFor(spec.fallbackKind),
-            size: 42,
-            color: const Color(0xFFD4842A),
+            size: showLabel ? 42 : 38,
+            color: iconColor,
           ),
-          const SizedBox(height: 10),
-          Text(
-            spec.fallbackLabel,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-          ),
+          if (showLabel) ...[
+            const SizedBox(height: 10),
+            Text(
+              spec.fallbackLabel,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+          ],
         ],
       ),
     );

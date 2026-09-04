@@ -18,8 +18,8 @@ dependencies:
   shared_preferences: ^2.5.5
   audioplayers: ^6.0.0
   o3d: ^3.1.0
-  google_fonts: ^6.2.0
   mobile_scanner: ^7.1.3
+  flutter_svg: ^2.2.3
 
 
 dev_dependencies:
@@ -29,7 +29,16 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  fonts:
+    - family: Fredoka
+      fonts:
+        - asset: assets/fonts/Fredoka-Variable.ttf
+    - family: OtomanopeeOne
+      fonts:
+        - asset: assets/fonts/OtomanopeeOne-Regular.ttf
   assets:
+    - assets/icons/
+    - assets/logo/
     - assets/models/male_char.glb
     - assets/models/female_char.glb
     - assets/models/olivia_animated.glb

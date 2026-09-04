@@ -5,7 +5,7 @@
 1. An administrator creates a module, unit, and page in the dashboard.
 2. Each page references one active guided speaking `setting_id`.
 3. The dashboard requests a launch token and receives a downloadable QR image.
-4. The QR contains `orbis://launch?token=<secret>`.
+4. The QR contains `engora://launch?token=<secret>`.
 5. The mobile scanner submits the complete scanned value to `POST /api/launch/resolve`.
 6. The resolver validates the token, module, unit, page, setting, topic, active state, and expiry.
 7. Mobile opens the existing guided briefing and AR runtime with `launch_source=module_qr`.
@@ -27,7 +27,7 @@ Request:
 
 ```json
 {
-  "token": "orbis://launch?token=<secret>"
+  "token": "engora://launch?token=<secret>"
 }
 ```
 

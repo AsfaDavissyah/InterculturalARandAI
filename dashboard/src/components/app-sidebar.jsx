@@ -1,13 +1,14 @@
 import * as React from "react"
 import {
-  Activity,
   BookOpen,
   ClipboardList,
   GraduationCap,
   Layers,
+  LayoutDashboard,
   LogOut,
-  QrCode,
+  Settings,
   ShieldCheck,
+  User,
   Users,
 } from "lucide-react"
 
@@ -30,18 +31,23 @@ export function AppSidebar({
   handleLogout,
   ...props
 }) {
-  const navItems = user.role === "admin"
-    ? [
-        { id: "topics", icon: Layers, label: "Topics & Settings" },
-        { id: "scenarios", icon: BookOpen, label: "Scenario Builder" },
-        { id: "modules", icon: QrCode, label: "Learning Modules" },
-        { id: "lecturers", icon: Users, label: "Lecturers" },
-      ]
-    : [
-        { id: "overview", icon: Activity, label: "Research Overview" },
-        { id: "students", icon: Users, label: "Students" },
-        { id: "history", icon: ClipboardList, label: "Practice History" },
-      ]
+  const navItems =
+    user.role === "admin"
+      ? [
+          { id: "overview", icon: LayoutDashboard, label: "Overview" },
+          { id: "scenarios", icon: BookOpen, label: "Scenarios" },
+          { id: "categories", icon: Layers, label: "Categories" },
+          { id: "lecturers", icon: Users, label: "Lecturers" },
+          { id: "practice-results", icon: ClipboardList, label: "Practice Results" },
+          { id: "system-settings", icon: Settings, label: "System Settings" },
+        ]
+      : [
+          { id: "overview", icon: LayoutDashboard, label: "Overview" },
+          { id: "scenarios", icon: BookOpen, label: "Scenarios" },
+          { id: "students", icon: GraduationCap, label: "Students" },
+          { id: "practice-results", icon: ClipboardList, label: "Practice Results" },
+          { id: "profile", icon: User, label: "Profile" },
+        ]
 
   return (
     <Sidebar variant="floating" collapsible="icon" {...props}>
@@ -53,9 +59,9 @@ export function AppSidebar({
                 {user.role === "admin" ? <ShieldCheck className="size-5" /> : <GraduationCap className="size-5" />}
               </div>
               <div className="flex flex-col gap-0.5 leading-none pl-1">
-                <span className="font-semibold text-sm tracking-tight text-foreground">Orbis Research</span>
+                <span className="font-semibold text-sm tracking-tight text-foreground">Engora Dashboard</span>
                 <span className="text-xs text-muted-foreground">
-                  {user.role === "admin" ? "Admin Console" : "Lecturer Dashboard"}
+                  {user.role === "admin" ? "Admin Console" : "Lecturer Portal"}
                 </span>
               </div>
             </SidebarMenuButton>
@@ -66,7 +72,7 @@ export function AppSidebar({
       <SidebarContent className="pt-2">
         <SidebarGroup>
           <SidebarGroupLabel className="px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground/75">
-            Workspace
+            Navigation
           </SidebarGroupLabel>
           <SidebarMenu className="gap-1 mt-1">
             {navItems.map((item) => {

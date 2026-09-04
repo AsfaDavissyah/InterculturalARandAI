@@ -22,7 +22,17 @@ class AvatarRegistry {
     'hr': hr,
   };
 
-  static String modelPathFor({String? avatarKey, String aiRole = ''}) {
+  static String modelPathFor({
+    String? avatarKey,
+    String aiRole = '',
+    String? experienceType,
+  }) {
+    final normalizedExperience = experienceType?.trim().toLowerCase();
+    if (normalizedExperience == 'legacy_scenario' ||
+        normalizedExperience == 'scenario_library') {
+      return malePrototype;
+    }
+
     final normalizedKey = avatarKey?.trim().toLowerCase() ?? '';
     final registeredPath = _prototypeByKey[normalizedKey];
     if (registeredPath != null) return registeredPath;

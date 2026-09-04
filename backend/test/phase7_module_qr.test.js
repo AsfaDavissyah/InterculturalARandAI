@@ -3,6 +3,9 @@ const assert = require("node:assert/strict");
 const http = require("http");
 const jwt = require("jsonwebtoken");
 
+process.env.FEATURE_MODULES_ENABLED = "true";
+process.env.FEATURE_QR_ENABLED = "true";
+
 const { app } = require("../server");
 const LearningModule = require("../models/LearningModule");
 const LearningUnit = require("../models/LearningUnit");
@@ -119,7 +122,7 @@ test("Phase 7 QR generation returns a scannable one-time launch value", async ()
       authHeaders
     );
     assert.equal(response.status, 201);
-    assert.match(response.body.launch_uri, /^orbis:\/\/launch\?token=/);
+    assert.match(response.body.launch_uri, /^engora:\/\/launch\?token=/);
     assert.match(response.body.qr_data_url, /^data:image\/png;base64,/);
     assert.equal(response.body.page.page_id, page.pageId);
     assert.ok(response.body.token.length >= 40);
@@ -137,7 +140,7 @@ test("Phase 7 resolver rejects invalid QR activities", async () => {
   LaunchToken.findOne = async () => null;
   try {
     const response = await request("POST", "/api/launch/resolve", {
-      token: "orbis://launch?token=invalid-token",
+      token: "engora://launch?token=invalid-token",
     });
     assert.equal(response.status, 404);
     assert.match(response.body.error, /invalid or inactive/i);
