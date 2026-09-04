@@ -4,12 +4,14 @@
 
 1. Open Vercel and import `AsfaDavissyah/InterculturalARandAI`.
 2. Set **Root Directory** to `backend`.
-3. Keep Framework Preset on **Other** if Express is not detected automatically.
+3. Set **Framework Preset** to `Express` (or keep the automatically detected
+   Express preset).
 4. Do not set an Output Directory.
 5. Keep the default install command (`npm install`).
 
-The repository includes `vercel.json` and `api/index.js`. All requests are routed
-to the existing Express application through one Vercel Function.
+Vercel detects `server.js` and deploys its default CommonJS export as one
+Express Function. Do not add a custom build command, output directory, rewrite,
+or second API wrapper.
 
 ## Environment variables
 
