@@ -279,6 +279,17 @@ test("CSV Export prevents formula injection", async () => {
   assert.ok(exportRes.headers["content-type"].includes("text/csv"));
 });
 
+test("Practice result deletion returns a clear response for an unknown session", async () => {
+  const deleteRes = await request(
+    "DELETE",
+    "/api/dashboard/practice-results/SESSION-DOES-NOT-EXIST",
+    null,
+    adminToken
+  );
+  assert.equal(deleteRes.status, 404);
+  assert.equal(deleteRes.body.error, "Practice result not found.");
+});
+
 test("Feature Flags: Modules and QR endpoints return FEATURE_DISABLED when flags are false", async () => {
   process.env.FEATURE_MODULES_ENABLED = "false";
   process.env.FEATURE_QR_ENABLED = "false";

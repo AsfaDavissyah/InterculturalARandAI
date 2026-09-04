@@ -10,6 +10,7 @@ import {
   Plus,
   Search,
   Send,
+  Trash2,
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -21,6 +22,9 @@ import {
   LoadingSkeleton,
   StatusBadge,
 } from '../components/CommonUI';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 
 export function ScenariosView({
   user,
@@ -153,7 +157,7 @@ export function ScenariosView({
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-[1600px] space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       {/* Header & Create Button */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border pb-5">
         <div>
@@ -162,28 +166,27 @@ export function ScenariosView({
             Single catalog for all speaking scenarios across Guided Topics and Scenario Library.
           </p>
         </div>
-        <button
+        <Button
           type="button"
           onClick={onCreateScenario}
-          className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-xs transition-colors hover:bg-primary/90"
         >
           <Plus className="size-4" />
           Create Scenario
-        </button>
+        </Button>
       </div>
 
       {/* Filter Toolbar */}
-      <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="rounded-lg border border-border bg-card p-3 shadow-sm">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-[minmax(300px,2fr)_repeat(4,minmax(140px,1fr))_auto]">
           {/* Search Box */}
-          <div className="relative flex-1 min-w-[240px]">
+          <div className="relative min-w-0">
             <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
+            <Input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by title, role, task, or location..."
-              className="w-full pl-9 pr-8 py-2 rounded-lg border border-border text-xs bg-background text-foreground"
+              className="h-10 pl-10! pr-9!"
             />
             {search && (
               <button
@@ -203,7 +206,7 @@ export function ScenariosView({
               setPlacement(e.target.value);
               setPage(1);
             }}
-            className="px-3 py-2 rounded-lg border border-border text-xs bg-background text-foreground font-medium"
+            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
           >
             <option value="all">All Placements</option>
             <option value="guided_topics">Guided Topics</option>
@@ -217,7 +220,7 @@ export function ScenariosView({
               setCategory(e.target.value);
               setPage(1);
             }}
-            className="px-3 py-2 rounded-lg border border-border text-xs bg-background text-foreground font-medium max-w-[180px]"
+            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
           >
             <option value="all">All Categories</option>
             {categories.map((c) => (
@@ -234,7 +237,7 @@ export function ScenariosView({
               setStatus(e.target.value);
               setPage(1);
             }}
-            className="px-3 py-2 rounded-lg border border-border text-xs bg-background text-foreground font-medium"
+            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
           >
             <option value="all">All Statuses</option>
             <option value="published">Published</option>
@@ -251,7 +254,7 @@ export function ScenariosView({
               setOwnership(e.target.value);
               setPage(1);
             }}
-            className="px-3 py-2 rounded-lg border border-border text-xs bg-background text-foreground font-medium"
+            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
           >
             <option value="all">All Owners</option>
             <option value="system">Engora Master</option>
@@ -259,13 +262,14 @@ export function ScenariosView({
           </select>
 
           {hasActiveFilters && (
-            <button
+            <Button
               type="button"
               onClick={clearFilters}
-              className="px-3 py-2 rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+              variant="ghost"
+              className="h-10"
             >
               Clear Filters
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -288,33 +292,33 @@ export function ScenariosView({
           onAction={hasActiveFilters ? clearFilters : onCreateScenario}
         />
       ) : (
-        <div className="rounded-xl border border-border bg-card overflow-hidden shadow-2xs">
+        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-border bg-muted/40 text-muted-foreground uppercase tracking-wider text-[10px] font-bold">
-                  <th className="py-3 px-4">Title & Placement</th>
-                  <th className="py-3 px-4">Category</th>
-                  <th className="py-3 px-4">AI Partner</th>
-                  <th className="py-3 px-4">Owner</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4">Updated</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
+            <Table className="min-w-[900px]">
+              <TableHeader>
+                <TableRow className="bg-muted/50 text-muted-foreground">
+                  <TableHead className="py-3 px-4">Title & Placement</TableHead>
+                  <TableHead className="py-3 px-4">Category</TableHead>
+                  <TableHead className="py-3 px-4">AI Partner</TableHead>
+                  <TableHead className="py-3 px-4">Owner</TableHead>
+                  <TableHead className="py-3 px-4">Status</TableHead>
+                  <TableHead className="py-3 px-4">Updated</TableHead>
+                  <TableHead className="py-3 px-4 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y divide-border">
                 {items.map((item) => {
                   const isOwner = String(item.owner?.user_id) === String(user.userId);
                   const canEdit = isAdmin || (isOwner && item.status === 'draft');
 
                   return (
-                    <tr
+                    <TableRow
                       key={item.scenario_id}
                       className="hover:bg-muted/30 transition-colors group cursor-pointer"
                       onClick={() => onSelectScenario(item.scenario_id)}
                     >
                       {/* Title & Placements */}
-                      <td className="py-3.5 px-4 min-w-[220px]">
+                      <TableCell className="py-3.5 px-4 min-w-[220px]">
                         <div className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
                           {item.title}
                         </div>
@@ -328,10 +332,10 @@ export function ScenariosView({
                             </span>
                           ))}
                         </div>
-                      </td>
+                      </TableCell>
 
                       {/* Category */}
-                      <td className="py-3.5 px-4 text-muted-foreground">
+                      <TableCell className="py-3.5 px-4 text-muted-foreground">
                         {item.category_ids?.length ? (
                           <span className="font-medium text-foreground capitalize">
                             {item.category_ids.join(', ')}
@@ -339,28 +343,28 @@ export function ScenariosView({
                         ) : (
                           <span className="text-muted-foreground/60">—</span>
                         )}
-                      </td>
+                      </TableCell>
 
                       {/* AI Partner */}
-                      <td className="py-3.5 px-4">
+                      <TableCell className="py-3.5 px-4">
                         <div className="font-medium text-foreground">{item.ai_partner?.display_name || 'AI Character'}</div>
                         <div className="text-[10px] text-muted-foreground">{item.ai_partner?.role}</div>
-                      </td>
+                      </TableCell>
 
                       {/* Owner */}
-                      <td className="py-3.5 px-4 text-muted-foreground">
+                      <TableCell className="py-3.5 px-4 text-muted-foreground">
                         <span className="font-medium text-foreground">
                           {item.owner?.display_name || 'System Admin'}
                         </span>
-                      </td>
+                      </TableCell>
 
                       {/* Status */}
-                      <td className="py-3.5 px-4">
+                      <TableCell className="py-3.5 px-4">
                         <StatusBadge status={item.status} />
-                      </td>
+                      </TableCell>
 
                       {/* Updated Date */}
-                      <td className="py-3.5 px-4 text-muted-foreground whitespace-nowrap">
+                      <TableCell className="py-3.5 px-4 text-muted-foreground whitespace-nowrap">
                         {item.updated_at
                           ? new Date(item.updated_at).toLocaleDateString('en-US', {
                               month: 'short',
@@ -368,46 +372,49 @@ export function ScenariosView({
                               year: 'numeric',
                             })
                           : '—'}
-                      </td>
+                      </TableCell>
 
                       {/* Actions Menu */}
-                      <td
+                      <TableCell
                         className="py-3.5 px-4 text-right whitespace-nowrap"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div className="flex items-center justify-end gap-1">
-                          <button
+                          <Button
                             type="button"
                             onClick={() => onSelectScenario(item.scenario_id)}
-                            className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
+                            variant="ghost"
+                            size="icon-sm"
                             title="View Details"
                           >
                             <Eye className="size-4" />
-                          </button>
+                          </Button>
 
                           {canEdit && (
-                            <button
+                            <Button
                               type="button"
                               onClick={() => onEditScenario(item.scenario_id)}
-                              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
+                              variant="ghost"
+                              size="icon-sm"
                               title="Edit Scenario"
                             >
                               <Edit3 className="size-4" />
-                            </button>
+                            </Button>
                           )}
 
-                          <button
+                          <Button
                             type="button"
                             onClick={() => handleRowAction('duplicate', item.scenario_id)}
-                            className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
+                            variant="ghost"
+                            size="icon-sm"
                             title="Duplicate Scenario"
                           >
                             <Copy className="size-4" />
-                          </button>
+                          </Button>
 
                           {/* Quick Lifecycle Buttons */}
                           {isAdmin && item.status !== 'published' && item.status !== 'archived' && (
-                            <button
+                            <Button
                               type="button"
                               onClick={() =>
                                 setActionModal({
@@ -417,15 +424,17 @@ export function ScenariosView({
                                   desc: `Publish "${item.title}" for mobile learners?`,
                                 })
                               }
-                              className="p-1.5 rounded-md hover:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 transition-all"
+                              variant="ghost"
+                              size="icon-sm"
+                              className="text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-700"
                               title="Publish"
                             >
                               <CheckCircle className="size-4" />
-                            </button>
+                            </Button>
                           )}
 
                           {!isAdmin && isOwner && item.status === 'draft' && (
-                            <button
+                            <Button
                               type="button"
                               onClick={() =>
                                 setActionModal({
@@ -435,19 +444,41 @@ export function ScenariosView({
                                   desc: `Submit "${item.title}" for Admin review?`,
                                 })
                               }
-                              className="p-1.5 rounded-md hover:bg-blue-500/15 text-blue-600 dark:text-blue-400 transition-all"
+                              variant="ghost"
+                              size="icon-sm"
+                              className="text-sky-700 hover:bg-sky-500/10 hover:text-sky-700"
                               title="Submit for Review"
                             >
                               <Send className="size-4" />
-                            </button>
+                            </Button>
+                          )}
+                          {isAdmin && item.status !== 'archived' && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              title="Delete Scenario"
+                              onClick={() =>
+                                setActionModal({
+                                  type: 'archive',
+                                  id: item.scenario_id,
+                                  title: 'Delete Scenario',
+                                  desc: `Remove "${item.title}" from the active catalog? It can still be restored from Archived scenarios.`,
+                                  isDestructive: true,
+                                })
+                              }
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
                           )}
                         </div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
 
           {/* Pagination Controls */}

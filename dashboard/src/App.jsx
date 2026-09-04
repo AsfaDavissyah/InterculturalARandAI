@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { toast, Toaster } from 'sonner';
+import { toast } from 'sonner';
 import { LoginForm } from './components/engora-login-form';
 import Header from './components/shadcn-space/blocks/topbar-02/header';
 import { requestJson } from './lib/api-client';
@@ -132,7 +132,6 @@ export default function App() {
   if (!session || !session.user) {
     return (
       <div className="login-shell">
-        <Toaster position="bottom-right" richColors />
         <LoginForm
           email={loginEmail}
           password={loginPassword}
@@ -151,7 +150,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen w-full bg-background text-foreground">
-      <Toaster position="bottom-right" richColors />
       <Header
         user={user}
         activeTab={activeTab}

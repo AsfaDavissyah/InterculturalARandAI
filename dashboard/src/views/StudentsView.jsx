@@ -8,6 +8,8 @@ import {
   ErrorBanner,
   LoadingSkeleton,
 } from '../components/CommonUI';
+import { Input } from '../components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 
 export function StudentsView({ user }) {
   const [students, setStudents] = useState([]);
@@ -44,7 +46,7 @@ export function StudentsView({ user }) {
   });
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-[1600px] space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="border-b border-border pb-5">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">Student Roster</h1>
@@ -55,17 +57,15 @@ export function StudentsView({ user }) {
       </div>
 
       {/* Search Filter */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <div className="relative w-full max-w-xl">
           <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
+          <Input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by student name, NIM, or email..."
-            className="w-full pl-9 pr-3 py-2 rounded-lg border border-border text-xs bg-background text-foreground"
+            className="h-10 pl-10!"
           />
-        </div>
       </div>
 
       {loading ? (
@@ -83,46 +83,46 @@ export function StudentsView({ user }) {
           }
         />
       ) : (
-        <div className="rounded-xl border border-border bg-card overflow-hidden shadow-2xs">
+        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-border bg-muted/40 text-muted-foreground uppercase tracking-wider text-[10px] font-bold">
-                  <th className="py-3 px-4">Student Name</th>
-                  <th className="py-3 px-4">Student ID (NIM)</th>
-                  <th className="py-3 px-4">Email</th>
-                  <th className="py-3 px-4">Practices (Completed)</th>
-                  <th className="py-3 px-4">Average Score</th>
-                  <th className="py-3 px-4 text-right">Last Practice</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
+            <Table className="min-w-[900px]">
+              <TableHeader>
+                <TableRow className="bg-muted/50 text-muted-foreground">
+                  <TableHead className="py-3 px-4">Student Name</TableHead>
+                  <TableHead className="py-3 px-4">Student ID (NIM)</TableHead>
+                  <TableHead className="py-3 px-4">Email</TableHead>
+                  <TableHead className="py-3 px-4">Practices (Completed)</TableHead>
+                  <TableHead className="py-3 px-4">Average Score</TableHead>
+                  <TableHead className="py-3 px-4 text-right">Last Practice</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y divide-border">
                 {filtered.map((st) => (
-                  <tr key={st.id} className="hover:bg-muted/30 transition-colors">
+                  <TableRow key={st.id} className="hover:bg-muted/30 transition-colors">
                     {/* Name */}
-                    <td className="py-3.5 px-4 font-semibold text-foreground">
+                    <TableCell className="py-3.5 px-4 font-semibold text-foreground">
                       <div className="flex items-center gap-2.5">
                         <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-xs uppercase border border-primary/20">
                           {st.name?.charAt(0) || 'S'}
                         </div>
                         <div className="text-sm text-foreground">{st.name}</div>
                       </div>
-                    </td>
+                    </TableCell>
 
                     {/* Student ID */}
-                    <td className="py-3.5 px-4 font-mono text-muted-foreground">{st.student_id || '—'}</td>
+                    <TableCell className="py-3.5 px-4 font-mono text-muted-foreground">{st.student_id || '—'}</TableCell>
 
                     {/* Email */}
-                    <td className="py-3.5 px-4 text-muted-foreground">{st.email}</td>
+                    <TableCell className="py-3.5 px-4 text-muted-foreground">{st.email}</TableCell>
 
                     {/* Practice count */}
-                    <td className="py-3.5 px-4 font-medium text-foreground">
+                    <TableCell className="py-3.5 px-4 font-medium text-foreground">
                       {st.practice_count ?? 0} sessions{' '}
                       <span className="text-muted-foreground text-[11px]">({st.completed_count ?? 0} done)</span>
-                    </td>
+                    </TableCell>
 
                     {/* Avg score */}
-                    <td className="py-3.5 px-4">
+                    <TableCell className="py-3.5 px-4">
                       {isNumericScore(st.average_score) ? (
                         <span className="font-bold text-foreground">
                           {formatScore(st.average_score)} <span className="text-[10px] text-muted-foreground">/ 5.0</span>
@@ -130,10 +130,10 @@ export function StudentsView({ user }) {
                       ) : (
                         <span className="text-muted-foreground/60">—</span>
                       )}
-                    </td>
+                    </TableCell>
 
                     {/* Last practice */}
-                    <td className="py-3.5 px-4 text-right text-muted-foreground whitespace-nowrap">
+                    <TableCell className="py-3.5 px-4 text-right text-muted-foreground whitespace-nowrap">
                       {st.last_practice
                         ? new Date(st.last_practice).toLocaleDateString('en-US', {
                             month: 'short',
@@ -141,11 +141,11 @@ export function StudentsView({ user }) {
                             year: 'numeric',
                           })
                         : 'Never'}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </div>
       )}

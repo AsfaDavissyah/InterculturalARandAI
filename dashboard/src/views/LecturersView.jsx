@@ -4,6 +4,7 @@ import {
   Key,
   RefreshCw,
   Search,
+  Trash2,
   UserPlus,
   Users,
 } from 'lucide-react';
@@ -17,6 +18,9 @@ import {
   LoadingSkeleton,
   StatusBadge,
 } from '../components/CommonUI';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 
 export function LecturersView() {
   const [lecturers, setLecturers] = useState([]);
@@ -164,7 +168,7 @@ export function LecturersView() {
   });
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-[1600px] space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border pb-5">
         <div>
@@ -173,28 +177,25 @@ export function LecturersView() {
             Manage participating research lecturers and their unique student connection codes.
           </p>
         </div>
-        <button
+        <Button
           type="button"
           onClick={() => setCreateModalOpen(true)}
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-xs shadow-xs hover:bg-primary/90 transition-all cursor-pointer"
         >
           <UserPlus className="size-4" />
           Add Lecturer
-        </button>
+        </Button>
       </div>
 
       {/* Search Filter */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <div className="relative w-full max-w-xl">
           <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
+          <Input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name, email, or code..."
-            className="w-full pl-9 pr-3 py-2 rounded-lg border border-border text-xs bg-background text-foreground"
+            className="h-10 pl-10!"
           />
-        </div>
       </div>
 
       {loading ? (
@@ -210,24 +211,24 @@ export function LecturersView() {
           onAction={() => setCreateModalOpen(true)}
         />
       ) : (
-        <div className="rounded-xl border border-border bg-card overflow-hidden shadow-2xs">
+        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-border bg-muted/40 text-muted-foreground uppercase tracking-wider text-[10px] font-bold">
-                  <th className="py-3 px-4">Lecturer Name</th>
-                  <th className="py-3 px-4">Email</th>
-                  <th className="py-3 px-4">Research Code</th>
-                  <th className="py-3 px-4">Connected Students</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
+            <Table className="min-w-[900px]">
+              <TableHeader>
+                <TableRow className="bg-muted/50 text-muted-foreground">
+                  <TableHead className="py-3 px-4">Lecturer Name</TableHead>
+                  <TableHead className="py-3 px-4">Email</TableHead>
+                  <TableHead className="py-3 px-4">Research Code</TableHead>
+                  <TableHead className="py-3 px-4">Connected Students</TableHead>
+                  <TableHead className="py-3 px-4">Status</TableHead>
+                  <TableHead className="py-3 px-4 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y divide-border">
                 {filtered.map((lec) => (
-                  <tr key={lec.id} className="hover:bg-muted/30 transition-colors">
+                  <TableRow key={lec.id} className="hover:bg-muted/30 transition-colors">
                     {/* Name */}
-                    <td className="py-3.5 px-4 font-semibold text-foreground">
+                    <TableCell className="py-3.5 px-4 font-semibold text-foreground">
                       <div className="flex items-center gap-2.5">
                         <div className="size-8 rounded-lg bg-secondary text-secondary-foreground flex items-center justify-center font-bold text-xs uppercase border">
                           {lec.name?.charAt(0) || 'L'}
@@ -237,73 +238,80 @@ export function LecturersView() {
                           <div className="text-[10px] text-muted-foreground capitalize">{lec.gender || 'lecturer'}</div>
                         </div>
                       </div>
-                    </td>
+                    </TableCell>
 
                     {/* Email */}
-                    <td className="py-3.5 px-4 text-muted-foreground">{lec.email}</td>
+                    <TableCell className="py-3.5 px-4 text-muted-foreground">{lec.email}</TableCell>
 
                     {/* Research Code */}
-                    <td className="py-3.5 px-4">
+                    <TableCell className="py-3.5 px-4">
                       {lec.lecturer_code ? (
                         <CopyableCode code={lec.lecturer_code} />
                       ) : (
                         <span className="text-muted-foreground/60">—</span>
                       )}
-                    </td>
+                    </TableCell>
 
                     {/* Connected Students */}
-                    <td className="py-3.5 px-4">
+                    <TableCell className="py-3.5 px-4">
                       <span className="font-semibold text-foreground">
                         {lec.connected_students_count ?? 0} students
                       </span>
-                    </td>
+                    </TableCell>
 
                     {/* Status */}
-                    <td className="py-3.5 px-4">
+                    <TableCell className="py-3.5 px-4">
                       <StatusBadge status={lec.status || 'active'} />
-                    </td>
+                    </TableCell>
 
                     {/* Actions */}
-                    <td className="py-3.5 px-4 text-right">
+                    <TableCell className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <button
+                        <Button
                           type="button"
                           onClick={() => setEditModal(lec)}
-                          className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
+                          variant="ghost"
+                          size="icon-sm"
                           title="Edit Lecturer"
                         >
                           <Edit2 className="size-4" />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
                           onClick={() => setRegenModal(lec)}
-                          className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
+                          variant="ghost"
+                          size="icon-sm"
                           title="Regenerate Research Code"
                         >
                           <RefreshCw className="size-4" />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
                           onClick={() => setResetModal(lec)}
-                          className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
+                          variant="ghost"
+                          size="icon-sm"
                           title="Reset Password"
                         >
                           <Key className="size-4" />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
                           onClick={() => setStatusModal(lec)}
-                          className="px-2 py-1.5 rounded-md hover:bg-muted text-[10px] font-semibold text-muted-foreground hover:text-foreground transition-all"
-                          title={lec.status === 'inactive' ? 'Activate Lecturer' : 'Deactivate Lecturer'}
+                          variant="ghost"
+                          size={lec.status === 'inactive' ? 'sm' : 'icon-sm'}
+                          className={lec.status === 'inactive'
+                            ? 'text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-700'
+                            : 'text-destructive hover:bg-destructive/10 hover:text-destructive'}
+                          title={lec.status === 'inactive' ? 'Restore Lecturer' : 'Delete Lecturer'}
                         >
-                          {lec.status === 'inactive' ? 'Activate' : 'Deactivate'}
-                        </button>
+                          {lec.status === 'inactive' ? 'Restore' : <Trash2 className="size-4" />}
+                        </Button>
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </div>
       )}
@@ -311,11 +319,11 @@ export function LecturersView() {
       {/* Create Lecturer Modal */}
       <ConfirmModal
         isOpen={Boolean(statusModal)}
-        title={statusModal?.status === 'inactive' ? 'Activate Lecturer' : 'Deactivate Lecturer'}
+        title={statusModal?.status === 'inactive' ? 'Restore Lecturer' : 'Delete Lecturer'}
         description={statusModal?.status === 'inactive'
           ? `Allow ${statusModal?.name} to sign in again?`
-          : `Prevent ${statusModal?.name} from signing in? Existing students and research history remain unchanged.`}
-        confirmLabel={statusModal?.status === 'inactive' ? 'Activate' : 'Deactivate'}
+          : `Remove ${statusModal?.name} from active lecturers? Sign-in will be disabled while students and research history remain intact.`}
+        confirmLabel={statusModal?.status === 'inactive' ? 'Restore' : 'Delete'}
         isDestructive={statusModal?.status !== 'inactive'}
         onConfirm={handleStatusChange}
         onCancel={() => setStatusModal(null)}

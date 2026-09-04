@@ -1466,6 +1466,40 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
     }
   });
 
+  router.delete("/practice-results/:session_id", async (req, res) => {
+    try {
+      const session = await PracticeSession.findOne({ sessionId: req.params.session_id });
+      if (!session) {
+        return res.status(404).json({ error: "Practice result not found." });
+      }
+
+      if (req.user.role === "lecturer") {
+        const [lecturer, student] = await Promise.all([
+          mongoose.Types.ObjectId.isValid(req.user.userId)
+            ? User.findById(req.user.userId).select("lecturerCode").lean()
+            : null,
+          session.userId ? User.findById(session.userId).select("studentLecturerCode").lean() : null,
+        ]);
+        const lecturerCode = lecturer?.lecturerCode || req.user.lecturerCode || "";
+        if (!lecturerCode || student?.studentLecturerCode !== lecturerCode) {
+          return res.status(403).json({ error: "You can only delete results from your own cohort." });
+        }
+      }
+
+      await PracticeSession.deleteOne({ _id: session._id });
+      logAuditEvent({
+        event: "practice_result_deleted",
+        actorId: req.user.userId,
+        role: req.user.role,
+        details: { session_id: session.sessionId },
+        requestId: req.requestId,
+      });
+      return res.json({ success: true });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   router.get("/practice-results/export.csv", async (req, res) => {
     try {
       const isAdmin = req.user.role === "admin";

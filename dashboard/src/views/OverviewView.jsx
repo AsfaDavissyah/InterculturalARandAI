@@ -22,6 +22,7 @@ import {
   LoadingSkeleton,
   StatusBadge,
 } from '../components/CommonUI';
+import { Button } from '../components/ui/button';
 
 export function OverviewView({ user, onNavigate }) {
   const [data, setData] = useState(null);
@@ -64,7 +65,7 @@ export function OverviewView({ user, onNavigate }) {
   const summary = data.summary || {};
 
   return (
-    <div className="mx-auto max-w-7xl space-y-7 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-[1600px] space-y-7 px-4 py-6 sm:px-6 lg:px-8">
       {/* Welcome Banner & Quick Actions */}
       <div className="flex flex-col items-start justify-between gap-5 border-b border-border pb-6 xl:flex-row xl:items-center">
         <div>
@@ -78,32 +79,31 @@ export function OverviewView({ user, onNavigate }) {
           </p>
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:justify-end">
-          <button
+          <Button
             type="button"
             onClick={() => onNavigate('scenarios', { action: 'create' })}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-xs shadow-xs hover:bg-primary/90 transition-all cursor-pointer"
           >
             <Plus className="size-4" />
             New Scenario
-          </button>
+          </Button>
           {isAdmin && (
             <>
-              <button
+              <Button
                 type="button"
                 onClick={() => onNavigate('categories', { action: 'create' })}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-background hover:bg-muted font-semibold text-xs text-foreground transition-all cursor-pointer"
+                variant="outline"
               >
                 <Layers className="size-4 text-muted-foreground" />
                 New Category
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => onNavigate('lecturers', { action: 'create' })}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-background hover:bg-muted font-semibold text-xs text-foreground transition-all cursor-pointer"
+                variant="outline"
               >
                 <UserPlus className="size-4 text-muted-foreground" />
                 Add Lecturer
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -391,30 +391,30 @@ export function OverviewView({ user, onNavigate }) {
 
 function KpiCard({ label, value, icon: Icon, color = 'primary', suffix = '', highlight = false }) {
   const colorStyles = {
-    emerald: 'text-emerald-600 bg-emerald-500/10 border-emerald-500/20',
-    amber: 'text-amber-600 bg-amber-500/10 border-amber-500/20',
-    blue: 'text-blue-600 bg-blue-500/10 border-blue-500/20',
-    indigo: 'text-indigo-600 bg-indigo-500/10 border-indigo-500/20',
-    purple: 'text-purple-600 bg-purple-500/10 border-purple-500/20',
-    cyan: 'text-cyan-600 bg-cyan-500/10 border-cyan-500/20',
-  }[color] || 'text-primary bg-primary/10 border-primary/20';
+    emerald: { icon: 'text-emerald-700 bg-emerald-500/10 border-emerald-500/20', value: 'text-emerald-700' },
+    amber: { icon: 'text-amber-700 bg-amber-500/10 border-amber-500/20', value: 'text-amber-700' },
+    blue: { icon: 'text-sky-700 bg-sky-500/10 border-sky-500/20', value: 'text-sky-700' },
+    indigo: { icon: 'text-teal-700 bg-teal-500/10 border-teal-500/20', value: 'text-teal-700' },
+    purple: { icon: 'text-rose-600 bg-rose-500/10 border-rose-500/20', value: 'text-rose-600' },
+    cyan: { icon: 'text-cyan-700 bg-cyan-500/10 border-cyan-500/20', value: 'text-cyan-700' },
+  }[color] || { icon: 'text-primary bg-primary/10 border-primary/20', value: 'text-primary' };
 
   return (
     <div
-      className={`min-h-28 border bg-card p-4 transition-colors ${
-        highlight ? 'border-amber-500 shadow-sm' : 'border-border'
+      className={`min-h-32 rounded-lg border bg-card p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
+        highlight ? 'border-amber-500' : 'border-border'
       }`}
     >
       <div className="flex items-center justify-between gap-2 mb-2">
         <span className="min-h-8 text-[11px] font-semibold leading-4 text-muted-foreground">
           {label}
         </span>
-        <div className={`p-1.5 rounded-lg border shrink-0 ${colorStyles}`}>
+        <div className={`shrink-0 rounded-md border p-2 ${colorStyles.icon}`}>
           <Icon className="size-3.5" />
         </div>
       </div>
       <div className="flex items-baseline gap-1 mt-1">
-        <span className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">{value}</span>
+        <span className={`text-3xl font-bold ${colorStyles.value}`}>{value}</span>
         {suffix && <span className="text-xs text-muted-foreground font-medium">{suffix}</span>}
       </div>
     </div>

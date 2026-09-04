@@ -7,17 +7,22 @@ import {
   Eye,
   MessageSquare,
   Search,
+  Trash2,
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { requestJson } from '../lib/api-client';
 import { cleanDisplayText, formatScore, isNumericScore } from '../lib/display-format';
 import {
+  ConfirmModal,
   EmptyState,
   ErrorBanner,
   LoadingSkeleton,
   StatusBadge,
 } from '../components/CommonUI';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 
 const SCORE_CATEGORIES = {
   grammar: 'Grammar',
@@ -50,6 +55,7 @@ export function PracticeResultsView({ user }) {
   const [selectedSessionId, setSelectedSessionId] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [sessionDetail, setSessionDetail] = useState(null);
+  const [deleteSessionId, setDeleteSessionId] = useState(null);
 
   const fetchResults = async () => {
     setLoading(true);
@@ -108,6 +114,18 @@ export function PracticeResultsView({ user }) {
     }
   };
 
+  const handleDeleteSession = async () => {
+    if (!deleteSessionId) return;
+    try {
+      await requestJson(`/api/dashboard/practice-results/${deleteSessionId}`, { method: 'DELETE' });
+      toast.success('Practice result deleted.');
+      setDeleteSessionId(null);
+      fetchResults();
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete practice result.');
+    }
+  };
+
   const handleExportCsv = () => {
     const params = new URLSearchParams();
     if (status !== 'all') params.set('status', status);
@@ -162,7 +180,7 @@ export function PracticeResultsView({ user }) {
   const sessionScores = sessionDetail?.score_breakdown || sessionDetail?.scores || {};
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-[1600px] space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       {/* Header & Export Button */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border pb-5">
         <div>
@@ -171,28 +189,27 @@ export function PracticeResultsView({ user }) {
             Detailed transcripts, ICC scores, and progress records of student speaking practices.
           </p>
         </div>
-        <button
+        <Button
           type="button"
           onClick={handleExportCsv}
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-xs shadow-xs hover:bg-primary/90 transition-all cursor-pointer"
         >
           <Download className="size-4" />
           Export to CSV
-        </button>
+        </Button>
       </div>
 
       {/* Filter Toolbar */}
-      <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="rounded-lg border border-border bg-card p-3 shadow-sm">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-[minmax(320px,2fr)_minmax(160px,1fr)_auto_auto] xl:items-center">
           {/* Search Box */}
-          <div className="relative flex-1 min-w-[240px]">
+          <div className="relative min-w-0">
             <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
+            <Input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by student name, ID, or scenario..."
-              className="w-full pl-9 pr-8 py-2 rounded-lg border border-border text-xs bg-background text-foreground"
+              className="h-10 pl-10! pr-9!"
             />
             {search && (
               <button
@@ -212,7 +229,7 @@ export function PracticeResultsView({ user }) {
               setStatus(e.target.value);
               setPage(1);
             }}
-            className="px-3 py-2 rounded-lg border border-border text-xs bg-background text-foreground font-medium"
+            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
           >
             <option value="all">All Statuses</option>
             <option value="completed">Completed</option>
@@ -221,7 +238,7 @@ export function PracticeResultsView({ user }) {
           </select>
 
           {/* Date Range */}
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
             <span>From:</span>
             <input
               type="date"
@@ -230,7 +247,7 @@ export function PracticeResultsView({ user }) {
                 setStartDate(e.target.value);
                 setPage(1);
               }}
-              className="px-2 py-1.5 rounded-lg border border-border text-xs bg-background text-foreground"
+              className="h-10 min-w-0 rounded-md border border-input bg-background px-2 text-sm"
             />
             <span>To:</span>
             <input
@@ -240,18 +257,19 @@ export function PracticeResultsView({ user }) {
                 setEndDate(e.target.value);
                 setPage(1);
               }}
-              className="px-2 py-1.5 rounded-lg border border-border text-xs bg-background text-foreground"
+              className="h-10 min-w-0 rounded-md border border-input bg-background px-2 text-sm"
             />
           </div>
 
           {hasActiveFilters && (
-            <button
+            <Button
               type="button"
               onClick={clearFilters}
-              className="px-3 py-2 rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+              variant="ghost"
+              className="h-10"
             >
               Clear Filters
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -274,69 +292,69 @@ export function PracticeResultsView({ user }) {
           onAction={hasActiveFilters ? clearFilters : undefined}
         />
       ) : (
-        <div className="rounded-xl border border-border bg-card overflow-hidden shadow-2xs">
+        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-border bg-muted/40 text-muted-foreground uppercase tracking-wider text-[10px] font-bold">
-                  <th className="py-3 px-4">Student</th>
-                  <th className="py-3 px-4">Scenario Title</th>
-                  <th className="py-3 px-4">Category</th>
-                  {isAdmin && <th className="py-3 px-4">Lecturer Code</th>}
-                  <th className="py-3 px-4">Duration & Turns</th>
-                  <th className="py-3 px-4">Overall Score</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4">Date</th>
-                  <th className="py-3 px-4 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
+            <Table className="min-w-[900px]">
+              <TableHeader>
+                <TableRow className="bg-muted/50 text-muted-foreground">
+                  <TableHead className="py-3 px-4">Student</TableHead>
+                  <TableHead className="py-3 px-4">Scenario Title</TableHead>
+                  <TableHead className="py-3 px-4">Category</TableHead>
+                  {isAdmin && <TableHead className="py-3 px-4">Lecturer Code</TableHead>}
+                  <TableHead className="py-3 px-4">Duration & Turns</TableHead>
+                  <TableHead className="py-3 px-4">Overall Score</TableHead>
+                  <TableHead className="py-3 px-4">Status</TableHead>
+                  <TableHead className="py-3 px-4">Date</TableHead>
+                  <TableHead className="py-3 px-4 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y divide-border">
                 {items.map((item) => (
-                  <tr
+                  <TableRow
                     key={item.session_id}
                     className="hover:bg-muted/30 transition-colors cursor-pointer"
                     onClick={() => fetchSessionDetail(item.session_id)}
                   >
                     {/* Student */}
-                    <td className="py-3.5 px-4 font-semibold text-foreground">
+                    <TableCell className="py-3.5 px-4 font-semibold text-foreground">
                       <div>{item.student?.display_name || item.student_name || 'Student'}</div>
                       <div className="text-[10px] font-mono text-muted-foreground">
                         {item.student?.student_id || item.student_id || '—'}
                       </div>
-                    </td>
+                    </TableCell>
 
                     {/* Scenario Title */}
-                    <td className="py-3.5 px-4 font-medium text-foreground max-w-xs truncate">
+                    <TableCell className="py-3.5 px-4 font-medium text-foreground max-w-xs truncate">
                       {cleanDisplayText(
                         item.scenario?.title || item.scenario_title || item.setting_title,
                         'Conversation Practice',
                       )}
-                    </td>
+                    </TableCell>
 
                     {/* Category */}
-                    <td className="py-3.5 px-4 text-muted-foreground capitalize">
+                    <TableCell className="py-3.5 px-4 text-muted-foreground capitalize">
                       {item.category_id || 'academic-communication'}
-                    </td>
+                    </TableCell>
 
                     {/* Lecturer Code for Admin */}
                     {isAdmin && (
-                      <td className="py-3.5 px-4 font-mono text-muted-foreground">
+                      <TableCell className="py-3.5 px-4 font-mono text-muted-foreground">
                         {item.lecturer_code || '—'}
-                      </td>
+                      </TableCell>
                     )}
 
                     {/* Duration & Turns */}
-                    <td className="py-3.5 px-4 text-muted-foreground">
+                    <TableCell className="py-3.5 px-4 text-muted-foreground">
                       <div className="font-medium text-foreground">
                         {Math.floor((item.duration_seconds || 0) / 60)}m {(item.duration_seconds || 0) % 60}s
                       </div>
                       <div className="text-[10px]">
                         {item.total_student_responses ?? item.student_response_count ?? 0} student turns
                       </div>
-                    </td>
+                    </TableCell>
 
                     {/* Score */}
-                    <td className="py-3.5 px-4">
+                    <TableCell className="py-3.5 px-4">
                       {isNumericScore(item.overall_score) ? (
                         <span className="font-bold text-foreground">
                           {formatScore(item.overall_score)} <span className="text-[10px] text-muted-foreground">/ 5.0</span>
@@ -344,15 +362,15 @@ export function PracticeResultsView({ user }) {
                       ) : (
                         <span className="text-muted-foreground/60">—</span>
                       )}
-                    </td>
+                    </TableCell>
 
                     {/* Status */}
-                    <td className="py-3.5 px-4">
+                    <TableCell className="py-3.5 px-4">
                       <StatusBadge status={item.status} />
-                    </td>
+                    </TableCell>
 
                     {/* Date */}
-                    <td className="py-3.5 px-4 text-muted-foreground whitespace-nowrap">
+                    <TableCell className="py-3.5 px-4 text-muted-foreground whitespace-nowrap">
                       {item.completed_at
                         ? new Date(item.completed_at).toLocaleDateString('en-US', {
                             month: 'short',
@@ -361,23 +379,36 @@ export function PracticeResultsView({ user }) {
                             minute: '2-digit',
                           })
                         : '—'}
-                    </td>
+                    </TableCell>
 
                     {/* Action */}
-                    <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
-                      <button
+                    <TableCell className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex justify-end gap-1">
+                      <Button
                         type="button"
                         onClick={() => fetchSessionDetail(item.session_id)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md hover:bg-muted text-foreground font-semibold text-xs transition-all"
+                        variant="ghost"
+                        size="sm"
                       >
                         <Eye className="size-3.5 text-muted-foreground" />
                         View
-                      </button>
-                    </td>
-                  </tr>
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => setDeleteSessionId(item.session_id)}
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        title="Delete Practice Result"
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
 
           {/* Pagination Controls */}
@@ -409,6 +440,16 @@ export function PracticeResultsView({ user }) {
           )}
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(deleteSessionId)}
+        title="Delete Practice Result"
+        description="Permanently delete this practice result and its transcript? This action cannot be undone."
+        confirmLabel="Delete"
+        isDestructive
+        onConfirm={handleDeleteSession}
+        onCancel={() => setDeleteSessionId(null)}
+      />
 
       {/* Session Detail Drawer / Modal */}
       {selectedSessionId && (

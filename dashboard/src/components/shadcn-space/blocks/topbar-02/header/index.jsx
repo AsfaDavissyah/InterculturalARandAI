@@ -76,7 +76,7 @@ export default function Header({ user, activeTab, onNavigate, onLogout }) {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur-sm">
-      <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-16 w-full max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
@@ -164,7 +164,7 @@ export default function Header({ user, activeTab, onNavigate, onLogout }) {
         </DropdownMenu>
       </div>
 
-      <nav className="hidden h-11 items-center gap-1 overflow-x-auto border-t border-border px-4 sm:px-6 lg:flex lg:px-8" aria-label="Main navigation">
+      <nav className="mx-auto hidden h-11 w-full max-w-[1600px] items-center gap-1 overflow-x-auto border-t border-border px-4 sm:px-6 lg:flex lg:px-8" aria-label="Main navigation">
         {navigation.map(({ id, icon: Icon, label }) => (
           <Button
             key={id}

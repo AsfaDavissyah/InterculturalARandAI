@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Archive,
   ArrowDown,
   ArrowUp,
   BookOpen,
@@ -15,6 +14,7 @@ import {
   RotateCcw,
   School,
   Sparkles,
+  Trash2,
   Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -26,6 +26,8 @@ import {
   LoadingSkeleton,
   StatusBadge,
 } from '../components/CommonUI';
+import { Button } from '../components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 
 const AVAILABLE_ICONS = [
   { key: 'school', label: 'School', icon: School },
@@ -170,7 +172,7 @@ export function CategoriesView() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-[1600px] space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border pb-5">
         <div>
@@ -179,14 +181,13 @@ export function CategoriesView() {
             Organize Guided Topics with clear names, icons, and student-facing order.
           </p>
         </div>
-        <button
+        <Button
           type="button"
           onClick={openCreateModal}
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-xs shadow-xs hover:bg-primary/90 transition-all cursor-pointer"
         >
           <Plus className="size-4" />
           Add Category
-        </button>
+        </Button>
       </div>
 
       {loading ? (
@@ -202,24 +203,24 @@ export function CategoriesView() {
           onAction={openCreateModal}
         />
       ) : (
-        <div className="rounded-xl border border-border bg-card overflow-hidden shadow-2xs">
+        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-border bg-muted/40 text-muted-foreground uppercase tracking-wider text-[10px] font-bold">
-                  <th className="py-3 px-4 w-12 text-center">Order</th>
-                  <th className="py-3 px-4">Category Name & Icon</th>
-                  <th className="py-3 px-4">Description</th>
-                  <th className="py-3 px-4">Scenarios</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
+            <Table className="min-w-[900px]">
+              <TableHeader>
+                <TableRow className="bg-muted/50 text-muted-foreground">
+                  <TableHead className="py-3 px-4 w-12 text-center">Order</TableHead>
+                  <TableHead className="py-3 px-4">Category Name & Icon</TableHead>
+                  <TableHead className="py-3 px-4">Description</TableHead>
+                  <TableHead className="py-3 px-4">Scenarios</TableHead>
+                  <TableHead className="py-3 px-4">Status</TableHead>
+                  <TableHead className="py-3 px-4 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y divide-border">
                 {categories.map((cat, idx) => (
-                  <tr key={cat.category_id} className="hover:bg-muted/30 transition-colors">
+                  <TableRow key={cat.category_id} className="hover:bg-muted/30 transition-colors">
                     {/* Move Up/Down Controls */}
-                    <td className="py-3.5 px-4 text-center">
+                    <TableCell className="py-3.5 px-4 text-center">
                       <div className="flex items-center justify-center gap-1">
                         <button
                           type="button"
@@ -240,10 +241,10 @@ export function CategoriesView() {
                           <ArrowDown className="size-3.5" />
                         </button>
                       </div>
-                    </td>
+                    </TableCell>
 
                     {/* Name & Icon */}
-                    <td className="py-3.5 px-4 font-semibold text-foreground">
+                    <TableCell className="py-3.5 px-4 font-semibold text-foreground">
                       <div className="flex items-center gap-2.5">
                         <div className="p-2 rounded-lg bg-primary/10 border border-primary/20 shrink-0">
                           {renderIcon(cat.icon_key)}
@@ -253,47 +254,50 @@ export function CategoriesView() {
                           <div className="text-[10px] font-mono text-muted-foreground">{cat.category_id}</div>
                         </div>
                       </div>
-                    </td>
+                    </TableCell>
 
                     {/* Description */}
-                    <td className="py-3.5 px-4 text-muted-foreground max-w-xs truncate">
+                    <TableCell className="py-3.5 px-4 text-muted-foreground max-w-xs truncate">
                       {cat.description || '—'}
-                    </td>
+                    </TableCell>
 
                     {/* Published Scenarios Count */}
-                    <td className="py-3.5 px-4">
+                    <TableCell className="py-3.5 px-4">
                       <span className="font-semibold text-foreground">
                         {cat.published_scenario_count ?? 0} published
                       </span>
-                    </td>
+                    </TableCell>
 
                     {/* Status */}
-                    <td className="py-3.5 px-4">
+                    <TableCell className="py-3.5 px-4">
                       <StatusBadge status={cat.status || 'active'} />
-                    </td>
+                    </TableCell>
 
                     {/* Actions */}
-                    <td className="py-3.5 px-4 text-right">
+                    <TableCell className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <button
+                        <Button
                           type="button"
                           onClick={() => openEditModal(cat)}
-                          className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
+                          variant="ghost"
+                          size="icon-sm"
                           title="Edit Category"
                         >
                           <Edit2 className="size-4" />
-                        </button>
+                        </Button>
                         {cat.status === 'archived' ? (
-                          <button
+                          <Button
                             type="button"
                             onClick={() => handleRestore(cat.category_id)}
-                            className="p-1.5 rounded-md hover:bg-emerald-500/15 text-emerald-600 transition-all"
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-700"
                             title="Restore Category"
                           >
                             <RotateCcw className="size-4" />
-                          </button>
+                          </Button>
                         ) : (
-                          <button
+                          <Button
                             type="button"
                             onClick={() =>
                               setArchiveModal({
@@ -301,18 +305,20 @@ export function CategoriesView() {
                                 name: cat.name,
                               })
                             }
-                            className="p-1.5 rounded-md hover:bg-rose-500/15 text-rose-600 dark:text-rose-400 transition-all"
-                            title="Archive Category"
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            title="Delete Category"
                           >
-                            <Archive className="size-4" />
-                          </button>
+                            <Trash2 className="size-4" />
+                          </Button>
                         )}
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </div>
       )}
@@ -405,9 +411,9 @@ export function CategoriesView() {
       {/* Archive Modal */}
       <ConfirmModal
         isOpen={Boolean(archiveModal)}
-        title="Archive Category"
-        description={`Archive "${archiveModal?.name}"? This is allowed only after all Guided Topics scenarios have been moved to another active Category or removed from Guided Topics.`}
-        confirmLabel="Archive"
+        title="Delete Category"
+        description={`Remove "${archiveModal?.name}" from active Categories? This recoverable action is allowed only after its Guided Topics scenarios have been moved or removed.`}
+        confirmLabel="Delete"
         isDestructive={true}
         onConfirm={() => handleArchive(archiveModal?.id)}
         onCancel={() => setArchiveModal(null)}

@@ -1,16 +1,21 @@
 import React from 'react';
 import { AlertCircle, Check, Copy, RefreshCw, Search, ShieldAlert } from 'lucide-react';
 import { formatStatusLabel } from '../lib/display-format';
+import OrbitalSpinner from './shadcn-space/spinner/spinner-07';
+import { Button } from './ui/button';
 
 export function LoadingSkeleton({ rows = 5, className = '' }) {
   return (
-    <div className={`space-y-3 animate-pulse ${className}`} data-testid="loading-skeleton">
-      <div className="h-8 bg-muted rounded-md w-1/3" />
-      <div className="h-4 bg-muted/70 rounded-md w-2/3" />
-      <div className="space-y-2 pt-4">
-        {Array.from({ length: rows }).map((_, i) => (
-          <div key={i} className="h-12 bg-muted/50 rounded-lg w-full" />
-        ))}
+    <div
+      className={`flex min-h-56 items-center justify-center ${className}`}
+      data-testid="loading-skeleton"
+      data-loading-rows={rows}
+      role="status"
+      aria-label="Loading dashboard data"
+    >
+      <div className="flex flex-col items-center gap-3 text-center">
+        <OrbitalSpinner size="md" className="text-primary" />
+        <p className="text-xs font-medium text-muted-foreground">Loading dashboard data...</p>
       </div>
     </div>
   );
@@ -32,13 +37,13 @@ export function EmptyState({
       <h3 className="text-base font-semibold text-foreground tracking-tight">{title}</h3>
       <p className="text-xs sm:text-sm text-muted-foreground max-w-sm mt-1.5 leading-relaxed">{description}</p>
       {actionLabel && onAction && (
-        <button
+        <Button
           type="button"
           onClick={onAction}
-          className="mt-5 inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all"
+          className="mt-5"
         >
           {actionLabel}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -52,14 +57,16 @@ export function ErrorBanner({ message = 'An unexpected error occurred.', onRetry
         <span className="font-medium text-xs sm:text-sm">{message}</span>
       </div>
       {onRetry && (
-        <button
+        <Button
           type="button"
           onClick={onRetry}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-destructive/15 hover:bg-destructive/25 text-destructive transition-all shrink-0"
+          variant="destructive"
+          size="sm"
+          className="shrink-0"
         >
           <RefreshCw className="size-3.5" />
           Retry
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -142,25 +149,21 @@ export function ConfirmModal({
         </div>
         {children}
         <div className="flex justify-end gap-2 pt-2">
-          <button
+          <Button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 text-xs font-medium rounded-lg border border-border bg-background hover:bg-muted text-foreground transition-all"
+            variant="outline"
           >
             {cancelLabel}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={onConfirm}
             disabled={confirmDisabled}
-            className={`px-4 py-2 text-xs font-semibold rounded-lg shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-              isDestructive
-                ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
-                : 'bg-primary text-primary-foreground hover:bg-primary/90'
-            }`}
+            variant={isDestructive ? 'destructive' : 'default'}
           >
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
