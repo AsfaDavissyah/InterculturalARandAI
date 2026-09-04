@@ -4,7 +4,7 @@ const jwt = require("jsonwebtoken");
 
 process.env.USE_OPENAI = "false";
 
-const { app } = require("../server");
+const { app } = require("../backend_core");
 const JWT_SECRET = process.env.JWT_SECRET || "intercultural_ai_dev_secret_key_2026_at_least_32_bytes";
 
 function getAdminToken() {

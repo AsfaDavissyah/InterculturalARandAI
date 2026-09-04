@@ -5,7 +5,7 @@ const {
   normalizePracticeSessionPayload,
   serializePracticeSession,
   serializeLecturerSession,
-} = require("../server");
+} = require("../backend_core");
 
 const pilotMetadata = {
   captured_at: "2026-08-15T08:05:00.000Z",

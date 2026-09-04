@@ -14,7 +14,7 @@ const {
   generateAIMessage,
   normalizePracticeSessionPayload,
   serializePracticeSession,
-} = require("../server");
+} = require("../backend_core");
 
 const airportScenario = JSON.parse(
   fs.readFileSync(

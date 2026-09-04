@@ -5,7 +5,7 @@ const path = require("node:path");
 const test = require("node:test");
 
 const AudioCache = require("../models/AudioCache");
-const { app } = require("../server");
+const { app } = require("../backend_core");
 const vercelHandler = require("../api");
 const { generateTTSBuffer } = require("../services/tts_service");
 
@@ -18,6 +18,7 @@ test("Vercel configuration routes requests through one serverless function", () 
   assert.equal(config.rewrites[0].destination, "/api");
   assert.equal(config.functions["api/index.js"].maxDuration, 60);
   assert.equal(typeof vercelHandler, "function");
+  assert.equal(typeof require("../server"), "function");
 });
 
 test("audio cache records expire automatically", () => {

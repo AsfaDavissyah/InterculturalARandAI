@@ -9,7 +9,7 @@ const {
   validateSecurityConfig,
   buildLecturerOwnershipFilter,
   combineSessionFilters,
-} = require("../server");
+} = require("../backend_core");
 const User = require("../models/User");
 const execFileAsync = promisify(execFile);
 
@@ -131,7 +131,7 @@ test("Admin bootstrap handles enabled/disabled switches and skips when admin exi
   try {
     // 1. When admin already exists
     User.findOne = async () => ({ _id: "admin_1", role: "admin" });
-    const { bootstrapAdmin } = require("../server");
+    const { bootstrapAdmin } = require("../backend_core");
     const resAlready = await bootstrapAdmin();
     assert.equal(resAlready.bootstrapped, false);
     assert.equal(resAlready.reason, "already_exists");

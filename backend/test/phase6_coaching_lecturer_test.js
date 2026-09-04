@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const http = require("http");
-const { app } = require("../server");
+const { app } = require("../backend_core");
 
 function request(app, method, path, body = null, headers = {}) {
   return new Promise((resolve, reject) => {

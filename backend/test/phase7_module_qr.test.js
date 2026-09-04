@@ -6,7 +6,7 @@ const jwt = require("jsonwebtoken");
 process.env.FEATURE_MODULES_ENABLED = "true";
 process.env.FEATURE_QR_ENABLED = "true";
 
-const { app } = require("../server");
+const { app } = require("../backend_core");
 const LearningModule = require("../models/LearningModule");
 const LearningUnit = require("../models/LearningUnit");
 const LearningPage = require("../models/LearningPage");

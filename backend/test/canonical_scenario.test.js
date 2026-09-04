@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const http = require("http");
 const jwt = require("jsonwebtoken");
 
-const { app, connectDatabase } = require("../server");
+const { app, connectDatabase } = require("../backend_core");
 const User = require("../models/User");
 const Scenario = require("../models/Scenario");
 const Topic = require("../models/Topic");

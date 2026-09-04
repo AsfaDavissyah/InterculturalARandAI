@@ -1,4 +1,4 @@
-const { app, connectDatabase } = require("../server");
+const { app, connectDatabase } = require("../backend_core");
 
 module.exports = async function handler(req, res) {
   try {

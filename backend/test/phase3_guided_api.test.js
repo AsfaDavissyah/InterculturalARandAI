@@ -3,7 +3,7 @@ const test = require("node:test");
 
 process.env.USE_OPENAI = "false";
 
-const { app } = require("../server");
+const { app } = require("../backend_core");
 const {
   buildGuidedScenarioData,
 } = require("../services/guided_scenario_service");

@@ -7,7 +7,7 @@ const {
   Topic,
   Setting,
   normalizeRuntimeContext,
-} = require("../server");
+} = require("../backend_core");
 
 const PracticeSession = require("../models/PracticeSession");
 
