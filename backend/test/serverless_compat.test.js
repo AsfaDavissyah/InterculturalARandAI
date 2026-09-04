@@ -1,5 +1,7 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const http = require("node:http");
+const path = require("node:path");
 const test = require("node:test");
 
 const AudioCache = require("../models/AudioCache");
@@ -7,8 +9,13 @@ const { app } = require("../backend_core");
 const { generateTTSBuffer } = require("../services/tts_service");
 
 test("Vercel Express entrypoint exports one application", () => {
+  const entrypoint = fs.readFileSync(
+    path.join(__dirname, "..", "server.js"),
+    "utf8"
+  );
   const exportedApp = require("../server");
 
+  assert.match(entrypoint, /require\(["']express["']\)/);
   assert.equal(exportedApp, app);
   assert.equal(typeof exportedApp, "function");
   assert.equal(typeof exportedApp.use, "function");

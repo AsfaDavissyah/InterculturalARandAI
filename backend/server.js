@@ -1,3 +1,5 @@
+require("express");
+
 const { app, connectDatabase } = require("./backend_core");
 
 if (require.main === module) {
