@@ -38,6 +38,7 @@ const {
 } = require("./services/canonical_scenario_service");
 const { createDashboardRouter } = require("./routes/dashboard_router");
 const AuditEvent = require("./models/AuditEvent");
+const AudioCache = require("./models/AudioCache");
 
 function requireFeature(flagName) {
   return (req, res, next) => {
@@ -203,22 +204,36 @@ async function seedScenarios() {
   }
 }
 
-async function connectDatabase() {
+let databaseConnectionPromise = null;
+
+async function connectDatabase({ throwOnError = false } = {}) {
   if (!MONGODB_URI) {
-    console.log("MONGODB_URI is not defined in .env. Database operations will be disabled.");
+    const error = new Error(
+      "MONGODB_URI is not defined. Database operations are unavailable."
+    );
+    console.log(`${error.message}${throwOnError ? "" : " Database operations will be disabled."}`);
+    if (throwOnError) throw error;
     return;
   }
 
-  if (mongoose.connection.readyState !== 0) return;
+  if (mongoose.connection.readyState === 1) return mongoose.connection;
+  if (databaseConnectionPromise) return databaseConnectionPromise;
 
-  try {
+  databaseConnectionPromise = (async () => {
     await mongoose.connect(MONGODB_URI);
     console.log("Connected to MongoDB Atlas successfully.");
     await bootstrapAdmin();
     await seedScenarios();
     await seedTopicsAndSettings();
+    return mongoose.connection;
+  })();
+
+  try {
+    return await databaseConnectionPromise;
   } catch (err) {
+    databaseConnectionPromise = null;
     console.error("MongoDB Atlas connection error:", err);
+    if (throwOnError) throw err;
   }
 }
 
@@ -234,9 +249,13 @@ try {
 }
 
 let generateTTS = null;
+let generateTTSBuffer = null;
+let buildTTSRequest = null;
 try {
   const ttsService = require("./services/tts_service");
   generateTTS = ttsService.generateTTS;
+  generateTTSBuffer = ttsService.generateTTSBuffer;
+  buildTTSRequest = ttsService.buildSpeechRequest;
 } catch (error) {
   console.log("TTS service not loaded. Text-to-speech endpoint will be disabled.");
 }
@@ -3419,6 +3438,55 @@ app.post("/api/tts", async (req, res) => {
   }
 
   try {
+    if (process.env.VERCEL) {
+      if (
+        typeof generateTTSBuffer !== "function" ||
+        typeof buildTTSRequest !== "function"
+      ) {
+        return res.status(503).json({
+          error: true,
+          message: "Serverless TTS generation is currently unavailable."
+        });
+      }
+
+      const { cacheFileName } = buildTTSRequest(text, gender, ai_role);
+      const cached = await AudioCache.exists({
+        key: cacheFileName,
+        expiresAt: { $gt: new Date() },
+      });
+      const generated = cached
+        ? { fileName: cacheFileName }
+        : await generateTTSBuffer(text, gender, ai_role);
+      const ttlHours = Math.max(
+        1,
+        Number.parseInt(process.env.TTS_CACHE_TTL_HOURS || "24", 10) || 24
+      );
+      if (!cached) {
+        await AudioCache.findOneAndUpdate(
+          { key: generated.fileName },
+          {
+            $set: {
+              contentType: generated.contentType,
+              data: generated.buffer,
+              expiresAt: new Date(Date.now() + ttlHours * 60 * 60 * 1000),
+            },
+            $setOnInsert: { createdAt: new Date() },
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+      }
+
+      const protocol = req.get("x-forwarded-proto") || req.protocol;
+      const host = req.get("host");
+      const audioUrl = `${protocol}://${host}/api/tts/audio/${encodeURIComponent(generated.fileName)}`;
+
+      return res.json({
+        success: true,
+        audio_url: audioUrl,
+        file_name: generated.fileName,
+      });
+    }
+
     const audioFileName = await generateTTS(text, gender, ai_role);
     const protocol = req.protocol;
     const host = req.get("host");
@@ -3435,6 +3503,31 @@ app.post("/api/tts", async (req, res) => {
       error: true,
       message: "Failed to generate text-to-speech audio: " + error.message
     });
+  }
+});
+
+app.get("/api/tts/audio/:fileName", async (req, res) => {
+  try {
+    const fileName = String(req.params.fileName || "");
+    if (!/^[a-f0-9]{64}\.mp3$/.test(fileName)) {
+      return res.status(400).json({ error: true, message: "Invalid audio cache key." });
+    }
+
+    const cached = await AudioCache.findOne({
+      key: fileName,
+      expiresAt: { $gt: new Date() },
+    });
+    if (!cached?.data) {
+      return res.status(404).json({ error: true, message: "Audio has expired or was not found." });
+    }
+
+    res.setHeader("Content-Type", cached.contentType || "audio/mpeg");
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    res.setHeader("Content-Length", cached.data.length);
+    return res.send(cached.data);
+  } catch (error) {
+    console.error("TTS cache read error:", error.message);
+    return res.status(500).json({ error: true, message: "Failed to read cached audio." });
   }
 });
 

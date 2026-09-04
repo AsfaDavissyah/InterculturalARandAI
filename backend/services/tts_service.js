@@ -13,7 +13,10 @@ function getClient() {
   return client;
 }
 
-const CACHE_DIR = path.join(__dirname, "..", "public", "audio_cache");
+const IS_SERVERLESS = Boolean(process.env.VERCEL);
+const CACHE_DIR = IS_SERVERLESS
+  ? path.join("/tmp", "engora_audio_cache")
+  : path.join(__dirname, "..", "public", "audio_cache");
 const DEFAULT_TTS_MODEL = "gpt-4o-mini-tts";
 
 if (!fs.existsSync(CACHE_DIR)) {
@@ -284,6 +287,20 @@ async function generateTTS(text, gender, aiRole) {
     throw new Error("Text is required for TTS generation.");
   }
 
+  const result = await generateTTSBuffer(text, gender, aiRole);
+  const fileName = result.fileName;
+  const filePath = path.join(CACHE_DIR, fileName);
+
+  if (!fs.existsSync(filePath)) fs.writeFileSync(filePath, result.buffer);
+
+  return fileName;
+}
+
+async function generateTTSBuffer(text, gender, aiRole) {
+  if (!String(text || "").trim()) {
+    throw new Error("Text is required for TTS generation.");
+  }
+
   const cleanText = String(text).trim();
   const { request, profile, intent, cacheFileName: fileName } =
     buildSpeechRequest(cleanText, gender, aiRole);
@@ -293,7 +310,11 @@ async function generateTTS(text, gender, aiRole) {
     console.log(
       `TTS cache hit profile=${profile.id} intent=${intent} text="${cleanText.substring(0, 20)}..."`
     );
-    return fileName;
+    return {
+      buffer: fs.readFileSync(filePath),
+      contentType: "audio/mpeg",
+      fileName,
+    };
   }
 
   console.log(
@@ -302,13 +323,13 @@ async function generateTTS(text, gender, aiRole) {
 
   const mp3 = await getClient().audio.speech.create(request);
   const buffer = Buffer.from(await mp3.arrayBuffer());
-  fs.writeFileSync(filePath, buffer);
 
-  return fileName;
+  return { buffer, contentType: "audio/mpeg", fileName };
 }
 
 module.exports = {
   generateTTS,
+  generateTTSBuffer,
   getVoiceName,
   getCharacterProfile,
   detectSpeechIntent,
