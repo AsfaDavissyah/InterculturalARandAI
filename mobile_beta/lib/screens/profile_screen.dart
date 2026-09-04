@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../services/app_settings.dart';
 import '../services/auth_service.dart';
-import '../services/chat_service.dart';
 import '../theme/engora_theme.dart';
 import '../widgets/app_svg_icon.dart';
 import 'login_screen.dart';
@@ -32,6 +31,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final profile = _profile;
     if (profile == null) return;
     final nameController = TextEditingController(text: profile.name);
+    final emailController = TextEditingController(text: profile.email);
     var gender = profile.gender;
     var saving = false;
 
@@ -48,6 +48,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 controller: nameController,
                 enabled: !saving,
                 decoration: const InputDecoration(labelText: 'Full name'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: emailController,
+                enabled: !saving,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(labelText: 'Email address'),
               ),
               const SizedBox(height: 12),
               SegmentedButton<String>(
@@ -72,10 +79,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ? null
                   : () async {
                       final name = nameController.text.trim();
-                      if (name.length < 3) return;
+                      final email = emailController.text.trim();
+                      if (name.length < 3 || !email.contains('@')) return;
                       setDialogState(() => saving = true);
                       final success = await AuthService.updateProfile(
                         name: name,
+                        email: email,
                         gender: gender,
                       );
                       if (!mounted || !dialogContext.mounted) return;
@@ -106,83 +115,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
     nameController.dispose();
-  }
-
-  Future<void> _serverSettings() async {
-    final currentUrl = await AppSettings.getBaseUrl();
-    if (!mounted) return;
-    final controller = TextEditingController(text: currentUrl);
-    var testing = false;
-    String? status;
-    final result = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Server connection'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                controller: controller,
-                enabled: !testing,
-                decoration: const InputDecoration(labelText: 'Backend address'),
-              ),
-              if (status != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  status!,
-                  style: TextStyle(
-                    color: status == 'Connected'
-                        ? EngoraColors.brand
-                        : EngoraColors.danger,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: testing
-                  ? null
-                  : () async {
-                      setDialogState(() {
-                        testing = true;
-                        status = null;
-                      });
-                      try {
-                        final url = AppSettings.normalizeBaseUrl(
-                          controller.text,
-                        );
-                        await ChatService(baseUrl: url).checkConnection();
-                        setDialogState(() => status = 'Connected');
-                      } catch (_) {
-                        setDialogState(() => status = 'Cannot connect');
-                      } finally {
-                        setDialogState(() => testing = false);
-                      }
-                    },
-              child: const Text('Test'),
-            ),
-            TextButton(
-              onPressed: testing ? null : () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: testing
-                  ? null
-                  : () => Navigator.pop(dialogContext, controller.text.trim()),
-              child: const Text('Save'),
-            ),
-          ],
-        ),
-      ),
-    );
-    controller.dispose();
-    if (result != null && result.isNotEmpty) {
-      await AppSettings.setBaseUrl(result);
-    }
+    emailController.dispose();
   }
 
   Future<void> _pilotSettings() async {
@@ -338,7 +271,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _ProfileTile(
             icon: Icons.person_outline_rounded,
             title: 'Personal information',
-            subtitle: 'Update your name and gender',
+            subtitle: 'Update your name, email, and gender',
             onTap: _editProfile,
           ),
           _ProfileTile(
@@ -346,12 +279,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             title: 'Student information',
             subtitle:
                 '${profile?.studentId ?? '-'}  •  ${profile?.studentLecturerCode ?? '-'}',
-          ),
-          _ProfileTile(
-            icon: Icons.dns_outlined,
-            title: 'Server connection',
-            subtitle: 'Configure and test the API server',
-            onTap: _serverSettings,
           ),
           _ProfileTile(
             icon: Icons.science_outlined,

@@ -89,7 +89,6 @@ export function ScenarioEditorView({ scenarioId, user, onBack, onSaved }) {
 
   const [loading, setLoading] = useState(isEditMode);
   const [saving, setSaving] = useState(false);
-  const [categories, setCategories] = useState([]);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [showExitModal, setShowExitModal] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
@@ -97,8 +96,8 @@ export function ScenarioEditorView({ scenarioId, user, onBack, onSaved }) {
   // Form State
   const [form, setForm] = useState({
     title: '',
-    placements: ['guided_topics'],
-    category_ids: ['academic-communication'],
+    placements: ['scenario_library'],
+    category_ids: [],
     briefing: '',
     student_role: 'International student',
     ai_partner: APPROVED_PARTNERS[0],
@@ -123,15 +122,12 @@ export function ScenarioEditorView({ scenarioId, user, onBack, onSaved }) {
   useEffect(() => {
     async function init() {
       try {
-        const catRes = await requestJson('/api/dashboard/categories');
-        setCategories(catRes || []);
-
         if (isEditMode) {
           const scn = await requestJson(`/api/dashboard/scenarios/${scenarioId}`);
           setForm({
             title: scn.title || '',
-            placements: scn.placements?.length ? scn.placements : ['guided_topics'],
-            category_ids: scn.category_ids?.length ? scn.category_ids : ['academic-communication'],
+            placements: ['scenario_library'],
+            category_ids: [],
             briefing: scn.briefing || '',
             student_role: scn.student_role || '',
             ai_partner: scn.ai_partner?.profile_id
@@ -170,30 +166,10 @@ export function ScenarioEditorView({ scenarioId, user, onBack, onSaved }) {
     }
   };
 
-  const togglePlacement = (placementKey) => {
-    let next;
-    if (form.placements.includes(placementKey)) {
-      if (form.placements.length === 1) {
-        toast.error('At least one placement must remain selected.');
-        return;
-      }
-      next = form.placements.filter((p) => p !== placementKey);
-    } else {
-      next = [...form.placements, placementKey];
-    }
-    updateField('placements', next);
-  };
-
   const validate = ({ release = false } = {}) => {
     const errs = {};
     if (!form.title.trim() || form.title.trim().length < 3 || form.title.trim().length > 100) {
       errs.title = 'Title must be between 3 and 100 characters.';
-    }
-    if (release && !form.placements.length) {
-      errs.placements = 'Select at least one placement location.';
-    }
-    if (release && form.placements.includes('guided_topics') && !form.category_ids.length) {
-      errs.category_ids = 'Please select a Category for Guided Topics placement.';
     }
     if (release && (!form.briefing.trim() || form.briefing.trim().length < 20 || form.briefing.trim().length > 500)) {
       errs.briefing = 'Practice Briefing must be between 20 and 500 characters.';
@@ -225,8 +201,8 @@ export function ScenarioEditorView({ scenarioId, user, onBack, onSaved }) {
     try {
       const payload = {
         title: form.title.trim(),
-        placements: form.placements,
-        category_ids: form.placements.includes('guided_topics') ? form.category_ids : [],
+        placements: ['scenario_library'],
+        category_ids: [],
         briefing: form.briefing.trim(),
         student_role: form.student_role.trim(),
         ai_partner: {
@@ -376,59 +352,6 @@ export function ScenarioEditorView({ scenarioId, user, onBack, onSaved }) {
             <p className="text-xs text-destructive">{errors.title}</p>
           ) : (
             <p className="text-[11px] text-muted-foreground">Clear, recognizable title shown to learners (3-100 characters).</p>
-          )}
-        </div>
-
-        {/* Placements & Categories Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 rounded-lg bg-muted/30 border border-border/70">
-          {/* Placements */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-foreground">
-              Where will this appear? <span className="text-destructive">*</span>
-            </label>
-            <div className="space-y-2 pt-1">
-              <label className="flex items-center gap-2.5 text-xs text-foreground cursor-pointer font-medium select-none">
-                <input
-                  type="checkbox"
-                  checked={form.placements.includes('guided_topics')}
-                  onChange={() => togglePlacement('guided_topics')}
-                  className="size-4 rounded border-border text-primary focus:ring-primary"
-                />
-                <span>Guided Topics (Structured 3D/AR Practice)</span>
-              </label>
-
-              <label className="flex items-center gap-2.5 text-xs text-foreground cursor-pointer font-medium select-none">
-                <input
-                  type="checkbox"
-                  checked={form.placements.includes('scenario_library')}
-                  onChange={() => togglePlacement('scenario_library')}
-                  className="size-4 rounded border-border text-primary focus:ring-primary"
-                />
-                <span>Scenario Library (Open Roleplay Catalog)</span>
-              </label>
-            </div>
-            {errors.placements && <p className="text-xs text-destructive">{errors.placements}</p>}
-          </div>
-
-          {/* Category Selector (if Guided Topics) */}
-          {form.placements.includes('guided_topics') && (
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-foreground">
-                Category <span className="text-destructive">*</span>
-              </label>
-              <select
-                value={form.category_ids[0] || 'academic-communication'}
-                onChange={(e) => updateField('category_ids', [e.target.value])}
-                className="w-full px-3 py-2 rounded-lg border border-border text-xs bg-background text-foreground font-medium"
-              >
-                {categories.map((c) => (
-                  <option key={c.category_id} value={c.category_id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              <p className="text-[11px] text-muted-foreground">Assigns the topic category in Guided Practice.</p>
-            </div>
           )}
         </div>
 

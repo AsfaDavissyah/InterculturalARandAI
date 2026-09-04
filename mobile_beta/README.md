@@ -39,13 +39,11 @@ The default backend is the online Engora VPS:
 https://api.202-10-37-3.sslip.io
 ```
 
-For local development on a physical phone, connect the phone and laptop to
-the same Wi-Fi. Start the backend, find the laptop's IPv4 address with
-`ipconfig`, then open the backend settings button and enter an address such
-as:
+For local development, override the endpoint at build time. The application
+does not expose server configuration to students:
 
-```text
-http://192.168.1.8:3000
+```bash
+flutter run --dart-define=API_BASE_URL=http://192.168.1.8:3000
 ```
 
 The same value can be supplied when starting Flutter:

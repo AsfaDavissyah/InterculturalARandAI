@@ -14,6 +14,7 @@ const {
   serializeCanonicalScenario,
 } = require("../services/canonical_scenario_service");
 const { topicsData, settingsData } = require("../scripts/seed_topics_and_settings");
+const { migrateLecturerCode } = require("../services/lecturer_code_service");
 
 function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) {
   const router = express.Router();
@@ -187,17 +188,16 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
         let connectedStudentsCount = 0;
         let studentIds = [];
         let sessions = [];
-        let ownDrafts = [];
 
         if (isDb) {
           const students = await User.find({ role: "student", studentLecturerCode: lecturerCode }).lean();
           connectedStudentsCount = students.length;
           studentIds = students.map((s) => s._id);
 
-          [sessions, ownDrafts] = await Promise.all([
-            PracticeSession.find({ userId: { $in: studentIds } }).sort({ completedAt: -1 }).limit(20).lean(),
-            Scenario.find({ "owner.user_id": req.user.userId, status: "draft" }).sort({ updatedAt: -1 }).limit(5).lean(),
-          ]);
+          sessions = await PracticeSession.find({ userId: { $in: studentIds } })
+            .sort({ completedAt: -1 })
+            .limit(20)
+            .lean();
         }
 
         const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -235,7 +235,7 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
             connected_students: connectedStudentsCount,
             practices_this_week: practicesThisWeek,
             average_overall_score: avgScore,
-            own_draft_scenarios: ownDrafts.length,
+            total_practices: sessions.length,
           },
           recent_sessions: sessions.slice(0, 6).map((s) => ({
             session_id: s.sessionId,
@@ -246,7 +246,6 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
             completed_at: s.completedAt || s.createdAt,
           })),
           students_needing_attention: studentsNeedingAttention.slice(0, 5),
-          own_drafts: ownDrafts.map(serializeCanonicalScenario),
         });
       }
     } catch (err) {
@@ -274,20 +273,14 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
       const pageNum = Math.max(1, parseInt(page, 10) || 1);
       const limit = Math.min(50, Math.max(1, parseInt(page_size, 10) || 10));
 
-      const filter = {};
+      const filter = { placements: "scenario_library" };
       const owner = requestedOwner || ownership;
 
       // Role scoping:
-      if (!isAdmin) {
-        // Lecturer sees: published scenarios OR own drafts/scenarios
-        filter.$or = [
-          { status: "published" },
-          { "owner.user_id": req.user.userId },
-        ];
-      }
+      if (!isAdmin) filter.status = "published";
 
       // Status filter:
-      if (status && status !== "all") {
+      if (isAdmin && status && status !== "all") {
         filter.status = status;
       } else if (!status || status === "all") {
         // By default exclude archived unless specifically requested
@@ -297,8 +290,9 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
       }
 
       // Placement filter:
-      if (placement && placement !== "all") {
-        filter.placements = placement;
+      // Guided settings are managed separately and never appear in Scenarios.
+      if (placement && placement !== "all" && placement !== "scenario_library") {
+        return res.json({ items: [], page: pageNum, page_size: limit, total_items: 0, total_pages: 1 });
       }
 
       // Category filter:
@@ -357,7 +351,7 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
     }
   });
 
-  router.post("/scenarios", async (req, res) => {
+  router.post("/scenarios", requireRole(["admin"]), async (req, res) => {
     try {
       const {
         title,
@@ -379,10 +373,7 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
       if (!title || title.trim().length < 3 || title.trim().length > 100) {
         return res.status(400).json({ error: "Title is required (3-100 characters)." });
       }
-      const normalizedPlacements = Array.isArray(placements) && placements.length > 0
-        ? placements.filter((p) => ["guided_topics", "scenario_library"].includes(p))
-        : ["scenario_library"];
-      const hasGuided = normalizedPlacements.includes("guided_topics");
+      const normalizedPlacements = ["scenario_library"];
 
       const partnerProfile = ai_partner?.profile_id
         ? getApprovedAiPartner(ai_partner.profile_id) || ai_partner
@@ -452,8 +443,8 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
         version: 1,
         isActive: false,
         legacyRefs: {
-          experience_type: hasGuided ? "guided_topic" : "legacy_scenario",
-          topic_id: category_ids && category_ids[0] ? category_ids[0] : null,
+          experience_type: "legacy_scenario",
+          topic_id: null,
           scenario_id: scenarioId,
         },
         data: runtimeData,
@@ -499,7 +490,7 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
     }
   });
 
-  router.put("/scenarios/:scenario_id", async (req, res) => {
+  router.put("/scenarios/:scenario_id", requireRole(["admin"]), async (req, res) => {
     try {
       const scenarioId = req.params.scenario_id.toUpperCase();
       const scenario = await Scenario.findOne({ scenarioId });
@@ -588,7 +579,7 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
     }
   });
 
-  router.post("/scenarios/:scenario_id/duplicate", async (req, res) => {
+  router.post("/scenarios/:scenario_id/duplicate", requireRole(["admin"]), async (req, res) => {
     try {
       const originalId = req.params.scenario_id.toUpperCase();
       const original = await Scenario.findOne({ scenarioId: originalId }).lean();
@@ -651,7 +642,7 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
     }
   });
 
-  router.post("/scenarios/:scenario_id/submit", async (req, res) => {
+  router.post("/scenarios/:scenario_id/submit", requireRole(["admin"]), async (req, res) => {
     try {
       const scenarioId = req.params.scenario_id.toUpperCase();
       const scenario = await Scenario.findOne({ scenarioId });
@@ -1229,19 +1220,30 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
         attempts++;
       }
 
-      lecturer.lecturerCode = code;
-      await lecturer.save();
+      const migration = await migrateLecturerCode({
+        UserModel: User,
+        lecturer,
+        nextCode: code,
+      });
 
       logAuditEvent({
         event: "lecturer_code_regenerated",
         actorId: req.user.userId,
         role: req.user.role,
         recordId: String(lecturer._id),
-        details: { new_code: code },
+        details: {
+          previous_code: migration.previousCode,
+          new_code: code,
+          migrated_students: migration.migratedStudents,
+        },
         requestId: req.requestId,
       });
 
-      return res.json({ success: true, lecturer_code: code });
+      return res.json({
+        success: true,
+        lecturer_code: code,
+        migrated_students: migration.migratedStudents,
+      });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -1738,6 +1740,9 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
         email: user?.email || req.user.email,
         role: user?.role || req.user.role,
         gender: user?.gender || "male",
+        account_status: user?.accountStatus || "active",
+        student_id: user?.studentId || null,
+        student_lecturer_code: user?.studentLecturerCode || null,
         lecturer_code: user?.lecturerCode || req.user.lecturerCode || null,
         created_at: user?.createdAt || new Date(),
       });
@@ -1748,7 +1753,7 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
 
   router.put("/profile", async (req, res) => {
     try {
-      const { name, current_password, new_password } = req.body;
+      const { name, email, gender, current_password, new_password } = req.body;
       const user = mongoose.Types.ObjectId.isValid(req.user.userId)
         ? await User.findById(req.user.userId)
         : null;
@@ -1769,6 +1774,25 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
 
       if (name && name.trim()) {
         user.name = name.trim();
+      }
+
+      if (email && email.trim().toLowerCase() !== user.email) {
+        const normalizedEmail = email.trim().toLowerCase();
+        if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+          return res.status(400).json({ error: "Enter a valid email address." });
+        }
+        const existingEmail = await User.findOne({ email: normalizedEmail, _id: { $ne: user._id } });
+        if (existingEmail) {
+          return res.status(400).json({ error: "Email is already registered." });
+        }
+        user.email = normalizedEmail;
+      }
+
+      if (gender !== undefined) {
+        if (!["male", "female"].includes(gender)) {
+          return res.status(400).json({ error: "Gender must be male or female." });
+        }
+        user.gender = gender;
       }
 
       if (new_password) {
@@ -1795,6 +1819,10 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
           name: user.name,
           email: user.email,
           role: user.role,
+          gender: user.gender,
+          account_status: user.accountStatus,
+          student_id: user.studentId || null,
+          student_lecturer_code: user.studentLecturerCode || null,
           lecturer_code: user.lecturerCode || null,
         },
       });

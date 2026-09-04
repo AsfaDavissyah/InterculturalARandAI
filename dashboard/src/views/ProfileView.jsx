@@ -16,6 +16,8 @@ export function ProfileView({ user, onProfileUpdated }) {
 
   // Edit fields
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [gender, setGender] = useState('male');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [saving, setSaving] = useState(false);
@@ -27,6 +29,8 @@ export function ProfileView({ user, onProfileUpdated }) {
       const res = await requestJson('/api/dashboard/profile');
       setProfile(res);
       setName(res.name || user.name || '');
+      setEmail(res.email || user.email || '');
+      setGender(res.gender || 'male');
     } catch (err) {
       setError(err.message || 'Failed to load profile.');
     } finally {
@@ -41,6 +45,7 @@ export function ProfileView({ user, onProfileUpdated }) {
   const handleSave = async (e) => {
     e.preventDefault();
     if (!name.trim()) return toast.error('Name cannot be empty.');
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return toast.error('Enter a valid email address.');
     if (newPassword && !currentPassword) {
       return toast.error('Please enter your current password to set a new password.');
     }
@@ -50,7 +55,11 @@ export function ProfileView({ user, onProfileUpdated }) {
 
     setSaving(true);
     try {
-      const payload = { name: name.trim() };
+      const payload = {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        gender,
+      };
       if (newPassword) {
         payload.current_password = currentPassword;
         payload.new_password = newPassword;
@@ -128,16 +137,29 @@ export function ProfileView({ user, onProfileUpdated }) {
           <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Email Address</label>
           <input
             type="email"
-            value={profile.email}
-            disabled
-            className="w-full px-3.5 py-2.5 rounded-lg border border-border text-sm bg-muted/40 text-muted-foreground cursor-not-allowed font-mono"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full px-3.5 py-2.5 rounded-lg border border-border text-sm bg-background text-foreground"
           />
         </div>
 
         <div className="space-y-1.5">
+          <label className="text-xs font-bold uppercase tracking-wider text-foreground">Gender</label>
+          <select
+            value={gender}
+            onChange={(e) => setGender(e.target.value)}
+            className="w-full px-3.5 py-2.5 rounded-lg border border-border text-sm bg-background text-foreground"
+          >
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+        </div>
+
+        <div className="space-y-1.5">
           <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Role</label>
-          <div>
+          <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={profile.role} />
+            <StatusBadge status={profile.account_status || 'active'} />
           </div>
         </div>
 

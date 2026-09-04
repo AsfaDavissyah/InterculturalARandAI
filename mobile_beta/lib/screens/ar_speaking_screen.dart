@@ -1283,6 +1283,23 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
           fit: StackFit.expand,
           children: [
             _buildCameraBackground(),
+            if (_sessionError == null &&
+                (widget.stickerAssetKey ?? '').isNotEmpty)
+              Positioned(
+                left: 12,
+                right: 12,
+                top: 120,
+                bottom: 165,
+                child: IgnorePointer(
+                  child: SettingVisual(
+                    stickerKey: widget.stickerAssetKey!,
+                    label: widget.scenario.title,
+                    borderRadius: 0,
+                    showLabel: false,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
             if (_sessionError == null)
               Positioned(
                 left: 0,
@@ -1319,17 +1336,6 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                           onPressed: _confirmExit,
                         ),
                         const SizedBox(width: 10),
-                        if ((widget.stickerAssetKey ?? '').isNotEmpty) ...[
-                          SettingVisual(
-                            stickerKey: widget.stickerAssetKey!,
-                            label: widget.scenario.title,
-                            width: 34,
-                            height: 34,
-                            borderRadius: 8,
-                            showLabel: false,
-                          ),
-                          const SizedBox(width: 10),
-                        ],
                         Expanded(
                           child: Text(
                             widget.topicTitle ?? widget.scenario.type,

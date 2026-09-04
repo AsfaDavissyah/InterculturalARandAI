@@ -11,7 +11,6 @@ import {
   Edit3,
   Layers,
   RotateCcw,
-  Send,
   Sparkles,
   Target,
   User,
@@ -112,8 +111,7 @@ export function ScenarioDetailView({ scenarioId, user, onBack, onEdit, onRefresh
   }
 
   const isAdmin = user.role === 'admin';
-  const isOwner = String(scenario.owner?.user_id) === String(user.userId);
-  const canEdit = isAdmin || (isOwner && scenario.status === 'draft');
+  const canEdit = isAdmin;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -155,27 +153,18 @@ export function ScenarioDetailView({ scenarioId, user, onBack, onEdit, onRefresh
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={() => handleAction('duplicate')}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-border bg-background hover:bg-muted font-semibold text-xs text-foreground transition-all cursor-pointer"
-          >
-            <Copy className="size-3.5 text-muted-foreground" />
-            Duplicate
-          </button>
-
-          {/* Role specific lifecycle buttons */}
-          {!isAdmin && scenario.status === 'draft' && isOwner && (
+          {isAdmin && (
             <button
               type="button"
-              onClick={() => setActionModal({ type: 'submit', title: 'Submit for Review', desc: 'Submit this scenario for Admin review and publishing.' })}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 text-white font-semibold text-xs shadow-xs hover:bg-blue-700 transition-all cursor-pointer"
+              onClick={() => handleAction('duplicate')}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-border bg-background hover:bg-muted font-semibold text-xs text-foreground transition-all cursor-pointer"
             >
-              <Send className="size-3.5" />
-              Submit for Review
+              <Copy className="size-3.5 text-muted-foreground" />
+              Duplicate
             </button>
           )}
 
+          {/* Role specific lifecycle buttons */}
           {isAdmin && scenario.status !== 'published' && scenario.status !== 'archived' && (
             <button
               type="button"

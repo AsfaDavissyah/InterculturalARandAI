@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../services/app_settings.dart';
 import '../services/auth_service.dart';
-import '../services/chat_service.dart';
 import '../theme/engora_theme.dart';
 import '../widgets/app_svg_icon.dart';
 import 'home_shell.dart';
@@ -59,88 +57,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _openBackendSettings() async {
-    final currentUrl = await AppSettings.getBaseUrl();
-    if (!mounted) return;
-    final controller = TextEditingController(text: currentUrl);
-    String? status;
-    bool checking = false;
-
-    final value = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Server connection'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                controller: controller,
-                enabled: !checking,
-                keyboardType: TextInputType.url,
-                autocorrect: false,
-                decoration: const InputDecoration(
-                  labelText: 'Backend address',
-                  hintText: 'https://example.com',
-                ),
-              ),
-              if (status != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  status!,
-                  style: TextStyle(
-                    color: status == 'Connected'
-                        ? EngoraColors.brand
-                        : EngoraColors.danger,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: checking
-                  ? null
-                  : () async {
-                      setDialogState(() {
-                        checking = true;
-                        status = null;
-                      });
-                      try {
-                        final url = AppSettings.normalizeBaseUrl(
-                          controller.text,
-                        );
-                        await ChatService(baseUrl: url).checkConnection();
-                        setDialogState(() => status = 'Connected');
-                      } catch (_) {
-                        setDialogState(() => status = 'Cannot connect');
-                      } finally {
-                        setDialogState(() => checking = false);
-                      }
-                    },
-              child: const Text('Test'),
-            ),
-            TextButton(
-              onPressed: checking ? null : () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: checking
-                  ? null
-                  : () => Navigator.pop(dialogContext, controller.text.trim()),
-              child: const Text('Save'),
-            ),
-          ],
-        ),
-      ),
-    );
-    controller.dispose();
-    if (value == null || value.isEmpty) return;
-    await AppSettings.setBaseUrl(value);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -152,20 +68,6 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: IconButton(
-                    tooltip: 'Server connection',
-                    onPressed: _openBackendSettings,
-                    icon: const Icon(Icons.dns_outlined),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: EngoraColors.ink,
-                      minimumSize: const Size(46, 46),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
                 Text(
                   'Welcome Back, Glad\nto See You Again.\nSign in to Practice',
                   style: EngoraTheme.display(fontSize: 31, height: 1.42),

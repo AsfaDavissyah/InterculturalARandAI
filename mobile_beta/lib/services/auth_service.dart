@@ -125,7 +125,9 @@ class AuthService {
       }
     } catch (e) {
       if (e.toString().contains('Exception:')) rethrow;
-      throw Exception('Failed to connect to server. Check your backend server address.');
+      throw Exception(
+        'Failed to connect to server. Check your backend server address.',
+      );
     }
   }
 
@@ -178,12 +180,18 @@ class AuthService {
           throw Exception(serverError.toString());
         }
         if (response.statusCode == 400) {
-          throw Exception('Registration failed. Please check your Lecturer Code and email.');
+          throw Exception(
+            'Registration failed. Please check your Lecturer Code and email.',
+          );
         }
         if (response.statusCode == 429) {
-          throw Exception('Registration limit reached. Please try again in 15 minutes.');
+          throw Exception(
+            'Registration limit reached. Please try again in 15 minutes.',
+          );
         }
-        throw Exception('Server error (HTTP ${response.statusCode}). Please try again later.');
+        throw Exception(
+          'Server error (HTTP ${response.statusCode}). Please try again later.',
+        );
       }
     } catch (e) {
       if (e.toString().contains('Exception:')) rethrow;
@@ -216,6 +224,7 @@ class AuthService {
   /// Updates user profile details both on the backend and locally.
   static Future<bool> updateProfile({
     required String name,
+    required String email,
     required String gender,
   }) async {
     final baseUrl = await AppSettings.getBaseUrl();
@@ -231,7 +240,7 @@ class AuthService {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: jsonEncode({'name': name, 'gender': gender}),
+        body: jsonEncode({'name': name, 'email': email, 'gender': gender}),
       );
 
       if (response.statusCode == 200) {

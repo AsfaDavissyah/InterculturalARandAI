@@ -10,7 +10,6 @@ import '../services/chat_service.dart';
 import '../services/page_transitions.dart';
 import '../theme/engora_theme.dart';
 import '../widgets/app_svg_icon.dart';
-import '../widgets/setting_visual.dart';
 import 'ar_speaking_screen.dart';
 
 class GuidedSettingBriefingScreen extends StatelessWidget {
@@ -72,16 +71,13 @@ class GuidedSettingBriefingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = TopicPalette.fromTopic(topic.topicId);
     return Scaffold(
       body: Column(
         children: [
           _OpeningVoiceWarmup(setting: setting),
           _BriefingHeader(
             title: setting.title,
-            stickerKey: setting.stickerAssetKey,
             location: setting.location,
-            palette: palette,
             onBack: () => Navigator.pop(context),
           ),
           Expanded(
@@ -154,16 +150,12 @@ class GuidedSettingBriefingScreen extends StatelessWidget {
 
 class _BriefingHeader extends StatelessWidget {
   final String title;
-  final String stickerKey;
   final String location;
-  final TopicPalette palette;
   final VoidCallback onBack;
 
   const _BriefingHeader({
     required this.title,
-    required this.stickerKey,
     required this.location,
-    required this.palette,
     required this.onBack,
   });
 
@@ -184,40 +176,21 @@ class _BriefingHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            height: 94,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                IconButton(
-                  tooltip: 'Back',
-                  onPressed: onBack,
-                  icon: const AppSvgIcon(AppIcons.back, size: 26),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: EngoraColors.ink,
-                    minimumSize: const Size(48, 48),
-                    side: BorderSide(
-                      color: EngoraColors.ink.withValues(alpha: 0.06),
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                SettingVisual(
-                  stickerKey: stickerKey,
-                  label: location,
-                  width: 118,
-                  height: 88,
-                  borderRadius: 16,
-                  showLabel: false,
-                  backgroundColor: palette.background,
-                  iconColor: palette.accent,
-                ),
-              ],
+          IconButton(
+            tooltip: 'Back',
+            onPressed: onBack,
+            icon: const AppSvgIcon(AppIcons.back, size: 26),
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: EngoraColors.ink,
+              minimumSize: const Size(48, 48),
+              side: BorderSide(color: EngoraColors.ink.withValues(alpha: 0.06)),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 18),
           Text(title, style: EngoraTheme.display(fontSize: 30, height: 1.35)),
+          const SizedBox(height: 4),
+          Text(location, style: const TextStyle(color: EngoraColors.muted)),
         ],
       ),
     );

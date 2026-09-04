@@ -133,7 +133,9 @@ export function LecturersView() {
       const res = await requestJson(`/api/dashboard/lecturers/${lecturerId}/regenerate-code`, {
         method: 'POST',
       });
-      toast.success(`Research code regenerated: ${res.lecturer_code}`);
+      toast.success(
+        `Research code regenerated: ${res.lecturer_code}. ${res.migrated_students || 0} connected student(s) preserved.`,
+      );
       setRegenModal(null);
       fetchLecturers();
     } catch (err) {

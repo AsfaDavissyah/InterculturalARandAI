@@ -176,8 +176,8 @@ export function OverviewView({ user, onNavigate }) {
               suffix="/ 5.0"
             />
             <KpiCard
-              label="My Draft Scenarios"
-              value={summary.own_draft_scenarios ?? 0}
+              label="Cohort Practices"
+              value={summary.total_practices ?? 0}
               icon={BookOpen}
               color="amber"
             />
@@ -187,7 +187,7 @@ export function OverviewView({ user, onNavigate }) {
 
       {/* Admin Specific Sections */}
       {isAdmin && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6">
           {/* Drafts Awaiting Review */}
           <div className="border border-border rounded-xl bg-card p-5 space-y-4">
             <div className="flex items-center justify-between">
@@ -335,54 +335,6 @@ export function OverviewView({ user, onNavigate }) {
             )}
           </div>
 
-          {/* Lecturer Own Drafts */}
-          <div className="border border-border rounded-xl bg-card p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <BookOpen className="size-4 text-primary" />
-                <h2 className="text-sm font-semibold text-foreground">My Draft Scenarios</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => onNavigate('scenarios', { filterOwnership: 'mine' })}
-                className="text-xs text-primary hover:underline font-medium inline-flex items-center gap-1"
-              >
-                View all <ArrowRight className="size-3" />
-              </button>
-            </div>
-
-            {data.own_drafts?.length > 0 ? (
-              <div className="space-y-2">
-                {data.own_drafts.map((d) => (
-                  <div
-                    key={d.scenario_id}
-                    className="flex items-center justify-between p-3 rounded-lg border border-border/70 bg-background/50"
-                  >
-                    <div className="min-w-0 pr-3">
-                      <div className="font-semibold text-xs text-foreground truncate">{d.title}</div>
-                      <div className="text-[11px] text-muted-foreground mt-0.5">{d.scenario_id}</div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => onNavigate('scenarios', { action: 'edit', scenarioId: d.scenario_id })}
-                      className="px-3 py-1.5 rounded-md bg-secondary text-secondary-foreground text-xs font-semibold hover:bg-secondary/80 shrink-0"
-                    >
-                      Edit
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                icon={BookOpen}
-                title="No active drafts"
-                description="Create customized practice scenarios for your class."
-                actionLabel="Create Scenario"
-                onAction={() => onNavigate('scenarios', { action: 'create' })}
-                className="py-8"
-              />
-            )}
-          </div>
         </div>
       )}
     </div>

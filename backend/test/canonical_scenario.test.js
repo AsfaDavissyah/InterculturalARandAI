@@ -145,26 +145,22 @@ test("Scenario Validation: Rejects invalid placement and missing fields", async 
   assert.equal(invalidRes.status, 400);
 });
 
-test("Draft can be saved with only a valid title", async () => {
+test("Lecturer cannot create or submit Scenario drafts", async () => {
   const res = await request(
     "POST",
     "/api/dashboard/scenarios",
     { title: "Unfinished Consultation Draft" },
     lecturerToken
   );
-  assert.equal(res.status, 201);
-  assert.equal(res.body.status, "draft");
-  assert.deepEqual(res.body.placements, ["scenario_library"]);
-  createdScenarioIds.push(res.body.scenario_id);
+  assert.equal(res.status, 403);
 
   const submit = await request(
     "POST",
-    `/api/dashboard/scenarios/${res.body.scenario_id}/submit`,
+    "/api/dashboard/scenarios/SCN-DOES-NOT-EXIST/submit",
     null,
     lecturerToken
   );
-  assert.equal(submit.status, 422);
-  assert.equal(submit.body.error, "SCENARIO_INCOMPLETE");
+  assert.equal(submit.status, 403);
 });
 
 test("Admin creates and publishes a canonical Scenario", async () => {
@@ -191,6 +187,7 @@ test("Admin creates and publishes a canonical Scenario", async () => {
 
   assert.equal(createRes.status, 201);
   assert.equal(createRes.body.status, "draft");
+  assert.deepEqual(createRes.body.placements, ["scenario_library"]);
   const scenarioId = createRes.body.scenario_id;
   createdScenarioIds.push(scenarioId);
   assert.ok(scenarioId.startsWith("SCN-"));
@@ -210,34 +207,18 @@ test("Admin creates and publishes a canonical Scenario", async () => {
   assert.equal(lectEditRes.status, 403);
 });
 
-test("Lecturer can duplicate a published scenario as an owned Draft", async () => {
-  // First list scenarios to pick one
-  const listRes = await request("GET", "/api/dashboard/scenarios?placement=guided_topics", null, lecturerToken);
+test("Lecturer has read-only access to Scenario Library", async () => {
+  const listRes = await request("GET", "/api/dashboard/scenarios", null, lecturerToken);
   assert.equal(listRes.status, 200);
-  assert.ok(listRes.body.items.length > 0);
+  assert.ok(listRes.body.items.every((item) => item.placements.includes("scenario_library")));
 
-  const targetId = listRes.body.items[0].scenario_id;
-  const dupRes = await request("POST", `/api/dashboard/scenarios/${targetId}/duplicate`, null, lecturerToken);
-  assert.equal(dupRes.status, 201);
-  assert.equal(dupRes.body.status, "draft");
-  assert.ok(dupRes.body.title.startsWith("Copy of "));
-  assert.equal(dupRes.body.owner.type, "lecturer");
-  createdScenarioIds.push(dupRes.body.scenario_id);
-
-  // Lecturer submits own draft for review
-  const submitRes = await request("POST", `/api/dashboard/scenarios/${dupRes.body.scenario_id}/submit`, null, lecturerToken);
-  assert.equal(submitRes.status, 200);
-  assert.equal(submitRes.body.scenario.status, "in_review");
-
-  const changesRes = await request(
+  const dupRes = await request(
     "POST",
-    `/api/dashboard/scenarios/${dupRes.body.scenario_id}/request-changes`,
-    { comment: "Clarify the student task before publishing." },
-    adminToken
+    "/api/dashboard/scenarios/SCN-READ-ONLY/duplicate",
+    null,
+    lecturerToken
   );
-  assert.equal(changesRes.status, 200);
-  assert.equal(changesRes.body.scenario.status, "draft");
-  assert.equal(changesRes.body.scenario.review.decision, "changes_requested");
+  assert.equal(dupRes.status, 403);
 });
 
 test("Categories Management: Admin can list, create, and reorder categories", async () => {

@@ -12,6 +12,7 @@ class SettingVisual extends StatelessWidget {
   final bool showLabel;
   final Color backgroundColor;
   final Color iconColor;
+  final BoxFit fit;
 
   const SettingVisual({
     super.key,
@@ -23,6 +24,7 @@ class SettingVisual extends StatelessWidget {
     this.showLabel = true,
     this.backgroundColor = const Color(0xFFF4EFE6),
     this.iconColor = EngoraColors.brand,
+    this.fit = BoxFit.cover,
   });
 
   IconData _iconFor(String kind) => switch (kind) {
@@ -43,7 +45,7 @@ class SettingVisual extends StatelessWidget {
           spec.assetPath!,
           width: width ?? double.infinity,
           height: height,
-          fit: BoxFit.cover,
+          fit: fit,
         ),
       );
     }

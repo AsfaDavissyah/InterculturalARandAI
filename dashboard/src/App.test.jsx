@@ -207,6 +207,7 @@ describe('Dashboard PRD Simplification', () => {
   beforeEach(() => {
     clearAuthSession();
     localStorage.clear();
+    window.location.hash = '';
     toastError.mockClear();
     toastSuccess.mockClear();
     vi.unstubAllGlobals();
@@ -268,6 +269,12 @@ describe('Dashboard PRD Simplification', () => {
     // Categories and Lecturers should not be visible for Lecturer
     expect(screen.queryByRole('button', { name: /^categories$/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /^lecturers$/i })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: /scenarios/i }));
+    await waitFor(() => {
+      expect(screen.getByText("Lecturer's Office Consultation")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('button', { name: /create scenario/i })).toBeNull();
   });
 
   it('Navigates to Scenarios view and opens Scenario Detail', async () => {

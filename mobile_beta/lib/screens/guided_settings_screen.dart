@@ -7,7 +7,6 @@ import '../services/chat_service.dart';
 import '../services/page_transitions.dart';
 import '../theme/engora_theme.dart';
 import '../widgets/app_svg_icon.dart';
-import '../widgets/setting_visual.dart';
 import 'guided_setting_briefing_screen.dart';
 
 class GuidedSettingsScreen extends StatefulWidget {
@@ -200,15 +199,14 @@ class _SettingCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SettingVisual(
-                stickerKey: setting.stickerAssetKey,
-                label: setting.title,
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                showLabel: false,
+              CircleAvatar(
+                radius: 22,
                 backgroundColor: EngoraColors.background,
-                iconColor: palette.accent,
+                child: Icon(
+                  Icons.view_in_ar_outlined,
+                  color: palette.accent,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(

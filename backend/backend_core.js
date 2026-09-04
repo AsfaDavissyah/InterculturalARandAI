@@ -2054,16 +2054,28 @@ app.post("/api/auth/login", async (req, res) => {
 });
 
 app.post("/api/auth/update", authenticateJWT, async (req, res) => {
-  const { name, gender } = req.body;
-  if (!name || !gender) {
-    return res.status(400).json({ error: "Name and gender are required" });
+  const { name, email, gender } = req.body;
+  if (!name || !email || !gender) {
+    return res.status(400).json({ error: "Name, email, and gender are required" });
   }
   try {
     const user = await User.findById(req.user.userId);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
+    const normalizedEmail = String(email).trim().toLowerCase();
+    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+      return res.status(400).json({ error: "Enter a valid email address" });
+    }
+    const existingEmail = await User.findOne({
+      email: normalizedEmail,
+      _id: { $ne: user._id },
+    });
+    if (existingEmail) {
+      return res.status(400).json({ error: "Email is already registered" });
+    }
     user.name = name;
+    user.email = normalizedEmail;
     user.gender = gender;
     await user.save();
     
@@ -2143,7 +2155,10 @@ app.get("/api/scenarios", async (req, res) => {
       );
     }
 
-    const list = await Scenario.find({ isActive: true });
+    const list = await Scenario.find({
+      isActive: true,
+      placements: "scenario_library",
+    });
     const summaries = list
       .map((item) => scenarioSummary(attachScenarioVersion(item.data, item.version)))
       .sort((left, right) => left.scenario_id.localeCompare(right.scenario_id));
@@ -2168,7 +2183,8 @@ app.get("/api/scenarios/:scenario_id", async (req, res) => {
 
     const scenario = await Scenario.findOne({
       scenarioId: req.params.scenario_id.toUpperCase(),
-      isActive: true
+      isActive: true,
+      placements: "scenario_library",
     });
 
     if (!scenario) {

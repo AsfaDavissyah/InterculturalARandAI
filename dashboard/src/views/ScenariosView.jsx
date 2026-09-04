@@ -9,7 +9,6 @@ import {
   Eye,
   Plus,
   Search,
-  Send,
   Trash2,
   X,
 } from 'lucide-react';
@@ -38,7 +37,6 @@ export function ScenariosView({
 
   // Filters
   const [search, setSearch] = useState('');
-  const [placement, setPlacement] = useState('all');
   const [category, setCategory] = useState('all');
   const [status, setStatus] = useState(initialFilterStatus);
   const [ownership, setOwnership] = useState(initialFilterOwnership);
@@ -70,7 +68,6 @@ export function ScenariosView({
         page_size: '10',
       });
       if (search.trim()) params.set('q', search.trim());
-      if (placement !== 'all') params.set('placement', placement);
       if (category !== 'all') params.set('category', category);
       if (status !== 'all') params.set('status', status);
       if (ownership !== 'all') params.set('ownership', ownership);
@@ -97,7 +94,7 @@ export function ScenariosView({
 
   useEffect(() => {
     fetchScenarios();
-  }, [page, placement, category, status, ownership]);
+  }, [page, category, status, ownership]);
 
   // Debounced search
   useEffect(() => {
@@ -110,7 +107,6 @@ export function ScenariosView({
 
   const clearFilters = () => {
     setSearch('');
-    setPlacement('all');
     setCategory('all');
     setStatus('all');
     setOwnership('all');
@@ -119,7 +115,6 @@ export function ScenariosView({
 
   const hasActiveFilters =
     Boolean(search.trim()) ||
-    placement !== 'all' ||
     category !== 'all' ||
     status !== 'all' ||
     ownership !== 'all';
@@ -163,21 +158,20 @@ export function ScenariosView({
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Scenarios</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Single catalog for all speaking scenarios across Guided Topics and Scenario Library.
+            Scenario Library catalog for student speaking practice.
           </p>
         </div>
-        <Button
-          type="button"
-          onClick={onCreateScenario}
-        >
-          <Plus className="size-4" />
-          Create Scenario
-        </Button>
+        {isAdmin && onCreateScenario && (
+          <Button type="button" onClick={onCreateScenario}>
+            <Plus className="size-4" />
+            Create Scenario
+          </Button>
+        )}
       </div>
 
       {/* Filter Toolbar */}
       <div className="rounded-lg border border-border bg-card p-3 shadow-sm">
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-[minmax(300px,2fr)_repeat(4,minmax(140px,1fr))_auto]">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-[minmax(300px,2fr)_repeat(3,minmax(140px,1fr))_auto]">
           {/* Search Box */}
           <div className="relative min-w-0">
             <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
@@ -198,20 +192,6 @@ export function ScenariosView({
               </button>
             )}
           </div>
-
-          {/* Placement Filter */}
-          <select
-            value={placement}
-            onChange={(e) => {
-              setPlacement(e.target.value);
-              setPage(1);
-            }}
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-          >
-            <option value="all">All Placements</option>
-            <option value="guided_topics">Guided Topics</option>
-            <option value="scenario_library">Scenario Library</option>
-          </select>
 
           {/* Category Filter */}
           <select
@@ -288,8 +268,8 @@ export function ScenariosView({
               ? 'Try adjusting your search query or removing filters.'
               : 'Create your first speaking scenario to get started.'
           }
-          actionLabel={hasActiveFilters ? 'Clear Filters' : 'Create Scenario'}
-          onAction={hasActiveFilters ? clearFilters : onCreateScenario}
+          actionLabel={hasActiveFilters ? 'Clear Filters' : (isAdmin ? 'Create Scenario' : undefined)}
+          onAction={hasActiveFilters ? clearFilters : (isAdmin ? onCreateScenario : undefined)}
         />
       ) : (
         <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
@@ -308,8 +288,7 @@ export function ScenariosView({
               </TableHeader>
               <TableBody className="divide-y divide-border">
                 {items.map((item) => {
-                  const isOwner = String(item.owner?.user_id) === String(user.userId);
-                  const canEdit = isAdmin || (isOwner && item.status === 'draft');
+                  const canEdit = isAdmin;
 
                   return (
                     <TableRow
@@ -402,15 +381,17 @@ export function ScenariosView({
                             </Button>
                           )}
 
-                          <Button
-                            type="button"
-                            onClick={() => handleRowAction('duplicate', item.scenario_id)}
-                            variant="ghost"
-                            size="icon-sm"
-                            title="Duplicate Scenario"
-                          >
-                            <Copy className="size-4" />
-                          </Button>
+                          {isAdmin && (
+                            <Button
+                              type="button"
+                              onClick={() => handleRowAction('duplicate', item.scenario_id)}
+                              variant="ghost"
+                              size="icon-sm"
+                              title="Duplicate Scenario"
+                            >
+                              <Copy className="size-4" />
+                            </Button>
+                          )}
 
                           {/* Quick Lifecycle Buttons */}
                           {isAdmin && item.status !== 'published' && item.status !== 'archived' && (
@@ -433,25 +414,6 @@ export function ScenariosView({
                             </Button>
                           )}
 
-                          {!isAdmin && isOwner && item.status === 'draft' && (
-                            <Button
-                              type="button"
-                              onClick={() =>
-                                setActionModal({
-                                  type: 'submit',
-                                  id: item.scenario_id,
-                                  title: 'Submit for Review',
-                                  desc: `Submit "${item.title}" for Admin review?`,
-                                })
-                              }
-                              variant="ghost"
-                              size="icon-sm"
-                              className="text-sky-700 hover:bg-sky-500/10 hover:text-sky-700"
-                              title="Submit for Review"
-                            >
-                              <Send className="size-4" />
-                            </Button>
-                          )}
                           {isAdmin && item.status !== 'archived' && (
                             <Button
                               type="button"

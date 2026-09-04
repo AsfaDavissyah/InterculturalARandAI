@@ -96,6 +96,12 @@ export default function App() {
     if (forbidden) handleNavigate('overview');
   }, [activeTab, session]);
 
+  useEffect(() => {
+    if (session?.user?.role === 'lecturer' && ['create', 'edit'].includes(scenarioMode)) {
+      handleNavigate('scenarios');
+    }
+  }, [scenarioMode, session]);
+
   const handleNavigate = (tabId, params = {}) => {
     setActiveTab(tabId);
     if (tabId === 'scenarios') {
@@ -173,12 +179,12 @@ export default function App() {
                     onSelectScenario={(id) => {
                       handleNavigate('scenarios', { action: 'detail', scenarioId: id });
                     }}
-                    onCreateScenario={() => {
+                    onCreateScenario={isAdmin ? () => {
                       handleNavigate('scenarios', { action: 'create' });
-                    }}
-                    onEditScenario={(id) => {
+                    } : undefined}
+                    onEditScenario={isAdmin ? (id) => {
                       handleNavigate('scenarios', { action: 'edit', scenarioId: id });
-                    }}
+                    } : undefined}
                   />
                 )}
 
@@ -187,14 +193,14 @@ export default function App() {
                     scenarioId={activeScenarioId}
                     user={user}
                     onBack={() => handleNavigate('scenarios')}
-                    onEdit={(id) => {
+                    onEdit={isAdmin ? (id) => {
                       handleNavigate('scenarios', { action: 'edit', scenarioId: id });
-                    }}
+                    } : undefined}
                     onRefreshList={() => {}}
                   />
                 )}
 
-                {(scenarioMode === 'create' || scenarioMode === 'edit') && (
+                {isAdmin && (scenarioMode === 'create' || scenarioMode === 'edit') && (
                   <ScenarioEditorView
                     scenarioId={scenarioMode === 'edit' ? activeScenarioId : null}
                     user={user}

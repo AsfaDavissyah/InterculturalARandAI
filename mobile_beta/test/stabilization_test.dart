@@ -27,40 +27,15 @@ void main() {
     });
   });
 
-  group('AppSettings.normalizeBaseUrl', () {
-    test('adds the HTTP scheme for a LAN address', () {
-      expect(
-        AppSettings.normalizeBaseUrl('192.168.0.103:3000'),
-        'http://192.168.0.103:3000',
-      );
-    });
-
-    test('removes trailing slashes without changing HTTPS', () {
-      expect(
-        AppSettings.normalizeBaseUrl('https://example.test///'),
-        'https://example.test',
-      );
-    });
-  });
-
   group('AppSettings.getBaseUrl', () {
-    test('migrates the retired Railway endpoint to the VPS', () async {
-      SharedPreferences.setMockInitialValues({
-        'api_base_url':
-            'https://interculturalarandai-production.up.railway.app',
-      });
-
-      expect(await AppSettings.getBaseUrl(), AppSettings.defaultBaseUrl);
-      final preferences = await SharedPreferences.getInstance();
-      expect(preferences.getString('api_base_url'), AppSettings.defaultBaseUrl);
-    });
-
-    test('preserves a custom test endpoint', () async {
+    test('always uses the configured production endpoint', () async {
       SharedPreferences.setMockInitialValues({
         'api_base_url': 'http://192.168.1.8:3000/',
       });
 
-      expect(await AppSettings.getBaseUrl(), 'http://192.168.1.8:3000');
+      expect(await AppSettings.getBaseUrl(), AppSettings.defaultBaseUrl);
+      final preferences = await SharedPreferences.getInstance();
+      expect(preferences.getString('api_base_url'), isNull);
     });
   });
 
