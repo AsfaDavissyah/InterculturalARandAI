@@ -186,6 +186,26 @@ function mockApi(role = 'admin') {
       });
     }
 
+    if (path === '/api/dashboard/practice-results/sess_1') {
+      return jsonResponse({
+        session_id: 'sess_1',
+        student: { name: 'Budi Santoso', student_id: 'NIM-101' },
+        scenario: {
+          title: "Lecturer's Office Consultation",
+          ai_character: { display_name: 'Dr Emma Collins' },
+        },
+        duration_seconds: 240,
+        student_response_count: 1,
+        overall_score: 4.5,
+        status: 'completed',
+        score_breakdown: { grammar: 4.5 },
+        transcript: [
+          { speaker: 'ai', message: 'How can I help with your research today?' },
+          { speaker: 'student', message: 'I would like feedback on my research question.' },
+        ],
+      });
+    }
+
     if (path === '/api/dashboard/system-settings') {
       return jsonResponse({
         approved_ai_partners: [scenarioFixture.ai_partner],
@@ -269,6 +289,8 @@ describe('Dashboard PRD Simplification', () => {
     // Categories and Lecturers should not be visible for Lecturer
     expect(screen.queryByRole('button', { name: /^categories$/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /^lecturers$/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /new scenario/i })).toBeNull();
+    expect(screen.getByText(/recent practice activity/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /scenarios/i }));
     await waitFor(() => {
@@ -305,5 +327,25 @@ describe('Dashboard PRD Simplification', () => {
       expect(screen.getByText(/Ask your lecturer for guidance on research methodology/i)).toBeInTheDocument();
       expect(screen.getByText(/AI Conversation Partner/i)).toBeInTheDocument();
     });
+  });
+
+  it('renders lecturer practice transcripts as aligned chat bubbles', async () => {
+    vi.stubGlobal('fetch', mockApi('lecturer'));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(screen.getByPlaceholderText(/lecturer@university.edu/i), 'lecturer@icc.com');
+    await user.type(screen.getByPlaceholderText(/enter your password/i), 'lecturer123');
+    await user.click(screen.getByRole('button', { name: /log in to portal/i }));
+    await user.click(await screen.findByRole('button', { name: /practice results/i }));
+    await user.click(await screen.findByRole('button', { name: /^view$/i }));
+
+    const aiMessage = await screen.findByText('How can I help with your research today?');
+    const studentMessage = screen.getByText('I would like feedback on my research question.');
+
+    expect(aiMessage.closest('[data-slot="bubble"]')).toHaveAttribute('data-align', 'start');
+    expect(studentMessage.closest('[data-slot="bubble"]')).toHaveAttribute('data-align', 'end');
+    expect(screen.getByText('Dr Emma Collins')).toBeInTheDocument();
+    expect(screen.getAllByText('Budi Santoso')).toHaveLength(2);
   });
 });

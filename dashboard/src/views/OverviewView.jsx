@@ -8,7 +8,6 @@ import {
   Clock,
   GraduationCap,
   Layers,
-  Plus,
   TrendingUp,
   UserPlus,
   Users,
@@ -75,19 +74,19 @@ export function OverviewView({ user, onNavigate }) {
           <p className="text-sm text-muted-foreground mt-1">
             {isAdmin
               ? 'Real-time overview of canonical scenarios, categories, lecturers, and student practices.'
-              : `Welcome back, ${user.name}. Track your connected student cohort and manage customized practice scenarios.`}
+              : `Welcome back, ${user.name}. Track your connected students and review their speaking practice progress.`}
           </p>
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:justify-end">
-          <Button
-            type="button"
-            onClick={() => onNavigate('scenarios', { action: 'create' })}
-          >
-            <Plus className="size-4" />
-            New Scenario
-          </Button>
           {isAdmin && (
             <>
+              <Button
+                type="button"
+                onClick={() => onNavigate('scenarios', { action: 'create' })}
+              >
+                <BookOpen className="size-4" />
+                New Scenario
+              </Button>
               <Button
                 type="button"
                 onClick={() => onNavigate('categories', { action: 'create' })}
@@ -110,7 +109,11 @@ export function OverviewView({ user, onNavigate }) {
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <div
+        className={`grid grid-cols-2 gap-3 ${
+          isAdmin ? 'md:grid-cols-3 xl:grid-cols-6' : 'lg:grid-cols-4'
+        }`}
+      >
         {isAdmin ? (
           <>
             <KpiCard
@@ -237,53 +240,7 @@ export function OverviewView({ user, onNavigate }) {
             )}
           </div>
 
-          {/* Recent Practice Sessions */}
-          <div className="border border-border rounded-xl bg-card p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Activity className="size-4 text-primary" />
-                <h2 className="text-sm font-semibold text-foreground">Recent Practice Activity</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => onNavigate('practice-results')}
-                className="text-xs text-primary hover:underline font-medium inline-flex items-center gap-1"
-              >
-                View all <ArrowRight className="size-3" />
-              </button>
-            </div>
-
-            {data.recent_sessions?.length > 0 ? (
-              <div className="space-y-2">
-                {data.recent_sessions.map((sess) => (
-                  <div
-                    key={sess.session_id}
-                    className="flex items-center justify-between p-3 rounded-lg border border-border/70 bg-background/50"
-                  >
-                    <div className="min-w-0 pr-3">
-                      <div className="font-semibold text-xs text-foreground truncate">{sess.student_name}</div>
-                      <div className="text-[11px] text-muted-foreground truncate">
-                        {cleanDisplayText(sess.scenario_title, 'Speaking Practice')}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs font-bold text-foreground">
-                        {isNumericScore(sess.overall_score) ? `${formatScore(sess.overall_score)}/5` : '-'}
-                      </span>
-                      <StatusBadge status={sess.status} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                icon={Activity}
-                title="No practice activity yet"
-                description="Student practice records will appear here as they complete sessions."
-                className="py-8"
-              />
-            )}
-          </div>
+          <RecentPracticePanel sessions={data.recent_sessions} onNavigate={onNavigate} />
         </div>
       )}
 
@@ -314,13 +271,17 @@ export function OverviewView({ user, onNavigate }) {
                     className="flex items-center justify-between p-3 rounded-lg border border-amber-500/20 bg-amber-500/5"
                   >
                     <div className="min-w-0 pr-3">
-                      <div className="font-semibold text-xs text-foreground">{st.name}</div>
+                      <div className="font-semibold text-xs text-foreground">
+                        {st.name || st.student_name || 'Student'}
+                      </div>
                       <div className="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5">
                         {st.reason || 'Low score in recent session'}
                       </div>
                     </div>
                     <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
-                      {isNumericScore(st.latest_score) ? `${formatScore(st.latest_score)}/5` : '-'}
+                      {isNumericScore(st.latest_score ?? st.overall_score)
+                        ? `${formatScore(st.latest_score ?? st.overall_score)}/5`
+                        : '-'}
                     </span>
                   </div>
                 ))}
@@ -334,8 +295,61 @@ export function OverviewView({ user, onNavigate }) {
               />
             )}
           </div>
-
+          <RecentPracticePanel sessions={data.recent_sessions} onNavigate={onNavigate} />
         </div>
+      )}
+    </div>
+  );
+}
+
+function RecentPracticePanel({ sessions = [], onNavigate }) {
+  return (
+    <div className="border border-border rounded-xl bg-card p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Activity className="size-4 text-primary" />
+          <h2 className="text-sm font-semibold text-foreground">Recent Practice Activity</h2>
+        </div>
+        <button
+          type="button"
+          onClick={() => onNavigate('practice-results')}
+          className="text-xs text-primary hover:underline font-medium inline-flex items-center gap-1"
+        >
+          View all <ArrowRight className="size-3" />
+        </button>
+      </div>
+
+      {sessions.length > 0 ? (
+        <div className="space-y-2">
+          {sessions.map((session) => (
+            <div
+              key={session.session_id}
+              className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-background/50 p-3"
+            >
+              <div className="min-w-0">
+                <div className="truncate text-xs font-semibold text-foreground">
+                  {session.student_name || 'Student'}
+                </div>
+                <div className="truncate text-[11px] text-muted-foreground">
+                  {cleanDisplayText(session.scenario_title, 'Speaking Practice')}
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="text-xs font-bold text-foreground">
+                  {isNumericScore(session.overall_score) ? `${formatScore(session.overall_score)}/5` : '-'}
+                </span>
+                <StatusBadge status={session.status} />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          icon={Activity}
+          title="No practice activity yet"
+          description="Student practice records will appear here as they complete sessions."
+          className="py-8"
+        />
       )}
     </div>
   );

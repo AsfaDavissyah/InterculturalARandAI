@@ -23,6 +23,7 @@ import {
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import { Bubble, BubbleContent, BubbleGroup } from '../components/ui/bubble';
 
 const SCORE_CATEGORIES = {
   grammar: 'Grammar',
@@ -571,26 +572,31 @@ export function PracticeResultsView({ user }) {
                   <h3 className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
                     <MessageSquare className="size-4 text-primary" /> Conversation Transcript
                   </h3>
-                  <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                  <div className="max-h-96 overflow-y-auto rounded-lg border border-border bg-background/60 p-4">
                     {sessionDetail.transcript?.length > 0 ? (
-                      sessionDetail.transcript.map((msg, i) => {
-                        const isAI = msg.sender === 'ai';
-                        return (
-                          <div
-                            key={i}
-                            className={`p-3 rounded-xl border text-xs leading-relaxed ${
-                              isAI
-                                ? 'border-border bg-muted/40 text-foreground mr-8'
-                                : 'border-primary/30 bg-primary/10 text-foreground ml-8'
-                            }`}
-                          >
-                            <div className="font-bold text-[10px] text-muted-foreground uppercase tracking-wider mb-1">
-                              {isAI ? (sessionDetail.scenario?.ai_character?.display_name || 'AI Partner') : 'Student'}
-                            </div>
-                            <p>{msg.text || msg.message}</p>
-                          </div>
-                        );
-                      })
+                      <BubbleGroup>
+                        {sessionDetail.transcript.map((msg, i) => {
+                          const speaker = String(msg.speaker || msg.sender || '').toLowerCase();
+                          const isAI = ['ai', 'assistant', 'character'].includes(speaker);
+                          const speakerName = isAI
+                            ? sessionDetail.scenario?.ai_character?.display_name ||
+                              sessionDetail.scenario?.ai_partner?.display_name ||
+                              'AI Partner'
+                            : sessionDetail.student?.name || sessionDetail.student?.display_name || 'Student';
+                          return (
+                            <Bubble
+                              key={i}
+                              align={isAI ? 'start' : 'end'}
+                              variant={isAI ? 'muted' : 'default'}
+                            >
+                              <div className="px-1 text-[10px] font-semibold text-muted-foreground">
+                                {speakerName}
+                              </div>
+                              <BubbleContent>{msg.text || msg.message}</BubbleContent>
+                            </Bubble>
+                          );
+                        })}
+                      </BubbleGroup>
                     ) : (
                       <p className="text-xs text-muted-foreground italic">No transcript recorded for this session.</p>
                     )}
