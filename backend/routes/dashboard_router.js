@@ -23,6 +23,21 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
   router.use(authenticateJWT);
   router.use(requireRole(["admin", "lecturer"]));
 
+  async function countActiveSettingsForCategory(categoryId) {
+    return Setting.countDocuments({
+      topicId: categoryId,
+      isActive: { $ne: false },
+    });
+  }
+
+  function categoryInUseResponse(res, linkedSettingCount) {
+    return res.status(409).json({
+      error: "CATEGORY_IN_USE",
+      message: `Deactivate or move ${linkedSettingCount} linked Guided Setting(s) before archiving this Category.`,
+      linked_setting_count: linkedSettingCount,
+    });
+  }
+
   function sanitizeCsvField(val) {
     if (val === null || val === undefined) return "";
     let str = String(val);
@@ -928,17 +943,9 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
       if (icon_key !== undefined) topic.iconKey = icon_key.trim();
       if (status !== undefined) {
         if (status !== "active") {
-          const linkedGuidedCount = await Scenario.countDocuments({
-            categoryIds: slug,
-            placements: "guided_topics",
-            status: { $ne: "archived" },
-          });
-          if (linkedGuidedCount > 0) {
-            return res.status(409).json({
-              error: "CATEGORY_IN_USE",
-              message: `Move or remove Guided Topics placement from ${linkedGuidedCount} linked scenario(s) before archiving this Category.`,
-              linked_scenario_count: linkedGuidedCount,
-            });
+          const linkedSettingCount = await countActiveSettingsForCategory(slug);
+          if (linkedSettingCount > 0) {
+            return categoryInUseResponse(res, linkedSettingCount);
           }
         }
         topic.status = status === "active" ? "active" : "archived";
@@ -1009,17 +1016,9 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
       const topic = await Topic.findOne({ topicId: slug });
       if (!topic) return res.status(404).json({ error: "Category not found." });
 
-      const linkedGuidedCount = await Scenario.countDocuments({
-        categoryIds: slug,
-        placements: "guided_topics",
-        status: { $ne: "archived" },
-      });
-      if (linkedGuidedCount > 0) {
-        return res.status(409).json({
-          error: "CATEGORY_IN_USE",
-          message: `Move or remove Guided Topics placement from ${linkedGuidedCount} linked scenario(s) before archiving this Category.`,
-          linked_scenario_count: linkedGuidedCount,
-        });
+      const linkedSettingCount = await countActiveSettingsForCategory(slug);
+      if (linkedSettingCount > 0) {
+        return categoryInUseResponse(res, linkedSettingCount);
       }
 
       topic.status = "archived";
