@@ -33,6 +33,14 @@ const SCORE_CATEGORIES = {
   intercultural_awareness: 'Intercultural Awareness',
 };
 
+function formatDuration(seconds) {
+  const duration = Number(seconds);
+  if (!Number.isFinite(duration) || duration <= 0) return 'Not recorded';
+
+  const wholeSeconds = Math.floor(duration);
+  return `${Math.floor(wholeSeconds / 60)}m ${wholeSeconds % 60}s`;
+}
+
 export function PracticeResultsView({ user }) {
   const isAdmin = user.role === 'admin';
 
@@ -346,7 +354,7 @@ export function PracticeResultsView({ user }) {
                     {/* Duration & Turns */}
                     <TableCell className="py-3.5 px-4 text-muted-foreground">
                       <div className="font-medium text-foreground">
-                        {Math.floor((item.duration_seconds || 0) / 60)}m {(item.duration_seconds || 0) % 60}s
+                        {formatDuration(item.duration_seconds)}
                       </div>
                       <div className="text-[10px]">
                         {item.total_student_responses ?? item.student_response_count ?? 0} student turns
@@ -521,6 +529,7 @@ export function PracticeResultsView({ user }) {
                       {formatScore(sessionDetail.overall_score, '0.0')} <span className="text-xs text-muted-foreground">/ 5.0</span>
                     </div>
                     <div className="text-[10px] text-muted-foreground">
+                      {formatDuration(sessionDetail.duration_seconds)} ·{' '}
                       {sessionDetail.total_student_responses ?? sessionDetail.student_response_count ?? 0} student responses
                     </div>
                   </div>

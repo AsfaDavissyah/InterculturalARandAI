@@ -15,6 +15,10 @@ const {
 } = require("../services/canonical_scenario_service");
 const { topicsData, settingsData } = require("../scripts/seed_topics_and_settings");
 const { migrateLecturerCode } = require("../services/lecturer_code_service");
+const {
+  deriveDurationSeconds,
+  deriveStudentResponseCount,
+} = require("../services/practice_metrics_service");
 
 function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) {
   const router = express.Router();
@@ -1447,8 +1451,8 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
         scenario_id: s.scenario?.scenario_id || s.settingId || "-",
         scenario_title: s.scenario?.title || s.settingTitle || "Speaking Practice",
         category_id: s.topicId || "-",
-        duration_seconds: s.durationSeconds || 0,
-        student_response_count: s.studentResponseCount || 0,
+        duration_seconds: deriveDurationSeconds(s),
+        student_response_count: deriveStudentResponseCount(s),
         overall_score: s.overallScore || 0,
         status: s.status,
         end_reason: s.endReason || null,
@@ -1589,8 +1593,8 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
             scores.politeness || 0,
             scores.pragmatic_appropriateness || 0,
             scores.intercultural_awareness || 0,
-            s.durationSeconds || 0,
-            s.studentResponseCount || 0,
+            deriveDurationSeconds(s),
+            deriveStudentResponseCount(s),
             sanitizeCsvField(s.status || ""),
             sanitizeCsvField(s.endReason || ""),
             sanitizeCsvField(s.completedAt ? new Date(s.completedAt).toISOString() : ""),
@@ -1647,8 +1651,8 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
           pragmatic_appropriateness: scores.pragmatic_appropriateness || 0,
           intercultural_awareness: scores.intercultural_awareness || 0,
         },
-        duration_seconds: session.durationSeconds || 0,
-        student_response_count: session.studentResponseCount || 0,
+        duration_seconds: deriveDurationSeconds(session),
+        student_response_count: deriveStudentResponseCount(session),
         status: session.status,
         end_reason: session.endReason || null,
         completed_at: session.completedAt || session.createdAt,
