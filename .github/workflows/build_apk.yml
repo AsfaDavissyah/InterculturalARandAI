@@ -169,6 +169,21 @@ jobs:
           cd mobile_beta
           flutter build appbundle --release --dart-define=API_BASE_URL=https://api.202-10-37-3.sslip.io
 
+      - name: Name Engora Release Artifacts
+        shell: bash
+        run: |
+          app_version="$(awk '/^version:/ { print $2 }' mobile_beta/pubspec.yaml)"
+          version_name="${app_version%%+*}"
+          build_number="${app_version##*+}"
+          output_dir='mobile_beta/build/app/outputs/flutter-apk'
+          cp "$output_dir/app-arm64-v8a-release.apk" "$output_dir/Engora-${version_name}-build${build_number}-arm64.apk"
+          cp "$output_dir/app-armeabi-v7a-release.apk" "$output_dir/Engora-${version_name}-build${build_number}-arm32.apk"
+          cp "$output_dir/app-x86_64-release.apk" "$output_dir/Engora-${version_name}-build${build_number}-x86_64.apk"
+          if [ -f mobile_beta/build/app/outputs/bundle/release/app-release.aab ]; then
+            cp mobile_beta/build/app/outputs/bundle/release/app-release.aab \
+              "mobile_beta/build/app/outputs/bundle/release/Engora-${version_name}-build${build_number}.aab"
+          fi
+
       - name: Record Build Metadata
         shell: bash
         run: |
@@ -183,11 +198,11 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: intercultural-ai-app-release-${{ github.sha }}
+          name: engora-android-release-${{ github.sha }}
           path: |
-            mobile_beta/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-            mobile_beta/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
-            mobile_beta/build/app/outputs/flutter-apk/app-x86_64-release.apk
+            mobile_beta/build/app/outputs/flutter-apk/Engora-*-arm64.apk
+            mobile_beta/build/app/outputs/flutter-apk/Engora-*-arm32.apk
+            mobile_beta/build/app/outputs/flutter-apk/Engora-*-x86_64.apk
             mobile_beta/build/app/outputs/flutter-apk/build-metadata.txt
 
       - name: Upload Signed AAB Artifact
@@ -195,4 +210,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: engora-signed-aab-${{ github.sha }}
-          path: mobile_beta/build/app/outputs/bundle/release/app-release.aab
+          path: mobile_beta/build/app/outputs/bundle/release/Engora-*.aab

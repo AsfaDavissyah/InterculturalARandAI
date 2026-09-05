@@ -24,6 +24,17 @@ flutter build appbundle --release --dart-define=API_BASE_URL=https://api.202-10-
 
 The output is `build/app/outputs/bundle/release/app-release.aab`.
 
+For direct device distribution, build the split APKs and use the branded
+ARM64 copy for most modern Android phones:
+
+```powershell
+flutter build apk --release --split-per-abi --dart-define=API_BASE_URL=https://api.202-10-37-3.sslip.io
+```
+
+Release artifacts are distributed with versioned names such as
+`Engora-1.0.0-build2-arm64.apk`. The generic `app-*-release.apk` names are
+Flutter's internal build outputs and do not affect the installed app name.
+
 ## GitHub Actions secrets
 
 Configure these repository secrets before requesting a signed AAB from CI:
