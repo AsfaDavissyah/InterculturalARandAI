@@ -1,0 +1,4 @@
+storePassword=replace-with-store-password
+keyPassword=replace-with-key-password
+keyAlias=engora-release
+storeFile=engora-release.jks

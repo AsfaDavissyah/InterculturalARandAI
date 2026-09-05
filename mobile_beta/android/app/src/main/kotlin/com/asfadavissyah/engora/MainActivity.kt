@@ -1,4 +1,4 @@
-package com.example.mobile_beta
+package com.asfadavissyah.engora
 
 import io.flutter.embedding.android.FlutterActivity
 

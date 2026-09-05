@@ -79,7 +79,7 @@ Dokumen ini menjadi catatan ringkas status implementasi Engora. Status dibagi me
 ## Finishing Wajib Sebelum Rilis Produksi
 
 - [ ] Finalisasi Terms of Service, Privacy Policy, Research Information Sheet, dan Research Consent.
-- [ ] Konfigurasikan Android application ID, versioning, signing key, dan build AAB release.
+- [x] Android application ID `com.asfadavissyah.engora`, version `1.0.0+2`, release signing key, dan AAB release telah dikonfigurasi serta diverifikasi.
 - [x] Backend VPS dan dashboard Vercel telah dideploy; endpoint status serta Scenario Library memberikan HTTP 200 pada online smoke test.
 - [ ] Pastikan secrets produksi tidak tersimpan di repository dan rotasi secret sementara bila diperlukan.
 - [ ] Selesaikan device acceptance, client acceptance, serta dokumentasikan sign-off.
