@@ -24,6 +24,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Bubble, BubbleContent, BubbleGroup } from '../components/ui/bubble';
+import { getAuthSession } from '../lib/auth-session';
 
 const SCORE_CATEGORIES = {
   grammar: 'Grammar',
@@ -141,9 +142,7 @@ export function PracticeResultsView({ user }) {
     if (startDate) params.set('start_date', startDate);
     if (endDate) params.set('end_date', endDate);
 
-    const token = localStorage.getItem('engora_auth_session')
-      ? JSON.parse(localStorage.getItem('engora_auth_session'))?.token
-      : '';
+    const token = getAuthSession()?.token || '';
 
     const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
     const exportUrl = `${baseUrl}/api/dashboard/practice-results/export.csv?${params.toString()}`;

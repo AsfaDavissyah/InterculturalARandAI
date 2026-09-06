@@ -14,6 +14,7 @@ globalThis.ResizeObserver = ResizeObserverMock;
 beforeEach(() => {
   clearAuthSession();
   localStorage.clear();
+  sessionStorage.clear();
   window.matchMedia = window.matchMedia || (() => ({
     matches: false,
     addEventListener: () => {},
