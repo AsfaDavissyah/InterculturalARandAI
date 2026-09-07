@@ -128,6 +128,7 @@ class ChatService {
     required String studentResponse,
     String? studentDisplayName,
     String? studentId,
+    List<String> completedObjectiveIds = const [],
   }) async {
     final url = Uri.parse("$baseUrl/api/chat/evaluate-turn");
 
@@ -141,6 +142,7 @@ class ChatService {
       "student_response": studentResponse,
       "student_display_name": studentDisplayName,
       "student_id": studentId,
+      "completed_objective_ids": completedObjectiveIds,
     };
 
     final response = await http
@@ -168,6 +170,7 @@ class ChatService {
     required String studentResponse,
     String? studentDisplayName,
     String? studentId,
+    List<String> completedObjectiveIds = const [],
   }) async {
     final url = Uri.parse("$baseUrl/api/chat/respond-turn");
 
@@ -181,6 +184,7 @@ class ChatService {
       "student_response": studentResponse,
       "student_display_name": studentDisplayName,
       "student_id": studentId,
+      "completed_objective_ids": completedObjectiveIds,
     };
 
     final response = await http

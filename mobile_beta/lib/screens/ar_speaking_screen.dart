@@ -90,6 +90,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   final List<ConversationMessage> _messages = [];
   final List<AiResponse> _evaluationResults = [];
   final List<ConversationLatencyTrace> _latencyMetrics = [];
+  final Set<String> _completedObjectiveIds = {};
   final PracticeHistoryStore _historyStore = const PracticeHistoryStore();
   late final String _sessionId = PracticeSession.createSessionId();
   late final DateTime _sessionStartedAt = DateTime.now().toUtc();
@@ -673,6 +674,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         studentResponse: text,
         studentDisplayName: _profile?.name,
         studentId: _profile?.studentId,
+        completedObjectiveIds: _completedObjectiveIds.toList(growable: false),
       );
       final aiTextReceivedAt = DateTime.now().toUtc();
       if (_activeLatencyDraft?.turnNumber == turnNumber) {
@@ -682,6 +684,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       if (!mounted) return;
       setState(() {
         _lastResponse = result;
+        _completedObjectiveIds.addAll(result.completedObjectiveIds);
         _evaluationResults.add(result);
         final aiMessage = ConversationMessage(
           speaker: 'AI',
@@ -700,11 +703,9 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
           turnNumber: turnNumber,
           history: history,
           studentResponse: text,
+          completedObjectiveIds: _completedObjectiveIds.toList(growable: false),
         ),
       );
-      if (!result.continueConversation && mounted) {
-        await _openResult();
-      }
     } catch (error) {
       if (!mounted) return;
       setState(() => _activity = AvatarActivity.idle);
@@ -737,6 +738,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     required int turnNumber,
     required List<Map<String, String>> history,
     required String studentResponse,
+    required List<String> completedObjectiveIds,
   }) async {
     if (_chatService == null) return;
     try {
@@ -750,9 +752,11 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         studentResponse: studentResponse,
         studentDisplayName: _profile?.name,
         studentId: _profile?.studentId,
+        completedObjectiveIds: completedObjectiveIds,
       );
       if (!mounted) return;
       setState(() {
+        _completedObjectiveIds.addAll(detailedResult.completedObjectiveIds);
         final index = _evaluationResults.indexWhere(
           (item) => item.turnNumber == turnNumber,
         );
@@ -770,7 +774,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     }
   }
 
-  Future<void> _requestFinish() async {
+  Future<void> _requestManualFinish() async {
     if (_lastResponse == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Give at least one response first.')),
@@ -780,8 +784,12 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     final shouldFinish = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Finish practice?'),
-        content: const Text('Your result and conversation feedback are ready.'),
+        title: const Text('End practice manually?'),
+        content: Text(
+          _completionEligible
+              ? 'All objectives are complete. You can also use the completion button to record this practice as completed.'
+              : 'Some objectives are still incomplete. This practice will be recorded as Ended Manually.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -789,15 +797,44 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Finish'),
+            child: const Text('End manually'),
           ),
         ],
       ),
     );
-    if (shouldFinish == true && mounted) await _openResult();
+    if (shouldFinish == true && mounted) {
+      await _openResult(completedByObjectives: false);
+    }
   }
 
-  Future<void> _openResult() async {
+  Future<void> _requestObjectiveFinish() async {
+    if (!_completionEligible || _lastResponse == null) return;
+    final shouldFinish = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Complete practice?'),
+        content: const Text(
+          'You have completed every objective. Your result and conversation feedback are ready.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep practicing'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.check_rounded),
+            label: const Text('Complete practice'),
+          ),
+        ],
+      ),
+    );
+    if (shouldFinish == true && mounted) {
+      await _openResult(completedByObjectives: true);
+    }
+  }
+
+  Future<void> _openResult({required bool completedByObjectives}) async {
     if (_lastResponse == null || _navigatingToResult) return;
     _navigatingToResult = true;
     await _speech.stop();
@@ -833,6 +870,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       pageId: widget.pageId,
       latencyMetrics: List.unmodifiable(_latencyMetrics),
       pilotMetadata: pilotMetadata,
+      completedByObjectives: completedByObjectives,
     );
     await _historyStore.saveSession(session);
     if (!mounted) return;
@@ -928,6 +966,66 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     );
   }
 
+  bool get _completionEligible => _lastResponse?.completionEligible == true;
+
+  Widget _buildObjectiveCompletionPanel() {
+    if (!_completionEligible) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+      decoration: BoxDecoration(
+        color: EngoraColors.professionalAccent.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: EngoraColors.professionalAccent.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.verified_rounded,
+            color: EngoraColors.professionalAccent,
+            size: 24,
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Objectives complete',
+                  style: TextStyle(
+                    color: EngoraColors.ink,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'You can complete the practice now or keep talking.',
+                  style: TextStyle(color: EngoraColors.muted, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton(
+            onPressed: _requestObjectiveFinish,
+            style: FilledButton.styleFrom(
+              backgroundColor: EngoraColors.professionalAccent,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              minimumSize: const Size(0, 42),
+            ),
+            child: const Text('Complete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   String get _statusLabel {
     final activityLabel = switch (_activity) {
       AvatarActivity.loading =>
@@ -942,7 +1040,6 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     if (_sessionLoading || _sessionError != null) return activityLabel;
 
     final progress = _lastResponse?.sessionProgress ?? const {};
-    final maximum = progress['maximum_student_responses'] ?? 10;
     final completed =
         (progress['completed_objective_ids'] as List<dynamic>?)?.length ?? 0;
     final remaining =
@@ -950,7 +1047,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     final objectiveProgress = completed + remaining > 0
         ? ' | Goals $completed/${completed + remaining}'
         : '';
-    return '$activityLabel | Response $_studentResponseCount/$maximum$objectiveProgress';
+    return '$activityLabel | Response $_studentResponseCount$objectiveProgress';
   }
 
   void _triggerCoachingBanner(CoachingEvent? event) {
@@ -1418,6 +1515,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        _buildObjectiveCompletionPanel(),
                         Text(
                           _statusLabel,
                           maxLines: 1,
@@ -1499,11 +1597,11 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                               ),
                             ),
                             _buildIconButton(
-                              tooltip: 'Finish practice',
+                              tooltip: 'End practice manually',
                               icon: const AppSvgIcon(AppIcons.finish, size: 24),
                               onPressed: _lastResponse == null
                                   ? null
-                                  : _requestFinish,
+                                  : _requestManualFinish,
                             ),
                           ],
                         ),

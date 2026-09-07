@@ -18,22 +18,24 @@ class CoachingEvent {
   factory CoachingEvent.fromJson(Map<String, dynamic> json) {
     return CoachingEvent(
       turnNumber: json['turn_number'] ?? json['turnNumber'] ?? 0,
-      studentUtterance: json['student_utterance'] ?? json['studentUtterance'] ?? '',
+      studentUtterance:
+          json['student_utterance'] ?? json['studentUtterance'] ?? '',
       category: json['category'] ?? '',
       shortHint: json['short_hint'] ?? json['shortHint'] ?? '',
       explanation: json['explanation'] ?? '',
-      improvedResponse: json['improved_response'] ?? json['improvedResponse'] ?? '',
+      improvedResponse:
+          json['improved_response'] ?? json['improvedResponse'] ?? '',
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'turn_number': turnNumber,
-        'student_utterance': studentUtterance,
-        'category': category,
-        'short_hint': shortHint,
-        'explanation': explanation,
-        'improved_response': improvedResponse,
-      };
+    'turn_number': turnNumber,
+    'student_utterance': studentUtterance,
+    'category': category,
+    'short_hint': shortHint,
+    'explanation': explanation,
+    'improved_response': improvedResponse,
+  };
 }
 
 class AiResponse {
@@ -52,6 +54,20 @@ class AiResponse {
   final Map<String, dynamic> sessionProgress;
   final String? endReason;
   final String source;
+
+  bool get completionEligible =>
+      sessionProgress['completion_eligible'] == true ||
+      sessionProgress['objectives_completed'] == true;
+
+  int get completedObjectiveCount => completedObjectiveIds.length;
+
+  int get totalObjectiveCount {
+    final remaining =
+        (sessionProgress['remaining_objective_ids'] as List<dynamic>?)
+            ?.length ??
+        0;
+    return completedObjectiveCount + remaining;
+  }
 
   AiResponse({
     required this.sessionId,

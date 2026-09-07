@@ -101,6 +101,7 @@ class PracticeSession {
     String? pageId,
     List<ConversationLatencyTrace> latencyMetrics = const [],
     PilotMetadata? pilotMetadata,
+    bool completedByObjectives = false,
   }) {
     final averages = <String, double>{};
     for (final key in scoreKeys) {
@@ -116,6 +117,7 @@ class PracticeSession {
               averages.length;
     final finalResponse = evaluations.isEmpty ? null : evaluations.last;
     final naturallyCompleted =
+        completedByObjectives ||
         finalResponse?.sessionProgress['session_complete'] == true;
 
     return PracticeSession(
@@ -127,7 +129,9 @@ class PracticeSession {
       completedAt: completedAt.toUtc(),
       durationSeconds: max(0, completedAt.difference(startedAt).inSeconds),
       status: naturallyCompleted ? 'completed' : 'ended_manually',
-      endReason: finalResponse?.endReason ?? 'manual_finish',
+      endReason: naturallyCompleted
+          ? 'objectives_completed'
+          : finalResponse?.endReason ?? 'manual_finish',
       studentResponseCount: evaluations.length,
       transcript: transcript,
       evaluations: evaluations,

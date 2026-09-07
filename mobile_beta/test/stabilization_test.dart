@@ -49,20 +49,25 @@ void main() {
       'feedback': '',
       'cultural_note': '',
       'improved_response': '',
-      'continue_conversation': false,
+      'continue_conversation': true,
       'completed_objective_ids': ['confirm_and_welcome'],
       'session_progress': {
         'student_response_count': 6,
-        'session_complete': true,
+        'session_complete': false,
+        'objectives_completed': true,
+        'completion_eligible': true,
+        'remaining_objective_ids': <String>[],
       },
-      'end_reason': 'objectives_completed',
       'source': 'rule_based',
     });
 
     expect(response.turnNumber, 6);
     expect(response.completedObjectiveIds, ['confirm_and_welcome']);
-    expect(response.sessionProgress['session_complete'], isTrue);
-    expect(response.continueConversation, isFalse);
+    expect(response.sessionProgress['session_complete'], isFalse);
+    expect(response.completionEligible, isTrue);
+    expect(response.completedObjectiveCount, 1);
+    expect(response.totalObjectiveCount, 1);
+    expect(response.continueConversation, isTrue);
   });
 
   test('PracticeSession creates a dashboard-ready record', () {
@@ -76,10 +81,13 @@ void main() {
       'feedback': 'Clear response.',
       'cultural_note': 'Respect local context.',
       'improved_response': 'Welcome to our university.',
-      'continue_conversation': false,
+      'continue_conversation': true,
       'completed_objective_ids': ['confirm_and_welcome'],
-      'session_progress': {'session_complete': true},
-      'end_reason': 'objectives_completed',
+      'session_progress': {
+        'session_complete': false,
+        'completion_eligible': true,
+        'remaining_objective_ids': <String>[],
+      },
       'source': 'openai',
     });
     final scenario = scenarioTopics.firstWhere(
@@ -95,6 +103,7 @@ void main() {
         {'speaker': 'Student', 'message': 'Welcome to our university.'},
       ],
       evaluations: [response],
+      completedByObjectives: true,
     );
     final dashboardRecord = session.toDashboardRecord();
 
@@ -104,6 +113,39 @@ void main() {
     expect(dashboardRecord['session_id'], 'session_test');
     expect(dashboardRecord['scenario_id'], 'G-ICC-008');
     expect(dashboardRecord['average_scores'], isA<Map<String, double>>());
+  });
+
+  test('manual flag remains ended manually even when objectives are ready', () {
+    final response = AiResponse.fromJson({
+      'scenario_id': 'G-ICC-008',
+      'turn_number': 3,
+      'ai_message': 'We can keep talking.',
+      'detected_category': 'GOOD',
+      'scores': {for (final key in PracticeSession.scoreKeys) key: 4},
+      'feedback': '',
+      'cultural_note': '',
+      'improved_response': '',
+      'continue_conversation': true,
+      'completed_objective_ids': ['confirm_and_welcome'],
+      'session_progress': {
+        'session_complete': false,
+        'completion_eligible': true,
+        'remaining_objective_ids': <String>[],
+      },
+      'source': 'openai',
+    });
+    final now = DateTime.utc(2026, 9, 7, 9);
+    final session = PracticeSession.fromPractice(
+      sessionId: 'manual_after_objectives',
+      scenario: scenarioTopics.first,
+      startedAt: now,
+      completedAt: now.add(const Duration(minutes: 2)),
+      transcript: const [],
+      evaluations: [response],
+    );
+
+    expect(session.status, 'ended_manually');
+    expect(session.endReason, 'manual_finish');
   });
 
   test('PracticeHistoryStore persists sessions after reload', () async {
