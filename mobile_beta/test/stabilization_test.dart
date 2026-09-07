@@ -27,6 +27,39 @@ void main() {
     });
   });
 
+  group('speech transcript alternatives', () {
+    test('deduplicates choices while preserving recognition order', () {
+      final alternatives = buildTranscriptAlternatives(
+        primary: 'I would like both',
+        alternatives: const [
+          'I would like both',
+          'I would like a boat',
+          'I would like both',
+          'I would like boats',
+        ],
+      );
+
+      expect(alternatives, [
+        'I would like both',
+        'I would like a boat',
+        'I would like boats',
+      ]);
+    });
+
+    test('adds accumulated speech to each candidate', () {
+      final alternatives = buildTranscriptAlternatives(
+        primary: 'both options',
+        alternatives: const ['boat options'],
+        accumulatedPrefix: 'I would like',
+      );
+
+      expect(alternatives, [
+        'I would like both options',
+        'I would like boat options',
+      ]);
+    });
+  });
+
   group('AppSettings.getBaseUrl', () {
     test('always uses the configured production endpoint', () async {
       SharedPreferences.setMockInitialValues({

@@ -34,6 +34,25 @@ Size cameraPreviewDisplaySize(Size previewSize, Orientation orientation) {
       : previewSize;
 }
 
+List<String> buildTranscriptAlternatives({
+  required String primary,
+  required Iterable<String> alternatives,
+  String accumulatedPrefix = '',
+}) {
+  final results = <String>[];
+  final seen = <String>{};
+  for (final rawCandidate in [primary, ...alternatives]) {
+    final candidate = rawCandidate.trim();
+    if (candidate.isEmpty) continue;
+    final combined = accumulatedPrefix.trim().isEmpty
+        ? candidate
+        : '${accumulatedPrefix.trim()} $candidate';
+    final normalized = combined.toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+    if (seen.add(normalized)) results.add(combined.trim());
+  }
+  return results.take(3).toList(growable: false);
+}
+
 class ConversationMessage {
   final String speaker;
   final String message;
@@ -113,9 +132,12 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   bool _cameraEnabled = true;
   bool _cameraInitializationInProgress = false;
   bool _submissionStarted = false;
+  bool _reviewingTranscript = false;
   bool _navigatingToResult = false;
   AppLifecycleState _lifecycleState = AppLifecycleState.resumed;
   String _recognizedWords = '';
+  List<String> _speechAlternatives = const [];
+  double? _speechConfidence;
   String _accumulatedWords = '';
   String _currentSegmentWords = '';
   String? _cameraError;
@@ -511,15 +533,23 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
     if (_speech.isListening) {
       _pulsingController.stop();
-      await _stopListeningAndSubmit();
+      await _stopListeningAndReview();
       return;
     }
 
+    await _startListening();
+  }
+
+  Future<void> _startListening() async {
+    if (!_speechAvailable || _speech.isListening || !mounted) return;
     _submissionStarted = false;
     _accumulatedWords = '';
     _currentSegmentWords = '';
     setState(() {
       _recognizedWords = '';
+      _speechAlternatives = const [];
+      _speechConfidence = null;
+      _reviewingTranscript = false;
       _activity = AvatarActivity.listening;
     });
 
@@ -532,7 +562,9 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         listenMode: ListenMode.dictation,
         partialResults: true,
         cancelOnError: true,
-        pauseFor: const Duration(seconds: 10),
+        onDevice: false,
+        autoPunctuation: true,
+        pauseFor: const Duration(seconds: 3),
         listenFor: const Duration(seconds: 60),
       ),
     );
@@ -563,7 +595,19 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         ? _currentSegmentWords
         : '$_accumulatedWords $_currentSegmentWords'.trim();
 
-    setState(() => _recognizedWords = fullWords);
+    final alternatives = buildTranscriptAlternatives(
+      primary: current,
+      alternatives: result.alternates
+          .skip(1)
+          .map((alternate) => alternate.recognizedWords),
+      accumulatedPrefix: _accumulatedWords,
+    );
+
+    setState(() {
+      _recognizedWords = fullWords;
+      _speechAlternatives = alternatives;
+      _speechConfidence = result.hasConfidenceRating ? result.confidence : null;
+    });
   }
 
   void _onSpeechStatus(String status) {
@@ -574,9 +618,11 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       _pulsingController.stop();
       final words = _recognizedWords.trim();
       if (words.isNotEmpty) {
-        _submissionStarted = true;
         unawaited(
-          _submitResponse(words, speechFinalAt: DateTime.now().toUtc()),
+          _reviewTranscriptAndSubmit(
+            words,
+            speechFinalAt: DateTime.now().toUtc(),
+          ),
         );
       } else {
         setState(() => _activity = AvatarActivity.idle);
@@ -587,34 +633,208 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   void _onSpeechError(SpeechRecognitionError error) {
     if (!mounted) return;
     _pulsingController.stop();
-    setState(() => _activity = AvatarActivity.idle);
-    if (error.permanent) {
-      String userFriendlyMessage;
-      if (error.errorMsg == 'error_speech_timeout' ||
-          error.errorMsg == 'error_no_match') {
-        userFriendlyMessage =
-            'Tidak ada suara terdeteksi. Silakan tekan tombol mic dan coba bicara lagi.';
-      } else {
-        userFriendlyMessage = 'Microphone: ${error.errorMsg}';
-      }
+    setState(() {
+      _activity = AvatarActivity.idle;
+      _submissionStarted = false;
+      _reviewingTranscript = false;
+    });
+    final noSpeech =
+        error.errorMsg == 'error_speech_timeout' ||
+        error.errorMsg == 'error_no_match';
+    final userFriendlyMessage = noSpeech
+        ? 'No clear speech was detected. Please try again.'
+        : 'Microphone: ${error.errorMsg}';
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(userFriendlyMessage)));
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(userFriendlyMessage),
+        action: noSpeech
+            ? SnackBarAction(
+                label: 'Retry',
+                onPressed: () => unawaited(_startListening()),
+              )
+            : null,
+      ),
+    );
   }
 
-  Future<void> _stopListeningAndSubmit() async {
+  Future<void> _stopListeningAndReview() async {
     _pulsingController.stop();
-    await _speech.stop();
     if (_submissionStarted) return;
     final words = _recognizedWords.trim();
     if (words.isEmpty) {
+      await _speech.stop();
       if (mounted) setState(() => _activity = AvatarActivity.idle);
       return;
     }
+    await _reviewTranscriptAndSubmit(
+      words,
+      speechFinalAt: DateTime.now().toUtc(),
+    );
+  }
+
+  Future<void> _reviewTranscriptAndSubmit(
+    String words, {
+    required DateTime speechFinalAt,
+  }) async {
+    if (_submissionStarted || !mounted) return;
     _submissionStarted = true;
-    await _submitResponse(words, speechFinalAt: DateTime.now().toUtc());
+    _pulsingController.stop();
+    await _speech.stop();
+    if (!mounted) return;
+
+    final controller = TextEditingController(text: words);
+    final candidates = buildTranscriptAlternatives(
+      primary: words,
+      alternatives: _speechAlternatives,
+    );
+    setState(() {
+      _activity = AvatarActivity.idle;
+      _reviewingTranscript = true;
+    });
+
+    final confirmedText = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      enableDrag: false,
+      isDismissible: false,
+      useSafeArea: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            20 + MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Did we hear that correctly?',
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    if (_speechConfidence != null && _speechConfidence! < 0.75)
+                      const Tooltip(
+                        message: 'Speech recognition confidence is low',
+                        child: Icon(
+                          Icons.hearing_disabled_rounded,
+                          color: EngoraColors.danger,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Check the transcript before it is sent to your conversation partner.',
+                  style: TextStyle(color: EngoraColors.muted),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: controller,
+                  minLines: 2,
+                  maxLines: 4,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    labelText: 'Your response',
+                    hintText: 'Edit any words that were heard incorrectly',
+                    prefixIcon: Icon(Icons.graphic_eq_rounded),
+                  ),
+                  onChanged: (_) => setModalState(() {}),
+                ),
+                if (candidates.length > 1) ...[
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Other possibilities',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  ),
+                  const SizedBox(height: 8),
+                  Column(
+                    children: candidates.skip(1).map((candidate) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            icon: const Icon(
+                              Icons.text_fields_rounded,
+                              size: 18,
+                            ),
+                            label: Text(
+                              candidate,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            onPressed: () {
+                              controller.text = candidate;
+                              controller.selection = TextSelection.collapsed(
+                                offset: controller.text.length,
+                              );
+                              setModalState(() {});
+                            },
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          FocusScope.of(sheetContext).unfocus();
+                          Navigator.pop(sheetContext);
+                        },
+                        icon: const Icon(Icons.replay_rounded),
+                        label: const Text('Try again'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: controller.text.trim().isEmpty
+                            ? null
+                            : () {
+                                FocusScope.of(sheetContext).unfocus();
+                                Navigator.pop(
+                                  sheetContext,
+                                  controller.text.trim(),
+                                );
+                              },
+                        icon: const Icon(Icons.send_rounded),
+                        label: const Text('Send'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    controller.dispose();
+    if (!mounted) return;
+    setState(() => _reviewingTranscript = false);
+
+    if (confirmedText == null) {
+      _submissionStarted = false;
+      await _startListening();
+      return;
+    }
+
+    await _submitResponse(confirmedText, speechFinalAt: speechFinalAt);
   }
 
   Future<void> _submitResponse(
@@ -1027,6 +1247,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   }
 
   String get _statusLabel {
+    if (_reviewingTranscript) return 'Review transcript';
     final activityLabel = switch (_activity) {
       AvatarActivity.loading =>
         _sessionLoading ? 'Preparing session' : 'AI is preparing to speak',

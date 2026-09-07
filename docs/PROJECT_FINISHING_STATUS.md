@@ -71,7 +71,7 @@ Dokumen ini menjadi catatan ringkas status implementasi Engora. Status dibagi me
 - [x] Batch 1 - Objective memory: ID objektif yang sudah selesai diterima dan digabung secara kumulatif pada endpoint chat.
 - [x] Batch 1 - Safety guard: batas internal 30 respons tersedia tanpa mengubah sesi menjadi completed.
 - [x] Batch 2 - Mobile completion UX: tampilkan progres/badge objektif, kirim progres kumulatif, dan buka tombol penyelesaian khusus ketika seluruh objektif selesai.
-- [ ] Batch 3 - Speech recognition recovery: tangani salah dengar seperti `both` menjadi `boat` melalui konfirmasi, alternatif transkrip, dan retry yang jelas.
+- [x] Batch 3 - Speech recognition recovery: hasil STT dikonfirmasi sebelum dikirim, dapat diedit, menampilkan alternatif perangkat, menyediakan retry, serta memperpendek jeda akhir ucapan dari 10 menjadi 3 detik.
 - [ ] Batch 4 - Uji perangkat fisik ulang untuk latency, respons berulang, kualitas suara, penyelesaian objektif, dan koneksi terputus.
 
 ## Finishing Wajib Sebelum Uji Klien
