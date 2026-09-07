@@ -12,44 +12,39 @@ const {
   DEFAULT_TTS_MODEL,
 } = require("../services/tts_service");
 
-test("TTS voice selection for Melbourne Cafe and Interview Room characters", async (t) => {
-  await t.test("Melbourne Cafe (Olivia Reed) gets a female voice (shimmer)", () => {
-    const voice = getVoiceName("female", "Olivia Reed (Australian cafe staff member)");
-    assert.equal(voice, "shimmer");
+test("TTS voice selection follows the approved UAT voice map", async (t) => {
+  await t.test("Scenario Library always uses alloy", () => {
+    const voice = getVoiceName("male", "David, an exchange student", {
+      experience_type: "legacy_scenario",
+      scenario_id: "G-ICC-008",
+    });
+    assert.equal(voice, "alloy");
   });
 
-  await t.test("Interview Room (Michael Harris) gets a male voice (onyx)", () => {
-    const voice = getVoiceName("male", "Michael Harris (International HR manager)");
-    assert.equal(voice, "onyx");
+  await t.test("Dr Emma gets nova in guided topics", () => {
+    const voice = getVoiceName("female", "Dr Emma Collins (Foreign lecturer)", {
+      experience_type: "guided_topic",
+      setting_id: "ACADEMIC-LECTURER-OFFICE",
+    });
+    assert.equal(voice, "nova");
   });
 
-  await t.test("Career Fair (Michael Harris) gets a male voice (onyx)", () => {
-    const voice = getVoiceName("male", "Michael Harris (HR manager representing an international company)");
-    assert.equal(voice, "onyx");
+  await t.test("the two guided service characters use marin", () => {
+    assert.equal(getVoiceName("female", "Sarah Bennett", {
+      experience_type: "guided_topic",
+      setting_id: "SOCIAL-LONDON-RESTAURANT",
+    }), "marin");
+    assert.equal(getVoiceName("female", "Olivia Reed", {
+      experience_type: "guided_topic",
+      setting_id: "SOCIAL-MELBOURNE-CAFE",
+    }), "marin");
   });
 
-  await t.test("London Restaurant (Sarah Bennett) gets a female voice (shimmer)", () => {
-    const voice = getVoiceName("female", "Sarah Bennett (British restaurant waitress)");
-    assert.equal(voice, "shimmer");
-  });
-
-  await t.test("Lecturer Consultation (Dr Emma Collins) gets a female voice (nova or shimmer)", () => {
-    const voice = getVoiceName("female", "Dr Emma Collins (Foreign lecturer)");
-    assert.ok(["nova", "shimmer"].includes(voice), `Expected female voice, got ${voice}`);
-  });
-
-  await t.test("Exchange Student (David) gets a male voice (fable)", () => {
-    const voice = getVoiceName("male", "David, an exchange student from Melbourne, Australia");
-    assert.equal(voice, "fable");
-  });
-
-  await t.test("explicit female gender wins over stale male role metadata", () => {
-    const voice = getVoiceName("female", "Michael Harris (Melbourne cafe staff)");
-    assert.equal(voice, "shimmer");
-  });
-
-  await t.test("explicit male gender wins over stale female role metadata", () => {
-    const voice = getVoiceName("male", "Olivia Reed (Australian cafe staff member)");
+  await t.test("guided male characters use fable", () => {
+    const voice = getVoiceName("male", "Michael Harris (International HR manager)", {
+      experience_type: "guided_topic",
+      setting_id: "PROFESSIONAL-INTERVIEW-ROOM",
+    });
     assert.equal(voice, "fable");
   });
 });
@@ -60,25 +55,25 @@ test("Tone Engine maps guided characters to stable expressive profiles", async (
       gender: "female",
       role: "Dr Emma Collins (Foreign lecturer)",
       id: "emma_lecturer",
-      voice: "shimmer",
+      voice: "nova",
     },
     {
       gender: "female",
       role: "Sarah Bennett (British restaurant waitress)",
       id: "sarah_waitress",
-      voice: "shimmer",
+      voice: "marin",
     },
     {
       gender: "female",
       role: "Olivia Reed (Australian cafe staff member)",
       id: "olivia_barista",
-      voice: "shimmer",
+      voice: "marin",
     },
     {
       gender: "male",
       role: "Michael Harris (International HR manager)",
       id: "michael_hr",
-      voice: "onyx",
+      voice: "fable",
     },
     {
       gender: "male",
@@ -120,6 +115,7 @@ test("Tone Engine instructions combine character persona and turn intent", () =>
   assert.equal(result.intent, "question");
   assert.match(result.instructions, /British university lecturer/i);
   assert.match(result.instructions, /genuinely curious/i);
+  assert.match(result.instructions, /not text you are reading aloud/i);
   assert.match(result.instructions, /do not add words/i);
 });
 
@@ -159,10 +155,11 @@ test("Tone Engine builds an expressive request and a safe legacy request", () =>
     "Welcome. Could you tell me about yourself?",
     "male",
     "Michael Harris (International HR manager)",
-    "gpt-4o-mini-tts"
+    "gpt-4o-mini-tts",
+    { experience_type: "guided_topic", setting_id: "PROFESSIONAL-INTERVIEW-ROOM" }
   );
   assert.equal(expressive.request.model, "gpt-4o-mini-tts");
-  assert.equal(expressive.request.voice, "onyx");
+  assert.equal(expressive.request.voice, "fable");
   assert.equal(expressive.profile.id, "michael_hr");
   assert.equal(expressive.intent, "greeting");
   assert.match(expressive.request.instructions, /international HR manager/i);

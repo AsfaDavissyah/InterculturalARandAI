@@ -305,9 +305,9 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   Future<void> _initializeTts() async {
     try {
       await _tts.setLanguage('en-US');
-      await _tts.setSpeechRate(0.45);
+      await _tts.setSpeechRate(0.5);
       final isMaleVoice = _voiceGender() == 'male';
-      await _tts.setPitch(isMaleVoice ? 0.85 : 1.1);
+      await _tts.setPitch(isMaleVoice ? 0.95 : 1.02);
       await _tts.setVolume(1.0);
       await _tts.awaitSpeakCompletion(true);
 
@@ -394,9 +394,12 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
               'text': text,
               'gender': _voiceGender(),
               'ai_role': widget.scenario.aiRole,
+              'experience_type': widget.experienceType,
+              'scenario_id': widget.scenario.id,
+              if (widget.settingId != null) 'setting_id': widget.settingId,
             }),
           )
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 8));
       if (response.statusCode != 200) return null;
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       return data['audio_url']?.toString();
@@ -451,7 +454,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       try {
         await _tts.stop();
         final isMaleVoice = _voiceGender() == 'male';
-        await _tts.setPitch(isMaleVoice ? 0.85 : 1.1);
+        await _tts.setPitch(isMaleVoice ? 0.95 : 1.02);
         _markTtsReady('local');
         await _tts.speak(text);
       } finally {
@@ -707,7 +710,9 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       setState(() => _activity = AvatarActivity.idle);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Response failed: $error'),
+          content: const Text(
+            'Agent belum berhasil merespons. Periksa jaringan lalu coba lagi.',
+          ),
           action: SnackBarAction(
             label: 'Retry',
             onPressed: () {

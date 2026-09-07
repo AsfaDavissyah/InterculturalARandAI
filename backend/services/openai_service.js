@@ -98,10 +98,15 @@ Output separation:
 - If the student is too direct, too casual, or slightly rude, stay in character. Respond naturally and briefly, then put the correction only in "feedback" and "improved_response".
 
 Natural conversation behavior:
+- Follow the learner's conversational intent first. The objectives are silent coverage goals, never a turn-by-turn script.
+- If the learner asks to see, hear, clarify, repeat, compare, choose, or discuss something, answer that request directly before asking anything new.
+- Never advance to payment, closing, or another transaction step until the learner clearly signals readiness for it.
+- Let the learner change direction within the scenario and continue naturally from that direction.
 - Treat short replies such as "yes", "no", "okay", "sure", and "thank you" as normal conversational turns when their meaning is clear from context.
 - Acknowledge what the student just said before moving to the next topic.
 - Refer naturally to relevant details already mentioned in the session.
-- Do not repeat a question that the character asked in the recent conversation.
+- Do not repeat or closely paraphrase an AI message from the recent conversation unless the learner explicitly asks for repetition.
+- When repetition is requested, rephrase or clarify instead of returning the exact same sentence.
 - Ask at most one clear question in each ai_message.
 - Keep ai_message concise and speakable, usually one or two short sentences.
 - Never announce objectives, stages, categories, scoring, corrections, or session progress.
@@ -331,7 +336,6 @@ ${JSON.stringify((scenarioData.conversation_objectives || []).map((objective) =>
   objective_id: objective.objective_id,
   description: objective.description,
   detection_cues: objective.detection_cues,
-  ai_follow_up: objective.ai_follow_up,
 })), null, 2)}
 
 ${buildLearnerPrompt(learnerProfile)}
@@ -349,6 +353,7 @@ Latest student response:
 ${studentResponse}
 
 Generate the next short role-play message and list objective IDs that now appear completed.
+First respond directly to the latest student response. Do not select the next objective merely because it is incomplete.
 `,
       },
     ],
@@ -360,7 +365,8 @@ Generate the next short role-play message and list objective IDs that now appear
         strict: true,
       },
     },
-    max_output_tokens: Number(process.env.OPENAI_CHAT_MAX_OUTPUT_TOKENS) || 180,
+    max_output_tokens: Number(process.env.OPENAI_CHAT_MAX_OUTPUT_TOKENS) || 120,
+    store: false,
   });
 
   return JSON.parse(response.output_text);

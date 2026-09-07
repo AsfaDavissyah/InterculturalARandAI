@@ -27,9 +27,32 @@ function normalize(value) {
   return String(value || "").trim().toLowerCase();
 }
 
-function getVoiceName(gender, aiRole) {
+function getVoiceName(gender, aiRole, context = {}) {
   const roleLower = normalize(aiRole);
   const genderLower = normalize(gender);
+  const experienceType = normalize(
+    context.experienceType || context.experience_type
+  );
+  const settingId = normalize(context.settingId || context.setting_id);
+
+  if (experienceType && experienceType !== "guided_topic") {
+    return "alloy";
+  }
+
+  if (experienceType === "guided_topic" || settingId) {
+    if (settingId.includes("lecturer") || roleLower.includes("emma")) {
+      return "nova";
+    }
+    if (
+      settingId.includes("restaurant") ||
+      settingId.includes("cafe") ||
+      roleLower.includes("sarah") ||
+      roleLower.includes("olivia")
+    ) {
+      return "marin";
+    }
+    return "fable";
+  }
 
   const roleSuggestsMale =
     roleLower.includes("david") ||
@@ -67,14 +90,28 @@ function getVoiceName(gender, aiRole) {
   return "nova";
 }
 
-function getCharacterProfile(gender, aiRole) {
+function getCharacterProfile(gender, aiRole, context = {}) {
   const identity = normalize(aiRole);
+  const experienceType = normalize(
+    context.experienceType || context.experience_type
+  );
+  const settingId = normalize(context.settingId || context.setting_id);
+
+  if (experienceType && experienceType !== "guided_topic") {
+    return {
+      id: "scenario_alloy",
+      voice: "alloy",
+      speed: 1.02,
+      persona:
+        "Speak as a responsive role-play partner in a real conversation. Sound spontaneous, engaged, and human, with natural phrasing and varied emphasis rather than narration.",
+    };
+  }
 
   if (identity.includes("emma") || identity.includes("foreign lecturer")) {
     return {
       id: "emma_lecturer",
-      voice: "shimmer",
-      speed: 0.96,
+      voice: "nova",
+      speed: 0.98,
       persona:
         "Speak as a warm British university lecturer. Sound calm, attentive, professional, and encouraging. Use clear articulation and a measured conversational pace.",
     };
@@ -87,7 +124,7 @@ function getCharacterProfile(gender, aiRole) {
   ) {
     return {
       id: "sarah_waitress",
-      voice: "shimmer",
+      voice: "marin",
       speed: 1.02,
       persona:
         "Speak as a friendly British restaurant waitress. Sound welcoming, helpful, and naturally upbeat, with clear service-oriented speech.",
@@ -101,7 +138,7 @@ function getCharacterProfile(gender, aiRole) {
   ) {
     return {
       id: "olivia_barista",
-      voice: "shimmer",
+      voice: "marin",
       speed: 1.03,
       persona:
         "Speak as a friendly Australian cafe staff member. Sound relaxed, approachable, and politely energetic, with natural conversational rhythm.",
@@ -115,7 +152,7 @@ function getCharacterProfile(gender, aiRole) {
   ) {
     return {
       id: "michael_hr",
-      voice: "onyx",
+      voice: "fable",
       speed: 0.97,
       persona:
         "Speak as a composed international HR manager. Sound confident, professional, attentive, and supportive, with a steady but expressive interview tone.",
@@ -132,7 +169,10 @@ function getCharacterProfile(gender, aiRole) {
     };
   }
 
-  const voice = getVoiceName(gender, aiRole);
+  const voice = getVoiceName(gender, aiRole, {
+    ...context,
+    settingId,
+  });
   const isMale =
     normalize(gender) === "male" || ["onyx", "fable"].includes(voice);
   return {
@@ -216,13 +256,13 @@ const INTENT_INSTRUCTIONS = {
     "Use varied, natural conversational intonation with subtle emphasis on important words. Avoid a flat, robotic, or theatrical delivery.",
 };
 
-function buildSpeechInstructions(text, gender, aiRole) {
-  const profile = getCharacterProfile(gender, aiRole);
+function buildSpeechInstructions(text, gender, aiRole, context = {}) {
+  const profile = getCharacterProfile(gender, aiRole, context);
   const intent = detectSpeechIntent(text);
   return {
     profile,
     intent,
-    instructions: `${profile.persona} ${INTENT_INSTRUCTIONS[intent]} Speak only the supplied text and do not add words, sound effects, or commentary.`,
+    instructions: `${profile.persona} ${INTENT_INSTRUCTIONS[intent]} Treat the line as something you are saying to a person right now, not text you are reading aloud. Use natural thought groups, small changes of pace, and purposeful emphasis. Speak only the supplied text and do not add words, sound effects, or commentary.`,
   };
 }
 
@@ -250,12 +290,19 @@ function getCacheFileName({ text, model, voice, speed, instructions }) {
   return `${hash}.mp3`;
 }
 
-function buildSpeechRequest(text, gender, aiRole, model = getTtsModel()) {
+function buildSpeechRequest(
+  text,
+  gender,
+  aiRole,
+  model = getTtsModel(),
+  context = {}
+) {
   const cleanText = String(text || "").trim();
   const { profile, intent, instructions } = buildSpeechInstructions(
     cleanText,
     gender,
-    aiRole
+    aiRole,
+    context
   );
   const requestInstructions = supportsSpeechInstructions(model)
     ? instructions
@@ -282,12 +329,12 @@ function buildSpeechRequest(text, gender, aiRole, model = getTtsModel()) {
   };
 }
 
-async function generateTTS(text, gender, aiRole) {
+async function generateTTS(text, gender, aiRole, context = {}) {
   if (!String(text || "").trim()) {
     throw new Error("Text is required for TTS generation.");
   }
 
-  const result = await generateTTSBuffer(text, gender, aiRole);
+  const result = await generateTTSBuffer(text, gender, aiRole, context);
   const fileName = result.fileName;
   const filePath = path.join(CACHE_DIR, fileName);
 
@@ -296,14 +343,14 @@ async function generateTTS(text, gender, aiRole) {
   return fileName;
 }
 
-async function generateTTSBuffer(text, gender, aiRole) {
+async function generateTTSBuffer(text, gender, aiRole, context = {}) {
   if (!String(text || "").trim()) {
     throw new Error("Text is required for TTS generation.");
   }
 
   const cleanText = String(text).trim();
   const { request, profile, intent, cacheFileName: fileName } =
-    buildSpeechRequest(cleanText, gender, aiRole);
+    buildSpeechRequest(cleanText, gender, aiRole, getTtsModel(), context);
   const filePath = path.join(CACHE_DIR, fileName);
 
   if (fs.existsSync(filePath)) {

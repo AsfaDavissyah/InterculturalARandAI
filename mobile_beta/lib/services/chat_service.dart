@@ -69,15 +69,25 @@ class ChatService {
     required String text,
     required String gender,
     required String aiRole,
+    required String experienceType,
+    String? scenarioId,
+    String? settingId,
   }) async {
     if (text.trim().isEmpty) return;
     await http
         .post(
           Uri.parse('$baseUrl/api/tts'),
           headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'text': text, 'gender': gender, 'ai_role': aiRole}),
+          body: jsonEncode({
+            'text': text,
+            'gender': gender,
+            'ai_role': aiRole,
+            'experience_type': experienceType,
+            if (scenarioId != null) 'scenario_id': scenarioId,
+            if (settingId != null) 'setting_id': settingId,
+          }),
         )
-        .timeout(const Duration(seconds: 8));
+        .timeout(const Duration(seconds: 10));
   }
 
   Future<List<ScenarioTopic>> getScenarios() async {

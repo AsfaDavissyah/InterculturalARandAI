@@ -962,7 +962,91 @@ function getObjectiveFollowUp(
     return followUp && !recentAiText.includes(followUp);
   });
 
-  return freshObjective?.ai_follow_up || objectives[0]?.ai_follow_up || null;
+  return freshObjective?.ai_follow_up || null;
+}
+
+function recentAiMessages(conversationHistory = []) {
+  return normalizeConversationHistory(conversationHistory)
+    .filter((item) => item.speaker === "AI")
+    .slice(-4)
+    .map((item) => item.message.trim())
+    .filter(Boolean);
+}
+
+function normalizeDialogueForComparison(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isRepeatedAiMessage(message, conversationHistory = []) {
+  const candidate = normalizeDialogueForComparison(message);
+  if (!candidate) return true;
+  return recentAiMessages(conversationHistory).some((recent) => {
+    const normalizedRecent = normalizeDialogueForComparison(recent);
+    return normalizedRecent === candidate ||
+      (candidate.length > 28 &&
+        (normalizedRecent.includes(candidate) || candidate.includes(normalizedRecent)));
+  });
+}
+
+function generateContextualFallback(
+  scenarioData,
+  studentResponse = "",
+  conversationHistory = []
+) {
+  const text = String(studentResponse || "").toLowerCase().trim();
+  const setting = String(
+    scenarioData.setting_id || scenarioData.context?.setting || ""
+  ).toLowerCase();
+  const isRestaurant = /restaurant|london/.test(setting);
+  const isCafe = /cafe|melbourne/.test(setting);
+
+  if (/\b(menu|western|food options?|dish|meal)\b/.test(text)) {
+    if (isRestaurant) {
+      return "Of course. Our menu includes fish and chips, grilled chicken, pasta, and salad. What would you like to try?";
+    }
+    if (isCafe) {
+      return "Sure. We have coffee, tea, sandwiches, and pastries. What sounds good to you?";
+    }
+  }
+
+  if (/\b(coffee|drink|snack|pastr|tea)\b/.test(text) && isCafe) {
+    return "Certainly. We have flat whites, long blacks, tea, and fresh pastries. What would you prefer?";
+  }
+
+  if (/\b(pay|payment|card|cash|bill|tip)\b/.test(text)) {
+    return isRestaurant || isCafe
+      ? "You can pay by card or cash when you are ready."
+      : "Certainly. How would you like to handle that?";
+  }
+
+  if (/\b(repeat|say that again|what do you mean|do you mean|clarify|understand)\b/.test(text)) {
+    if (isRestaurant) {
+      return "Of course. I mean I can show you the menu or help you choose a meal. Which would you prefer?";
+    }
+    if (isCafe) {
+      return "Of course. I can help you choose a drink or a snack. What would you like?";
+    }
+    return "Of course. Let me put that another way. What part would you like me to explain?";
+  }
+
+  if (/\b(no|not that|instead|different)\b/.test(text)) {
+    return "No problem. Tell me what you would prefer, and we can continue from there.";
+  }
+
+  const objectiveFollowUp = getObjectiveFollowUp(
+    scenarioData,
+    getSessionRules(scenarioData).requiredObjectiveIds,
+    conversationHistory
+  );
+  if (objectiveFollowUp && !isRepeatedAiMessage(objectiveFollowUp, conversationHistory)) {
+    return objectiveFollowUp;
+  }
+
+  return "All right. Tell me a little more about what you would like to do.";
 }
 
 function buildSessionMemory(
@@ -1235,6 +1319,15 @@ function generateAIMessage(
   );
   const fallbackResponses = scenarioData.fallback_responses || {};
   const shortResponse = String(studentResponse || "").toLowerCase().trim();
+  const contextualResponse = generateContextualFallback(
+    scenarioData,
+    studentResponse,
+    conversationHistory
+  );
+
+  if (/\b(menu|western|food options?|dish|meal|coffee|drink|snack|pastr|tea|repeat|say that again|what do you mean|clarify|not that|instead)\b/.test(shortResponse)) {
+    return contextualResponse;
+  }
 
   if (/^(yes|yeah|yep|okay|ok|sure|right|of course)[.!]*$/.test(shortResponse)) {
     return objectiveFollowUp
@@ -1258,11 +1351,14 @@ function generateAIMessage(
     return objectiveFollowUp;
   }
 
-  return (
+  const fallbackMessage = (
     fallbackResponses[category] ||
     fallbackResponses.ACCEPTABLE ||
-    "Thank you. Could you tell me a little more?"
+    contextualResponse
   );
+  return isRepeatedAiMessage(fallbackMessage, conversationHistory)
+    ? contextualResponse
+    : fallbackMessage;
 }
 
 function generateFeedback(category, studentResponse = "", scenarioData) {
@@ -3285,10 +3381,18 @@ app.post("/api/chat/respond-turn", async (req, res) => {
           studentResponse: student_response,
           learnerProfile,
         }),
-        Number(process.env.OPENAI_CHAT_TIMEOUT_MS) || 4500,
+        Number(process.env.OPENAI_CHAT_TIMEOUT_MS) || 3200,
         "openai_chat_timeout"
       );
       aiMessage = chatResult?.ai_message || aiMessage;
+      if (isRepeatedAiMessage(aiMessage, normalizedHistory)) {
+        aiMessage = generateContextualFallback(
+          versionedScenarioData,
+          student_response,
+          normalizedHistory
+        );
+        fallbackReason = "openai_repetition_filtered";
+      }
       completedObjectiveIds = normalizeCompletedObjectiveIds(
         versionedScenarioData,
         cueDetectedObjectiveIds,
@@ -3452,7 +3556,15 @@ app.post("/api/chat/evaluate-turn", async (req, res) => {
 });
 
 app.post("/api/tts", async (req, res) => {
-  const { text, gender, ai_role } = req.body;
+  const {
+    text,
+    gender,
+    ai_role,
+    experience_type,
+    scenario_id,
+    setting_id,
+  } = req.body;
+  const voiceContext = { experience_type, scenario_id, setting_id };
 
   if (!text) {
     return res.status(400).json({
@@ -3480,14 +3592,20 @@ app.post("/api/tts", async (req, res) => {
         });
       }
 
-      const { cacheFileName } = buildTTSRequest(text, gender, ai_role);
+      const { cacheFileName } = buildTTSRequest(
+        text,
+        gender,
+        ai_role,
+        undefined,
+        voiceContext
+      );
       const cached = await AudioCache.exists({
         key: cacheFileName,
         expiresAt: { $gt: new Date() },
       });
       const generated = cached
         ? { fileName: cacheFileName }
-        : await generateTTSBuffer(text, gender, ai_role);
+        : await generateTTSBuffer(text, gender, ai_role, voiceContext);
       const ttlHours = Math.max(
         1,
         Number.parseInt(process.env.TTS_CACHE_TTL_HOURS || "24", 10) || 24
@@ -3518,7 +3636,12 @@ app.post("/api/tts", async (req, res) => {
       });
     }
 
-    const audioFileName = await generateTTS(text, gender, ai_role);
+    const audioFileName = await generateTTS(
+      text,
+      gender,
+      ai_role,
+      voiceContext
+    );
     const protocol = req.protocol;
     const host = req.get("host");
     const audioUrl = `${protocol}://${host}/audio_cache/${audioFileName}`;
@@ -3749,6 +3872,8 @@ module.exports = {
   buildSessionMemory,
   detectCategory,
   generateAIMessage,
+  generateContextualFallback,
+  isRepeatedAiMessage,
   getSessionRules,
   validateScenarioData,
   normalizePracticeSessionPayload,

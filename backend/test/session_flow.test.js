@@ -197,6 +197,75 @@ test("respond-turn preserves the fast chat response contract", async () => {
   }
 });
 
+test("guided restaurant fallback follows the learner instead of a fixed stage", async () => {
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise((resolve) => server.once("listening", resolve));
+  const { port } = server.address();
+
+  try {
+    const response = await fetch(
+      `http://127.0.0.1:${port}/api/chat/respond-turn`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: "session_student_led_restaurant",
+          setting_id: "SOCIAL-LONDON-RESTAURANT",
+          student_response_count: 2,
+          conversation_history: [
+            { speaker: "AI", message: "Good evening. Welcome. How may I help you?" },
+            { speaker: "Student", message: "Please show me the menu." },
+            { speaker: "AI", message: "Would you like a recommendation for a meal or a drink?" },
+          ],
+          student_response: "Yes, I want to see the Western menu.",
+        }),
+      }
+    );
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.match(body.ai_message, /menu includes/i);
+    assert.doesNotMatch(body.ai_message, /card|cash|payment/i);
+  } finally {
+    await new Promise((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve()))
+    );
+  }
+});
+
+test("guided fallback clarifies instead of repeating the opening", async () => {
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise((resolve) => server.once("listening", resolve));
+  const { port } = server.address();
+
+  try {
+    const opening = "Hi there. What can I get started for you today?";
+    const response = await fetch(
+      `http://127.0.0.1:${port}/api/chat/respond-turn`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: "session_no_repeated_opening",
+          setting_id: "SOCIAL-MELBOURNE-CAFE",
+          student_response_count: 1,
+          conversation_history: [{ speaker: "AI", message: opening }],
+          student_response: "What do you mean?",
+        }),
+      }
+    );
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.notEqual(body.ai_message, opening);
+    assert.match(body.ai_message, /drink or a snack/i);
+  } finally {
+    await new Promise((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve()))
+    );
+  }
+});
+
 test("local fallback returns character dialogue without spoken correction", async () => {
   const server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));

@@ -332,6 +332,8 @@ class _OpeningVoiceWarmupState extends State<_OpeningVoiceWarmup> {
         text: widget.setting.buildOpeningMessage(),
         gender: gender,
         aiRole: '${character.displayName} (${character.role})',
+        experienceType: 'guided_topic',
+        settingId: widget.setting.settingId,
       );
     } catch (_) {
       // AR startup has neural and local TTS fallbacks.
