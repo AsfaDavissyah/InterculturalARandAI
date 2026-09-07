@@ -6,18 +6,18 @@ Engineering verification is complete when the repository test, lint, build, and 
 
 ## Engineering Verification Result
 
-- Backend: 63 tests passed.
-- Dashboard: 11 tests passed; lint completed with shadcn fast-refresh warnings only; production build passed.
-- Mobile: 26 tests passed; `flutter analyze` reported no issues.
+- Backend: 107 tests passed.
+- Dashboard: 18 tests passed; lint completed with non-fatal warnings only; production build passed.
+- Mobile: 38 tests passed; `flutter analyze` reported no issues.
 - Railway smoke: 3 topics, 6 guided settings, 10 legacy scenarios, and safe invalid-QR rejection passed.
 - Open Blocker/High defects in the engineering register: 0.
 
 ## Phase 11 APK Artifacts
 
-- Build label: `phase11-2026.08.15`
-- ARM64 APK: `mobile_beta/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`
-- ARM64 size: 53,181,267 bytes (50.7 MB)
-- ARM64 SHA-256: `38CE4359B44D71E48901FD1E27AB0087F6412923E99C24F3BD51DC670D20D1A0`
+- Build label: `Engora 1.0.1 build 3 - Batch 4 candidate`
+- ARM64 APK: `mobile_beta/build/app/outputs/flutter-apk/Engora-1.0.1-build3-arm64.apk`
+- ARM64 size: 60,326,326 bytes (57.5 MB)
+- ARM64 SHA-256: `14BF6FF8D9FD65C104ED4666F5DF96AA3421491C783F84B70A8EA83802973845`
 - ARMv7 APK: `mobile_beta/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk`
 - ARMv7 SHA-256: `738EA73E66DE4A5B6EFA18A39F280C0CF3C8CBA11FA3B677651E7C844E693046`
 - x86_64 APK: `mobile_beta/build/app/outputs/flutter-apk/app-x86_64-release.apk`
@@ -66,8 +66,9 @@ Engineering verification is complete when the repository test, lint, build, and 
 - Camera/microphone denial followed by recovery
 - Short, normal, and unclear speech input
 - AI role, identity, and location remain consistent
-- Minimum 5 responses, normal target 6-8, maximum 10
-- Natural closing and manual session ending
+- Turn count remains analytics only and does not advance or close the conversation
+- Objective-complete badge and dedicated completion action work only after every required objective is complete
+- Manual flag ending remains available before objective completion and records `Ended Manually`
 - Silent coaching shown during practice and retained in results
 - Transcript, score, duration, session status, and history persist after restart
 

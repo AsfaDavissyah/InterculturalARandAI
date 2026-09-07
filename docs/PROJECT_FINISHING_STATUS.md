@@ -57,10 +57,10 @@ Dokumen ini menjadi catatan ringkas status implementasi Engora. Status dibagi me
 
 ### Verifikasi Otomatis Terakhir
 
-- [x] Backend pasca-UAT Batch 1: alur sesi 20/20 dan pemetaan suara/Tone Engine 16/16 lulus; full suite 103/107, dengan 4 kegagalan integrasi hanya akibat DNS MongoDB Atlas lokal timeout.
-- [x] Dashboard unit test: 16/16 lulus.
+- [x] Backend pasca-UAT Batch 1-3: full suite 107/107 lulus.
+- [x] Dashboard unit test: 18/18 lulus.
 - [x] Dashboard production build berhasil.
-- [x] Mobile Flutter test: 35/35 lulus setelah revisi Guided Settings, sticker AR, profile, dan konfigurasi API.
+- [x] Mobile Flutter test: 38/38 lulus setelah revisi Guided Settings, sticker AR, objective completion, dan konfirmasi transkrip STT.
 - [x] Flutter analyze lulus tanpa issue.
 - [x] Sticker registry test: 7/7 lulus.
 
@@ -73,6 +73,13 @@ Dokumen ini menjadi catatan ringkas status implementasi Engora. Status dibagi me
 - [x] Batch 2 - Mobile completion UX: tampilkan progres/badge objektif, kirim progres kumulatif, dan buka tombol penyelesaian khusus ketika seluruh objektif selesai.
 - [x] Batch 3 - Speech recognition recovery: hasil STT dikonfirmasi sebelum dikirim, dapat diedit, menampilkan alternatif perangkat, menyediakan retry, serta memperpendek jeda akhir ucapan dari 10 menjadi 3 detik.
 - [ ] Batch 4 - Uji perangkat fisik ulang untuk latency, respons berulang, kualitas suara, penyelesaian objektif, dan koneksi terputus.
+
+### Kandidat Uji Batch 4
+
+- [x] Kandidat release Android dinaikkan ke versi `1.0.1+3` dan diarahkan ke API VPS produksi.
+- [x] APK ARM64 bertanda tangan berhasil dibuat sebagai `Engora-1.0.1-build3-arm64.apk`.
+- [x] Signature APK, ABI ARM64, serta checksum SHA-256 telah diverifikasi.
+- [ ] Instal kandidat build 3 pada perangkat Android fisik dan rekam hasil matriks Batch 4.
 
 ## Finishing Wajib Sebelum Uji Klien
 
@@ -89,7 +96,7 @@ Dokumen ini menjadi catatan ringkas status implementasi Engora. Status dibagi me
 ## Finishing Wajib Sebelum Rilis Produksi
 
 - [ ] Finalisasi Terms of Service, Privacy Policy, Research Information Sheet, dan Research Consent.
-- [x] Android application ID `com.asfadavissyah.engora`, version `1.0.0+2`, release signing key, dan AAB release telah dikonfigurasi serta diverifikasi.
+- [x] Android application ID `com.asfadavissyah.engora`, version `1.0.1+3`, dan release signing key telah dikonfigurasi serta diverifikasi. AAB build 2 sebelumnya tetap tersedia sebagai baseline Play Store.
 - [x] Backend VPS dan dashboard Vercel telah dideploy; endpoint status serta Scenario Library memberikan HTTP 200 pada online smoke test.
 - [ ] Pastikan secrets produksi tidak tersimpan di repository dan rotasi secret sementara bila diperlukan.
 - [ ] Selesaikan device acceptance, client acceptance, serta dokumentasikan sign-off.
