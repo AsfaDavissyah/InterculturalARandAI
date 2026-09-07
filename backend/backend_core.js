@@ -966,6 +966,14 @@ function isRepeatedAiMessage(message, conversationHistory = []) {
   });
 }
 
+function selectFreshFallback(candidates, conversationHistory = []) {
+  const usableCandidates = [...new Set(candidates.map((item) => String(item || "").trim()))]
+    .filter(Boolean);
+  return usableCandidates.find(
+    (candidate) => !isRepeatedAiMessage(candidate, conversationHistory)
+  ) || usableCandidates[0] || "Could you tell me a little more?";
+}
+
 function generateContextualFallback(
   scenarioData,
   studentResponse = "",
@@ -980,15 +988,40 @@ function generateContextualFallback(
 
   if (/\b(menu|western|food options?|dish|meal)\b/.test(text)) {
     if (isRestaurant) {
-      return "Of course. Our menu includes fish and chips, grilled chicken, pasta, and salad. What would you like to try?";
+      return selectFreshFallback([
+        "Of course. Our menu includes fish and chips, grilled chicken, pasta, and salad. What would you like to try?",
+        "Certainly. I can recommend the grilled chicken or pasta. Which sounds better to you?",
+        "Sure. We have several meals and lighter options. What kind of food are you in the mood for?",
+      ], conversationHistory);
     }
     if (isCafe) {
-      return "Sure. We have coffee, tea, sandwiches, and pastries. What sounds good to you?";
+      return selectFreshFallback([
+        "Sure. We have coffee, tea, sandwiches, and pastries. What sounds good to you?",
+        "Certainly. A sandwich with coffee is popular here. Would you prefer that or a pastry?",
+        "Of course. I can help you choose a drink, snack, or light meal. What would you like?",
+      ], conversationHistory);
     }
+    return selectFreshFallback([
+      "Sure. I can help with the menu. Are you looking for a meal, a snack, or a drink?",
+      "Of course. There are several food and drink options. What kind of thing would you enjoy?",
+      "Certainly. Tell me what flavors you like, and I can suggest something from the menu.",
+    ], conversationHistory);
   }
 
   if (/\b(coffee|drink|snack|pastr|tea)\b/.test(text) && isCafe) {
-    return "Certainly. We have flat whites, long blacks, tea, and fresh pastries. What would you prefer?";
+    return selectFreshFallback([
+      "Certainly. We have flat whites, long blacks, tea, and fresh pastries. What would you prefer?",
+      "Sure. Would you like a coffee, some tea, or something to eat?",
+      "Of course. I can recommend a drink first. Do you prefer coffee or tea?",
+    ], conversationHistory);
+  }
+
+  if (/\b(pizza|burger|sandwich|noodles?|rice|salad|chicken)\b/.test(text)) {
+    return selectFreshFallback([
+      "That sounds good to me. Pizza would be a nice choice.",
+      "I'd be happy with that. Shall we choose something we can both enjoy?",
+      "Good idea. Let's go with that and see what else is available.",
+    ], conversationHistory);
   }
 
   if (/\b(pay|payment|card|cash|bill|tip)\b/.test(text)) {
@@ -1004,18 +1037,39 @@ function generateContextualFallback(
     if (isCafe) {
       return "Of course. I can help you choose a drink or a snack. What would you like?";
     }
-    return "Of course. Let me put that another way. What part would you like me to explain?";
+    return selectFreshFallback([
+      "Of course. Let me put that another way. What part would you like me to explain?",
+      "Certainly. I can explain it more simply. Which detail was unclear?",
+      "No problem. Let me clarify it without changing the subject. What would help most?",
+    ], conversationHistory);
   }
 
   if (/\b(no|not that|instead|different)\b/.test(text)) {
-    return "No problem. Tell me what you would prefer, and we can continue from there.";
+    return selectFreshFallback([
+      "No problem. Tell me what you would prefer, and we can continue from there.",
+      "That's all right. What would work better for you?",
+      "Understood. We can change direction. What would you rather discuss?",
+    ], conversationHistory);
   }
 
   if (/\?$/.test(String(studentResponse || "").trim())) {
-    return "I want to make sure I understood you. Could you say a little more about what you mean?";
+    return selectFreshFallback([
+      "I want to make sure I understood you. Could you say a little more about what you mean?",
+      "Let me answer the right question. Which part would you like me to focus on?",
+      "I may have missed your point. Could you explain that in another way?",
+    ], conversationHistory);
   }
 
-  return "I understand. Tell me a little more about that.";
+  return selectFreshFallback([
+    "I understand. Tell me a little more about that.",
+    "Thanks for explaining. What would you like to focus on next?",
+    "All right, I'm following you. What is the most important part for you?",
+  ], conversationHistory);
+}
+
+function getOpenAIChatTimeoutMs() {
+  const configured = Number(process.env.OPENAI_CHAT_TIMEOUT_MS);
+  return Math.min(Math.max(configured || 7000, 6500), 9000);
 }
 
 function buildSessionMemory(
@@ -3343,7 +3397,7 @@ app.post("/api/chat/respond-turn", async (req, res) => {
           learnerProfile,
           completedObjectiveIds,
         }),
-        Number(process.env.OPENAI_CHAT_TIMEOUT_MS) || 3200,
+        getOpenAIChatTimeoutMs(),
         "openai_chat_timeout"
       );
       aiMessage = chatResult?.ai_message || aiMessage;
@@ -3840,6 +3894,7 @@ module.exports = {
   detectCategory,
   generateAIMessage,
   generateContextualFallback,
+  getOpenAIChatTimeoutMs,
   isRepeatedAiMessage,
   getSessionRules,
   validateScenarioData,

@@ -12,6 +12,8 @@ const {
   detectCategory,
   detectCompletedObjectives,
   generateAIMessage,
+  generateContextualFallback,
+  getOpenAIChatTimeoutMs,
   normalizePracticeSessionPayload,
   serializePracticeSession,
 } = require("../backend_core");
@@ -23,6 +25,35 @@ const airportScenario = JSON.parse(
   )
 );
 const allObjectiveIds = airportScenario.session_rules.required_objective_ids;
+
+test("chat timeout leaves enough time for a normal OpenAI response", () => {
+  const previous = process.env.OPENAI_CHAT_TIMEOUT_MS;
+  process.env.OPENAI_CHAT_TIMEOUT_MS = "3200";
+  assert.equal(getOpenAIChatTimeoutMs(), 6500);
+  if (previous === undefined) delete process.env.OPENAI_CHAT_TIMEOUT_MS;
+  else process.env.OPENAI_CHAT_TIMEOUT_MS = previous;
+});
+
+test("contextual fallback answers menu intent and avoids repeating itself", () => {
+  const canteenScenario = structuredClone(airportScenario);
+  canteenScenario.context.setting = "Campus canteen";
+  canteenScenario.scenario.ar_scene = "Campus canteen";
+
+  const first = generateContextualFallback(
+    canteenScenario,
+    "Could you recommend something from the menu?",
+    []
+  );
+  const second = generateContextualFallback(
+    canteenScenario,
+    "Could you recommend something from the menu?",
+    [{ speaker: "AI", message: first }]
+  );
+
+  assert.match(first, /menu|meal|snack|drink/i);
+  assert.notEqual(second, first);
+  assert.doesNotMatch(first, /tell me a little more/i);
+});
 
 test("all workbook scenarios use Scenario Engine V2", () => {
   const files = fs
