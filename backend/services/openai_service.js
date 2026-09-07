@@ -110,6 +110,7 @@ Natural conversation behavior:
 - Ask at most one clear question in each ai_message.
 - Keep ai_message concise and speakable, usually one or two short sentences.
 - Never announce objectives, stages, categories, scoring, corrections, or session progress.
+- The application controls when practice ends. Never close the session merely because a turn count or every objective has been reached.
 
 Scenario:
 ${JSON.stringify(buildPromptScenario(scenarioData), null, 2)}
@@ -122,7 +123,6 @@ ${JSON.stringify((scenarioData.conversation_objectives || []).map((objective) =>
   objective_id: objective.objective_id,
   description: objective.description,
   detection_cues: objective.detection_cues,
-  ai_follow_up: objective.ai_follow_up,
 })), null, 2)}
 
 Rules:
@@ -138,20 +138,10 @@ Rules:
 }
 
 function getTurnGuidance(scenarioData, studentResponseCount) {
-  const stages = scenarioData.conversation_stages || [];
-  const stageIndex = Math.min(
-    Math.max(Number(studentResponseCount) - 1, 0),
-    Math.max(stages.length - 1, 0)
-  );
-  const currentStage = stages[stageIndex] || null;
-
   return `
 Student response count: ${studentResponseCount}
 
-Current scenario phase:
-${JSON.stringify(currentStage || null, null, 2)}
-
-Identify every objective already completed across the full conversation. Generate a natural next message as the AI role from the context and objectives, not from a fixed script. If the target response count has been reached and all required objectives are complete, close the conversation naturally. Keep corrections and examples out of ai_message.
+Identify every objective already completed across the full conversation. Generate a natural next message as the AI role from the context and objectives, not from a fixed script. Conversation stages are unordered coverage guidance, not phases selected by turn number. Turn count is analytics only and must not make you close or advance the conversation. Keep corrections and examples out of ai_message.
 `;
 }
 
@@ -159,7 +149,8 @@ function buildPromptMemory(
   scenarioData,
   conversationHistory = [],
   studentResponse = "",
-  learnerProfile = {}
+  learnerProfile = {},
+  completedObjectiveIds = []
 ) {
   const normalizedHistory = (Array.isArray(conversationHistory)
     ? conversationHistory
@@ -173,7 +164,7 @@ function buildPromptMemory(
       message: String(item?.message || "").trim(),
     }))
     .filter((item) => item.message)
-    .slice(-6);
+    .slice(-12);
 
   return {
     fixed_context: {
@@ -186,6 +177,7 @@ function buildPromptMemory(
       boundaries: scenarioData.context.boundaries,
       learner_display_name: learnerProfile.displayName || null,
       learner_student_id: learnerProfile.studentId || null,
+      previously_completed_objective_ids: completedObjectiveIds,
     },
     recent_exchanges: normalizedHistory,
     latest_student_response: String(studentResponse || "").trim(),
@@ -247,20 +239,11 @@ function buildOutputSchema(scenarioData) {
       feedback: { type: "string" },
       cultural_note: { type: "string" },
       improved_response: { type: "string" },
-      continue_conversation: { type: "boolean" },
       completed_objective_ids: {
         type: "array",
         items: objectiveIds.length
           ? { type: "string", enum: objectiveIds }
           : { type: "string" },
-      },
-      end_reason: {
-        type: ["string", "null"],
-        enum: [
-          "objectives_completed",
-          "maximum_student_responses_reached",
-          null,
-        ],
       },
     },
     required: [
@@ -272,9 +255,7 @@ function buildOutputSchema(scenarioData) {
       "feedback",
       "cultural_note",
       "improved_response",
-      "continue_conversation",
       "completed_objective_ids",
-      "end_reason",
     ],
   };
 }
@@ -305,6 +286,7 @@ async function generateChatResponseWithOpenAI({
   conversationHistory,
   studentResponse,
   learnerProfile = {},
+  completedObjectiveIds = [],
 }) {
   const model = process.env.OPENAI_CHAT_MODEL || process.env.OPENAI_MODEL || "gpt-5.4-mini";
   const scenario = scenarioData.scenario;
@@ -312,7 +294,8 @@ async function generateChatResponseWithOpenAI({
     scenarioData,
     conversationHistory,
     studentResponse,
-    learnerProfile
+    learnerProfile,
+    completedObjectiveIds
   );
 
   const response = await getOpenAIClient().responses.create({
@@ -327,6 +310,7 @@ Do not score, correct, teach, or mention categories in ai_message.
 Do not use scripted sample names such as Rina, Raka, or David for the learner. Use the learner's display name only if provided.
 Keep ai_message natural, concise, and speakable: one or two short sentences.
 Ask at most one question.
+The application controls completion. Never close or jump ahead because of turn count or objective coverage.
 
 Scenario:
 ${JSON.stringify(buildPromptScenario(scenarioData), null, 2)}
@@ -378,6 +362,7 @@ async function evaluateWithOpenAI({
   conversationHistory,
   studentResponse,
   learnerProfile = {},
+  completedObjectiveIds = [],
 }) {
   const model = process.env.OPENAI_MODEL || "gpt-5.4-mini";
   const scenario = scenarioData.scenario;
@@ -387,7 +372,8 @@ async function evaluateWithOpenAI({
     scenarioData,
     conversationHistory,
     studentResponse,
-    learnerProfile
+    learnerProfile,
+    completedObjectiveIds
   );
 
   const userPrompt = `

@@ -64,18 +64,21 @@ test("client revisions replace the old G-ICC-008 and N-ICC-005 contexts", () => 
   assert.match(cultureScenario.scenario.ai_role, /David/i);
 });
 
-test("does not close before the target minimum", () => {
-  const progress = buildSessionProgress(airportScenario, 5, allObjectiveIds);
+test("objective completion unlocks finishing regardless of turn count", () => {
+  const progress = buildSessionProgress(airportScenario, 1, allObjectiveIds);
 
   assert.equal(progress.session_complete, false);
   assert.equal(progress.objectives_completed, true);
+  assert.equal(progress.completion_eligible, true);
+  assert.equal(progress.turn_limit_controls_completion, false);
 });
 
-test("closes naturally from response six when all objectives are complete", () => {
+test("completed objectives do not automatically close the conversation", () => {
   const progress = buildSessionProgress(airportScenario, 6, allObjectiveIds);
 
-  assert.equal(progress.session_complete, true);
-  assert.equal(progress.end_reason, "objectives_completed");
+  assert.equal(progress.session_complete, false);
+  assert.equal(progress.completion_eligible, true);
+  assert.equal(progress.end_reason, null);
 });
 
 test("uses responses nine and ten for objectives that still need repair", () => {
@@ -87,11 +90,22 @@ test("uses responses nine and ten for objectives that still need repair", () => 
   assert.ok(progress.remaining_objective_ids.length > 0);
 });
 
-test("always closes at the maximum of ten student responses", () => {
+test("legacy maximum turns no longer closes an incomplete conversation", () => {
   const progress = buildSessionProgress(airportScenario, 10, []);
 
-  assert.equal(progress.session_complete, true);
-  assert.equal(progress.end_reason, "maximum_student_responses_reached");
+  assert.equal(progress.session_complete, false);
+  assert.equal(progress.completion_eligible, false);
+  assert.equal(progress.safety_limit_reached, false);
+  assert.equal(progress.end_reason, null);
+});
+
+test("reports the hidden safety threshold without marking completion", () => {
+  const progress = buildSessionProgress(airportScenario, 30, []);
+
+  assert.equal(progress.session_complete, false);
+  assert.equal(progress.completion_eligible, false);
+  assert.equal(progress.safety_limit_reached, true);
+  assert.equal(progress.safety_maximum_student_responses, 30);
 });
 
 test("detects objectives across the full student conversation", () => {
@@ -175,6 +189,7 @@ test("respond-turn preserves the fast chat response contract", async () => {
           student_response: "Yes, welcome to our university.",
           student_display_name: "Alya",
           student_id: "student_001",
+          completed_objective_ids: ["arrival_small_talk"],
         }),
       }
     );
@@ -266,6 +281,40 @@ test("guided fallback clarifies instead of repeating the opening", async () => {
   }
 });
 
+test("generic fallback stays with the latest turn instead of jumping objectives", async () => {
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise((resolve) => server.once("listening", resolve));
+  const { port } = server.address();
+
+  try {
+    const response = await fetch(
+      `http://127.0.0.1:${port}/api/chat/respond-turn`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: "session_no_objective_jump",
+          setting_id: "SOCIAL-LONDON-RESTAURANT",
+          student_response_count: 3,
+          conversation_history: [
+            { speaker: "AI", message: "What would you like to order?" },
+          ],
+          student_response: "I am still deciding between two meals.",
+        }),
+      }
+    );
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.match(body.ai_message, /tell me a little more/i);
+    assert.doesNotMatch(body.ai_message, /card|cash|payment/i);
+  } finally {
+    await new Promise((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve()))
+    );
+  }
+});
+
 test("local fallback returns character dialogue without spoken correction", async () => {
   const server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
@@ -308,7 +357,7 @@ test("local fallback returns character dialogue without spoken correction", asyn
   }
 });
 
-test("evaluate-turn uses student_response_count and returns a natural close", async () => {
+test("evaluate-turn marks eligibility but keeps the conversation open", async () => {
   const server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
   const { port } = server.address();
@@ -357,9 +406,12 @@ test("evaluate-turn uses student_response_count and returns a natural close", as
 
     assert.equal(response.status, 200);
     assert.equal(body.turn_number, 6);
-    assert.equal(body.continue_conversation, false);
-    assert.equal(body.end_reason, "objectives_completed");
-    assert.match(body.ai_message, /thank you/i);
+    assert.equal(body.continue_conversation, true);
+    assert.ok(body.completed_objective_ids.includes("arrival_small_talk"));
+    assert.ok(body.completed_objective_ids.includes("confirm_and_welcome"));
+    assert.equal(body.end_reason, null);
+    assert.equal(body.session_progress.completion_eligible, true);
+    assert.equal(body.session_progress.session_complete, false);
   } finally {
     await new Promise((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve()))
@@ -367,7 +419,7 @@ test("evaluate-turn uses student_response_count and returns a natural close", as
   }
 });
 
-test("N-ICC-005 reaches a natural close from completed cultural objectives", async () => {
+test("N-ICC-005 remains open after completing cultural objectives", async () => {
   const server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
   const { port } = server.address();
@@ -417,9 +469,9 @@ test("N-ICC-005 reaches a natural close from completed cultural objectives", asy
 
     assert.equal(response.status, 200);
     assert.equal(body.turn_number, 6);
-    assert.equal(body.continue_conversation, false);
-    assert.equal(body.end_reason, "objectives_completed");
-    assert.match(body.ai_message, /learned a lot/i);
+    assert.equal(body.continue_conversation, true);
+    assert.equal(body.end_reason, null);
+    assert.equal(body.session_progress.completion_eligible, true);
   } finally {
     await new Promise((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve()))

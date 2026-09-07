@@ -696,6 +696,8 @@ function getSessionRules(scenarioData) {
       Number(configured.target_student_responses_max) || 8,
     maximumStudentResponses:
       Number(configured.maximum_student_responses) || 10,
+    safetyMaximumStudentResponses:
+      Number(process.env.SAFETY_MAX_STUDENT_RESPONSES) || 30,
     requiredObjectiveIds:
       configured.required_objective_ids?.filter(Boolean) || objectiveIds,
     naturalClosingMessage:
@@ -759,13 +761,10 @@ function buildSessionProgress(
   const remainingObjectiveIds = rules.requiredObjectiveIds.filter(
     (objectiveId) => !completed.has(objectiveId)
   );
-  const objectivesCompleted = remainingObjectiveIds.length === 0;
-  const reachedMaximum =
-    studentResponseCount >= rules.maximumStudentResponses;
-  const reachedTarget =
-    objectivesCompleted &&
-    studentResponseCount >= rules.targetStudentResponsesMin;
-  const sessionComplete = reachedMaximum || reachedTarget;
+  const objectivesCompleted =
+    rules.requiredObjectiveIds.length > 0 && remainingObjectiveIds.length === 0;
+  const safetyLimitReached =
+    studentResponseCount >= rules.safetyMaximumStudentResponses;
 
   return {
     student_response_count: studentResponseCount,
@@ -773,15 +772,15 @@ function buildSessionProgress(
     target_student_responses_min: rules.targetStudentResponsesMin,
     target_student_responses_max: rules.targetStudentResponsesMax,
     maximum_student_responses: rules.maximumStudentResponses,
+    safety_maximum_student_responses: rules.safetyMaximumStudentResponses,
     completed_objective_ids: completedObjectiveIds,
     remaining_objective_ids: remainingObjectiveIds,
     objectives_completed: objectivesCompleted,
-    session_complete: sessionComplete,
-    end_reason: sessionComplete
-      ? reachedMaximum && !reachedTarget
-        ? "maximum_student_responses_reached"
-        : "objectives_completed"
-      : null,
+    completion_eligible: objectivesCompleted,
+    safety_limit_reached: safetyLimitReached,
+    turn_limit_controls_completion: false,
+    session_complete: false,
+    end_reason: null,
   };
 }
 
@@ -940,31 +939,6 @@ function replaceDefaultLearnerNames(text, scenarioData, learnerProfile = {}) {
     .trim();
 }
 
-function getObjectiveFollowUp(
-  scenarioData,
-  remainingObjectiveIds,
-  conversationHistory = []
-) {
-  const recentAiText = normalizeConversationHistory(conversationHistory)
-    .filter((item) => item.speaker === "AI")
-    .slice(-3)
-    .map((item) => item.message.toLowerCase())
-    .join(" ");
-  const objectives = remainingObjectiveIds
-    .map((remainingId) =>
-      (scenarioData.conversation_objectives || []).find(
-        (item) => item.objective_id === remainingId
-      )
-    )
-    .filter(Boolean);
-  const freshObjective = objectives.find((objective) => {
-    const followUp = String(objective.ai_follow_up || "").toLowerCase();
-    return followUp && !recentAiText.includes(followUp);
-  });
-
-  return freshObjective?.ai_follow_up || null;
-}
-
 function recentAiMessages(conversationHistory = []) {
   return normalizeConversationHistory(conversationHistory)
     .filter((item) => item.speaker === "AI")
@@ -1037,16 +1011,11 @@ function generateContextualFallback(
     return "No problem. Tell me what you would prefer, and we can continue from there.";
   }
 
-  const objectiveFollowUp = getObjectiveFollowUp(
-    scenarioData,
-    getSessionRules(scenarioData).requiredObjectiveIds,
-    conversationHistory
-  );
-  if (objectiveFollowUp && !isRepeatedAiMessage(objectiveFollowUp, conversationHistory)) {
-    return objectiveFollowUp;
+  if (/\?$/.test(String(studentResponse || "").trim())) {
+    return "I want to make sure I understood you. Could you say a little more about what you mean?";
   }
 
-  return "All right. Tell me a little more about what you would like to do.";
+  return "I understand. Tell me a little more about that.";
 }
 
 function buildSessionMemory(
@@ -1312,11 +1281,6 @@ function generateAIMessage(
   studentResponse = "",
   conversationHistory = []
 ) {
-  const objectiveFollowUp = getObjectiveFollowUp(
-    scenarioData,
-    remainingObjectiveIds,
-    conversationHistory
-  );
   const fallbackResponses = scenarioData.fallback_responses || {};
   const shortResponse = String(studentResponse || "").toLowerCase().trim();
   const contextualResponse = generateContextualFallback(
@@ -1330,25 +1294,19 @@ function generateAIMessage(
   }
 
   if (/^(yes|yeah|yep|okay|ok|sure|right|of course)[.!]*$/.test(shortResponse)) {
-    return objectiveFollowUp
-      ? `Great. ${objectiveFollowUp}`
-      : "Great, thank you. Tell me a little more about that.";
+    return "Great. Tell me a little more about that.";
   }
 
   if (/^(no|nope)[.!]*$/.test(shortResponse)) {
-    return objectiveFollowUp
-      ? `That's all right. ${objectiveFollowUp}`
-      : "That's all right. What would you like to talk about next?";
+    return "That's all right. What would you prefer instead?";
   }
 
   if (/^(thanks|thank you)[.!]*$/.test(shortResponse)) {
-    return objectiveFollowUp
-      ? `You're welcome. ${objectiveFollowUp}`
-      : "You're welcome. I'm glad we could talk about it.";
+    return "You're welcome. I'm glad we could talk about it.";
   }
 
-  if (["GOOD", "ACCEPTABLE"].includes(category) && objectiveFollowUp) {
-    return objectiveFollowUp;
+  if (["GOOD", "ACCEPTABLE"].includes(category)) {
+    return contextualResponse;
   }
 
   const fallbackMessage = (
@@ -1443,21 +1401,25 @@ function buildRuleBasedResponse({
   student_response,
   scenarioData,
   learnerProfile = {},
+  previousCompletedObjectiveIds = [],
 }) {
   const detectedCategory = detectCategory(student_response, scenarioData);
   const scores = generateScores(detectedCategory);
   const studentResponseCount = Number(turn_number);
-  const completedObjectiveIds = detectCompletedObjectives(
+  const completedObjectiveIds = normalizeCompletedObjectiveIds(
     scenarioData,
-    conversation_history,
-    student_response
+    previousCompletedObjectiveIds,
+    detectCompletedObjectives(
+      scenarioData,
+      conversation_history,
+      student_response
+    )
   );
   const sessionProgress = buildSessionProgress(
     scenarioData,
     studentResponseCount,
     completedObjectiveIds
   );
-  const rules = getSessionRules(scenarioData);
   const regularAiMessage = generateAIMessage(
     detectedCategory,
     scenarioData,
@@ -1478,9 +1440,7 @@ function buildRuleBasedResponse({
     ...getExperienceMetadata(scenarioData),
     turn_number: studentResponseCount,
     ai_message: cleanAiDialogue(
-      sessionProgress.session_complete
-        ? rules.naturalClosingMessage
-        : regularAiMessage,
+      regularAiMessage,
       scenarioData,
       learnerProfile
     ),
@@ -1490,7 +1450,7 @@ function buildRuleBasedResponse({
     cultural_note: cleanScenarioText(scenarioData.scenario.cultural_note, scenarioData),
     improved_response: generateImprovedResponse(detectedCategory, scenarioData),
     coaching_event: coachingEvent,
-    continue_conversation: !sessionProgress.session_complete,
+    continue_conversation: true,
     completed_objective_ids: completedObjectiveIds,
     session_progress: sessionProgress,
     session_memory: buildSessionMemory(
@@ -1512,7 +1472,8 @@ function normalizeOpenAIResult(
   studentResponse,
   scenarioData,
   conversationHistory,
-  learnerProfile = {}
+  learnerProfile = {},
+  previousCompletedObjectiveIds = []
 ) {
   const numericTurn = Number(studentResponseCount);
   const detectedCategory = VALID_CATEGORIES.includes(aiResult?.detected_category)
@@ -1526,6 +1487,7 @@ function normalizeOpenAIResult(
   );
   const completedObjectiveIds = normalizeCompletedObjectiveIds(
     scenarioData,
+    previousCompletedObjectiveIds,
     cueDetectedObjectiveIds,
     aiResult?.completed_objective_ids
   );
@@ -1534,7 +1496,6 @@ function normalizeOpenAIResult(
     numericTurn,
     completedObjectiveIds
   );
-  const rules = getSessionRules(scenarioData);
   const coachingEvent = buildCoachingEvent(
     detectedCategory,
     studentResponse,
@@ -1562,7 +1523,7 @@ function normalizeOpenAIResult(
       scenarioData
     ),
     coaching_event: coachingEvent,
-    continue_conversation: !sessionProgress.session_complete,
+    continue_conversation: true,
     completed_objective_ids: completedObjectiveIds,
     session_progress: sessionProgress,
     session_memory: buildSessionMemory(
@@ -1582,9 +1543,7 @@ function normalizeOpenAIResult(
     messageLeavesScenarioContext(aiMessage, scenarioData);
 
   normalized.ai_message = cleanAiDialogue(
-    sessionProgress.session_complete
-      ? rules.naturalClosingMessage
-      : shouldUseFallbackMessage
+    shouldUseFallbackMessage
       ? generateAIMessage(
           detectedCategory,
           scenarioData,
@@ -3301,6 +3260,7 @@ app.post("/api/chat/respond-turn", async (req, res) => {
     student_response,
     student_display_name,
     student_id,
+    completed_objective_ids = [],
   } = req.body;
 
   if ((!scenario_id && !setting_id) || !student_response) {
@@ -3334,11 +3294,11 @@ app.post("/api/chat/respond-turn", async (req, res) => {
   if (
     !Number.isInteger(responseCount) ||
     responseCount < 1 ||
-    responseCount > sessionRules.maximumStudentResponses
+    responseCount > sessionRules.safetyMaximumStudentResponses
   ) {
     return res.status(400).json({
       error: true,
-      message: `student_response_count must be an integer between 1 and ${sessionRules.maximumStudentResponses}.`,
+      message: `student_response_count must be an integer between 1 and ${sessionRules.safetyMaximumStudentResponses}.`,
     });
   }
 
@@ -3348,30 +3308,31 @@ app.post("/api/chat/respond-turn", async (req, res) => {
     normalizedHistory,
     student_response
   );
-  let completedObjectiveIds = cueDetectedObjectiveIds;
+  let completedObjectiveIds = normalizeCompletedObjectiveIds(
+    versionedScenarioData,
+    completed_objective_ids,
+    cueDetectedObjectiveIds
+  );
   const fallbackProgress = buildSessionProgress(
     versionedScenarioData,
     responseCount,
     completedObjectiveIds
   );
-  const rules = getSessionRules(versionedScenarioData);
   const shouldUseOpenAI =
     process.env.USE_OPENAI === "true" &&
     Boolean(process.env.OPENAI_API_KEY) &&
     typeof generateChatResponseWithOpenAI === "function";
-  let aiMessage = fallbackProgress.session_complete
-    ? rules.naturalClosingMessage
-    : generateAIMessage(
-        detectedCategory,
-        versionedScenarioData,
-        fallbackProgress.remaining_objective_ids,
-        student_response,
-        normalizedHistory
-      );
+  let aiMessage = generateAIMessage(
+    detectedCategory,
+    versionedScenarioData,
+    fallbackProgress.remaining_objective_ids,
+    student_response,
+    normalizedHistory
+  );
   let source = "local_fast_fallback";
   let fallbackReason = shouldUseOpenAI ? null : "openai_not_configured";
 
-  if (shouldUseOpenAI && !fallbackProgress.session_complete) {
+  if (shouldUseOpenAI) {
     try {
       const chatResult = await withTimeout(
         generateChatResponseWithOpenAI({
@@ -3380,6 +3341,7 @@ app.post("/api/chat/respond-turn", async (req, res) => {
           conversationHistory: normalizedHistory,
           studentResponse: student_response,
           learnerProfile,
+          completedObjectiveIds,
         }),
         Number(process.env.OPENAI_CHAT_TIMEOUT_MS) || 3200,
         "openai_chat_timeout"
@@ -3395,6 +3357,7 @@ app.post("/api/chat/respond-turn", async (req, res) => {
       }
       completedObjectiveIds = normalizeCompletedObjectiveIds(
         versionedScenarioData,
+        completed_objective_ids,
         cueDetectedObjectiveIds,
         chatResult?.completed_objective_ids
       );
@@ -3419,7 +3382,7 @@ app.post("/api/chat/respond-turn", async (req, res) => {
     ...getExperienceMetadata(versionedScenarioData),
     turn_number: responseCount,
     ai_message: cleanAiDialogue(
-      sessionProgress.session_complete ? rules.naturalClosingMessage : aiMessage,
+      aiMessage,
       versionedScenarioData,
       learnerProfile
     ),
@@ -3428,7 +3391,7 @@ app.post("/api/chat/respond-turn", async (req, res) => {
     feedback: generateFeedback(detectedCategory, student_response, versionedScenarioData),
     cultural_note: cleanScenarioText(versionedScenarioData.scenario.cultural_note, versionedScenarioData),
     improved_response: generateImprovedResponse(detectedCategory, versionedScenarioData),
-    continue_conversation: !sessionProgress.session_complete,
+    continue_conversation: true,
     completed_objective_ids: completedObjectiveIds,
     session_progress: sessionProgress,
     session_memory: buildSessionMemory(
@@ -3455,6 +3418,7 @@ app.post("/api/chat/evaluate-turn", async (req, res) => {
     student_response,
     student_display_name,
     student_id,
+    completed_objective_ids = [],
   } = req.body;
 
   if ((!scenario_id && !setting_id) || !student_response) {
@@ -3488,11 +3452,11 @@ app.post("/api/chat/evaluate-turn", async (req, res) => {
   if (
     !Number.isInteger(responseCount) ||
     responseCount < 1 ||
-    responseCount > sessionRules.maximumStudentResponses
+    responseCount > sessionRules.safetyMaximumStudentResponses
   ) {
     return res.status(400).json({
       error: true,
-      message: `student_response_count must be an integer between 1 and ${sessionRules.maximumStudentResponses}.`,
+      message: `student_response_count must be an integer between 1 and ${sessionRules.safetyMaximumStudentResponses}.`,
     });
   }
 
@@ -3511,6 +3475,7 @@ app.post("/api/chat/evaluate-turn", async (req, res) => {
           conversationHistory: normalizedHistory,
           studentResponse: student_response,
           learnerProfile,
+          completedObjectiveIds: completed_objective_ids,
         }),
         Number(process.env.OPENAI_EVALUATION_TIMEOUT_MS) || 9000,
         "openai_evaluation_timeout"
@@ -3522,7 +3487,8 @@ app.post("/api/chat/evaluate-turn", async (req, res) => {
         student_response,
         versionedScenarioData,
         normalizedHistory,
-        learnerProfile
+        learnerProfile,
+        completed_objective_ids
       );
 
       return res.json({
@@ -3546,6 +3512,7 @@ app.post("/api/chat/evaluate-turn", async (req, res) => {
     student_response,
     scenarioData: versionedScenarioData,
     learnerProfile,
+    previousCompletedObjectiveIds: completed_objective_ids,
   });
 
   return res.json({
