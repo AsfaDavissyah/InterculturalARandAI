@@ -329,7 +329,7 @@ describe('Dashboard PRD Simplification', () => {
     });
   });
 
-  it('renders lecturer practice transcripts as aligned chat bubbles', async () => {
+  it('renders the session analysis as a full page with aligned chat bubbles', async () => {
     vi.stubGlobal('fetch', mockApi('lecturer'));
     const user = userEvent.setup();
     render(<App />);
@@ -343,9 +343,14 @@ describe('Dashboard PRD Simplification', () => {
     const aiMessage = await screen.findByText('How can I help with your research today?');
     const studentMessage = screen.getByText('I would like feedback on my research question.');
 
+    expect(screen.getByRole('heading', { name: 'Practice Session Analysis' })).toBeVisible();
     expect(aiMessage.closest('[data-slot="bubble"]')).toHaveAttribute('data-align', 'start');
     expect(studentMessage.closest('[data-slot="bubble"]')).toHaveAttribute('data-align', 'end');
+    expect(aiMessage.closest('.max-h-96')).toBeNull();
     expect(screen.getByText('Dr Emma Collins')).toBeInTheDocument();
-    expect(screen.getAllByText('Budi Santoso')).toHaveLength(2);
+    expect(screen.getByText('Budi Santoso')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /back to practice results/i }));
+    expect(await screen.findByRole('heading', { name: 'Practice Results' })).toBeVisible();
   });
 });

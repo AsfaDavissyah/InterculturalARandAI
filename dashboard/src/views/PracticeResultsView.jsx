@@ -187,6 +187,156 @@ export function PracticeResultsView({ user }) {
     Boolean(endDate);
   const sessionScores = sessionDetail?.score_breakdown || sessionDetail?.scores || {};
 
+  const closeSessionDetail = () => {
+    setSelectedSessionId(null);
+    setSessionDetail(null);
+  };
+
+  if (selectedSessionId) {
+    return (
+      <div className="mx-auto w-full max-w-[1180px] space-y-5 px-4 py-6 sm:px-6 lg:px-8">
+        <Button type="button" variant="outline" size="sm" onClick={closeSessionDetail}>
+          <ChevronLeft className="size-4" />
+          Back to Practice Results
+        </Button>
+
+        <div className="flex flex-col gap-3 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">Practice Session Analysis</h1>
+              {sessionDetail && <StatusBadge status={sessionDetail.status} />}
+            </div>
+            <p className="mt-1 font-mono text-xs text-muted-foreground">Session ID: {selectedSessionId}</p>
+          </div>
+          {sessionDetail?.completed_at && (
+            <div className="text-left sm:text-right">
+              <div className="text-[10px] font-bold uppercase text-muted-foreground">Completed At</div>
+              <div className="mt-1 text-xs font-semibold text-foreground">
+                {new Date(sessionDetail.completed_at).toLocaleString('en-US')}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {detailLoading ? (
+          <LoadingSkeleton rows={8} />
+        ) : sessionDetail ? (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="space-y-1 rounded-lg border border-border bg-card p-4">
+                <span className="text-[10px] font-bold uppercase text-muted-foreground">Student Info</span>
+                <div className="text-sm font-bold text-foreground">
+                  {sessionDetail.student?.display_name || 'Student'}
+                </div>
+                <div className="font-mono text-[11px] text-muted-foreground">
+                  NIM: {sessionDetail.student?.student_id || '—'}
+                </div>
+              </div>
+
+              <div className="space-y-1 rounded-lg border border-border bg-card p-4">
+                <span className="text-[10px] font-bold uppercase text-muted-foreground">Scenario</span>
+                <div className="text-sm font-bold text-foreground">
+                  {cleanDisplayText(
+                    sessionDetail.scenario?.title || sessionDetail.scenario_title || sessionDetail.setting_title,
+                    'Speaking Practice',
+                  )}
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  Location: {cleanDisplayText(
+                    sessionDetail.scenario?.context?.location || sessionDetail.scenario?.ar_scene,
+                    'Campus',
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-1 rounded-lg border border-primary/20 bg-primary/5 p-4">
+                <span className="text-[10px] font-bold uppercase text-primary">Overall Score</span>
+                <div className="text-2xl font-bold text-primary">
+                  {formatScore(sessionDetail.overall_score, '0.0')}{' '}
+                  <span className="text-xs text-muted-foreground">/ 5.0</span>
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  {formatDuration(sessionDetail.duration_seconds)} ·{' '}
+                  {sessionDetail.total_student_responses ?? sessionDetail.student_response_count ?? 0} student responses
+                </div>
+              </div>
+            </div>
+
+            {Object.keys(sessionScores).length > 0 && (
+              <section className="space-y-2" aria-labelledby="rubric-breakdown-heading">
+                <h2 id="rubric-breakdown-heading" className="text-xs font-bold uppercase text-foreground">
+                  Assessment Rubric Breakdown
+                </h2>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {Object.entries(sessionScores).map(([crit, score]) => (
+                    <div key={crit} className="rounded-lg border border-border bg-card p-3">
+                      <div className="text-[11px] text-muted-foreground">
+                        {SCORE_CATEGORIES[crit] || crit.replace(/_/g, ' ')}
+                      </div>
+                      <div className="mt-0.5 text-sm font-bold text-foreground">
+                        {formatScore(score, '0.0')} / 5.0
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {sessionDetail.feedback_summary && (
+              <section className="space-y-1 rounded-lg border border-border bg-muted/20 p-4">
+                <h2 className="text-xs font-bold uppercase text-foreground">Feedback Summary</h2>
+                <p className="text-xs font-medium leading-relaxed text-foreground">
+                  {sessionDetail.feedback_summary}
+                </p>
+              </section>
+            )}
+
+            <section className="space-y-3" aria-labelledby="conversation-transcript-heading">
+              <div className="flex items-center justify-between gap-3">
+                <h2 id="conversation-transcript-heading" className="flex items-center gap-1.5 text-xs font-bold uppercase text-foreground">
+                  <MessageSquare className="size-4 text-primary" /> Conversation Transcript
+                </h2>
+                <span className="text-xs text-muted-foreground">
+                  {sessionDetail.transcript?.length || 0} messages
+                </span>
+              </div>
+              <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
+                {sessionDetail.transcript?.length > 0 ? (
+                  <BubbleGroup className="gap-4">
+                    {sessionDetail.transcript.map((msg, i) => {
+                      const speaker = String(msg.speaker || msg.sender || '').toLowerCase();
+                      const isAI = ['ai', 'assistant', 'character'].includes(speaker);
+                      const speakerName = isAI
+                        ? sessionDetail.scenario?.ai_character?.display_name ||
+                          sessionDetail.scenario?.ai_partner?.display_name ||
+                          'AI Partner'
+                        : sessionDetail.student?.name || sessionDetail.student?.display_name || 'Student';
+                      return (
+                        <Bubble
+                          key={i}
+                          align={isAI ? 'start' : 'end'}
+                          variant={isAI ? 'muted' : 'default'}
+                        >
+                          <div className="flex items-center justify-between gap-3 px-1 text-[10px] font-semibold text-muted-foreground">
+                            <span>{speakerName}</span>
+                            <span>Turn {i + 1}</span>
+                          </div>
+                          <BubbleContent>{msg.text || msg.message}</BubbleContent>
+                        </Bubble>
+                      );
+                    })}
+                  </BubbleGroup>
+                ) : (
+                  <p className="text-xs italic text-muted-foreground">No transcript recorded for this session.</p>
+                )}
+              </div>
+            </section>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto w-full max-w-[1600px] space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       {/* Header & Export Button */}
@@ -459,153 +609,6 @@ export function PracticeResultsView({ user }) {
         onCancel={() => setDeleteSessionId(null)}
       />
 
-      {/* Session Detail Drawer / Modal */}
-      {selectedSessionId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div className="bg-card border border-border shadow-2xl rounded-2xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto space-y-6">
-            <div className="flex items-start justify-between gap-4 border-b border-border pb-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-lg font-bold text-foreground">Practice Session Analysis</h2>
-                  {sessionDetail && <StatusBadge status={sessionDetail.status} />}
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5 font-mono">
-                  Session ID: {selectedSessionId}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedSessionId(null);
-                  setSessionDetail(null);
-                }}
-                className="p-1.5 rounded-lg border border-border hover:bg-muted text-muted-foreground hover:text-foreground"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-
-            {detailLoading ? (
-              <LoadingSkeleton rows={8} />
-            ) : sessionDetail ? (
-              <div className="space-y-6">
-                {/* Metadata & Scores Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="p-3.5 rounded-xl border border-border bg-muted/20 space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                      Student Info
-                    </span>
-                    <div className="text-xs font-bold text-foreground">
-                      {sessionDetail.student?.display_name || 'Student'}
-                    </div>
-                    <div className="text-[11px] text-muted-foreground font-mono">
-                      NIM: {sessionDetail.student?.student_id || '—'}
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl border border-border bg-muted/20 space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                      Scenario
-                    </span>
-                    <div className="text-xs font-bold text-foreground truncate">
-                      {cleanDisplayText(
-                        sessionDetail.scenario?.title || sessionDetail.scenario_title || sessionDetail.setting_title,
-                        'Speaking Practice',
-                      )}
-                    </div>
-                    <div className="text-[11px] text-muted-foreground">
-                      Location: {cleanDisplayText(
-                        sessionDetail.scenario?.context?.location || sessionDetail.scenario?.ar_scene,
-                        'Campus',
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl border border-primary/20 bg-primary/5 space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-primary">
-                      Overall Score
-                    </span>
-                    <div className="text-xl font-bold text-primary">
-                      {formatScore(sessionDetail.overall_score, '0.0')} <span className="text-xs text-muted-foreground">/ 5.0</span>
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">
-                      {formatDuration(sessionDetail.duration_seconds)} ·{' '}
-                      {sessionDetail.total_student_responses ?? sessionDetail.student_response_count ?? 0} student responses
-                    </div>
-                  </div>
-                </div>
-
-                {/* Score Breakdown */}
-                {Object.keys(sessionScores).length > 0 && (
-                  <div className="space-y-2">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                      Assessment Rubric Breakdown
-                    </h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {Object.entries(sessionScores).map(([crit, score]) => (
-                        <div key={crit} className="p-2.5 rounded-lg border border-border bg-background">
-                          <div className="text-[11px] text-muted-foreground">
-                            {SCORE_CATEGORIES[crit] || crit.replace(/_/g, ' ')}
-                          </div>
-                          <div className="text-sm font-bold text-foreground mt-0.5">
-                            {formatScore(score, '0.0')} / 5.0
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Feedback Summary */}
-                {sessionDetail.feedback_summary && (
-                  <div className="p-3.5 rounded-xl border border-border bg-muted/20 space-y-1">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">Feedback Summary</h3>
-                    <p className="text-xs text-foreground leading-relaxed font-medium">
-                      {sessionDetail.feedback_summary}
-                    </p>
-                  </div>
-                )}
-
-                {/* Full Transcript */}
-                <div className="space-y-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
-                    <MessageSquare className="size-4 text-primary" /> Conversation Transcript
-                  </h3>
-                  <div className="max-h-96 overflow-y-auto rounded-lg border border-border bg-background/60 p-4">
-                    {sessionDetail.transcript?.length > 0 ? (
-                      <BubbleGroup>
-                        {sessionDetail.transcript.map((msg, i) => {
-                          const speaker = String(msg.speaker || msg.sender || '').toLowerCase();
-                          const isAI = ['ai', 'assistant', 'character'].includes(speaker);
-                          const speakerName = isAI
-                            ? sessionDetail.scenario?.ai_character?.display_name ||
-                              sessionDetail.scenario?.ai_partner?.display_name ||
-                              'AI Partner'
-                            : sessionDetail.student?.name || sessionDetail.student?.display_name || 'Student';
-                          return (
-                            <Bubble
-                              key={i}
-                              align={isAI ? 'start' : 'end'}
-                              variant={isAI ? 'muted' : 'default'}
-                            >
-                              <div className="px-1 text-[10px] font-semibold text-muted-foreground">
-                                {speakerName}
-                              </div>
-                              <BubbleContent>{msg.text || msg.message}</BubbleContent>
-                            </Bubble>
-                          );
-                        })}
-                      </BubbleGroup>
-                    ) : (
-                      <p className="text-xs text-muted-foreground italic">No transcript recorded for this session.</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

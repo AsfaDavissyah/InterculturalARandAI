@@ -1,6 +1,5 @@
-"use client";;
+"use client";
 import { memo } from "react";
-import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 
 const sizeConfig = {
@@ -29,18 +28,6 @@ const sizeConfig = {
   }
 };
 
-const containerVariants = {
-  initial: { opacity: 0, scale: 0.8 },
-  animate: {
-    opacity: 1,
-    scale: 1,
-    transition: {
-      duration: 0.4,
-      ease: "easeOut",
-    },
-  },
-};
-
 const OrbitalSpinner = memo(({
   size = "sm",
   className,
@@ -49,32 +36,20 @@ const OrbitalSpinner = memo(({
   const config = sizeConfig[size];
 
   return (
-    <motion.div
-      animate="animate"
+    <div
       className={cn(
-        "relative flex items-center justify-center",
+        "relative flex items-center justify-center animate-in fade-in zoom-in-80 duration-300",
         config.container,
         className
       )}
-      initial="initial"
-      variants={containerVariants}
       {...props}
     >
       {/* Central Core */}
-      <motion.div
-        animate={{
-          scale: [1, 1.05, 1],
-          opacity: [0.9, 1, 0.9],
-        }}
+      <div
         className={cn(
-          "rounded-full bg-foreground z-10",
+          "z-10 animate-pulse rounded-full bg-foreground",
           config.core
         )}
-        transition={{
-          duration: 2,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
       />
 
       {/* Orbital Path (The faint circle) */}
@@ -88,15 +63,7 @@ const OrbitalSpinner = memo(({
       />
 
       {/* Satellite Container (Rotating) */}
-      <motion.div
-        animate={{ rotate: 360 }}
-        className="absolute inset-0"
-        transition={{
-          duration: 2.5,
-          repeat: Infinity,
-          ease: "linear",
-        }}
-      >
+      <div className="absolute inset-0 animate-spin [animation-duration:2.5s]">
         {/* Satellite Dot */}
         <div 
           className={cn(
@@ -104,8 +71,8 @@ const OrbitalSpinner = memo(({
             config.satellite
           )} 
         />
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 });
 
