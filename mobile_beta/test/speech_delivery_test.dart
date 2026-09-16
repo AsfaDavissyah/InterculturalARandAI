@@ -15,6 +15,40 @@ void main() {
     },
   );
 
+  test('final STT chunks remain visible while the next chunk is recognized', () {
+    final draft = SpeechDraft()..start();
+    draft.update(
+      'The first option is to submit my assignment this Friday',
+      isFinal: true,
+    );
+    draft.update('and the second');
+
+    expect(
+      draft.text,
+      'The first option is to submit my assignment this Friday and the second',
+    );
+
+    draft.update(
+      'and the second is to request an extension until Monday',
+      isFinal: true,
+    );
+    expect(
+      draft.text,
+      'The first option is to submit my assignment this Friday and the second is to request an extension until Monday',
+    );
+  });
+
+  test('cumulative final STT results do not duplicate committed words', () {
+    final draft = SpeechDraft()..start();
+    draft.update('I would like to discuss both options', isFinal: true);
+    draft.update(
+      'I would like to discuss both options with you',
+      isFinal: true,
+    );
+
+    expect(draft.text, 'I would like to discuss both options with you');
+  });
+
   test(
     'continuation preserves edited words and replaces only the new segment',
     () {

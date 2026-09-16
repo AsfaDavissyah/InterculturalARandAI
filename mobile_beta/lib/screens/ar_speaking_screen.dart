@@ -646,20 +646,22 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
   void _onSpeechResult(SpeechRecognitionResult result) {
     if (!mounted || !_captureActive) return;
-    if (result.finalResult && !(_speechFinal?.isCompleted ?? true)) {
-      _speechFinal!.complete();
+    _speechEndTimer?.cancel();
+    if (!result.finalResult && (_speechFinal?.isCompleted ?? false)) {
+      _speechFinal = Completer<void>();
     }
     final current = result.recognizedWords.trim();
     if (current.isEmpty) return;
 
-    _speechDraft.update(current);
+    final accumulatedPrefix = _speechDraft.prefix;
+    _speechDraft.update(current, isFinal: result.finalResult);
 
     final alternatives = buildTranscriptAlternatives(
       primary: current,
       alternatives: result.alternates
           .skip(1)
           .map((alternate) => alternate.recognizedWords),
-      accumulatedPrefix: _speechDraft.prefix,
+      accumulatedPrefix: accumulatedPrefix,
     );
 
     setState(() {
@@ -667,14 +669,17 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       _speechAlternatives = alternatives;
       _speechConfidence = result.hasConfidenceRating ? result.confidence : null;
     });
-    if (result.finalResult) _scheduleSpeechReview();
+    if (result.finalResult) {
+      if (!(_speechFinal?.isCompleted ?? true)) _speechFinal!.complete();
+      _scheduleSpeechReview();
+    }
   }
 
   void _scheduleSpeechReview() {
     if (!_captureActive || !mounted) return;
     _speechEndTimer?.cancel();
     // Android can signal notListening before delivering its final transcript.
-    _speechEndTimer = Timer(const Duration(milliseconds: 500), () {
+    _speechEndTimer = Timer(const Duration(milliseconds: 1200), () {
       if (mounted && _captureActive) unawaited(_stopListeningAndReview());
     });
   }
