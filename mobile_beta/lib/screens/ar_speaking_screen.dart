@@ -1655,7 +1655,10 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         : _activeSubtitle;
     if (displayMessage == null) return const SizedBox.shrink();
     return Container(
-      constraints: const BoxConstraints(maxWidth: 520, minHeight: 58),
+      constraints: BoxConstraints(
+        maxWidth: 520,
+        minHeight: isListening ? 124 : 58,
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: _cream,

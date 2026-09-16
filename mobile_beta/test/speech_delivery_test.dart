@@ -38,6 +38,23 @@ void main() {
     );
   });
 
+  test('implicit Android segment restart preserves the long partial result', () {
+    final draft = SpeechDraft()..start();
+    draft.update('The first option is to submit my assignment this Friday');
+    draft.update('and the second');
+
+    expect(
+      draft.text,
+      'The first option is to submit my assignment this Friday and the second',
+    );
+
+    draft.update('and the second is to request an extension until Monday');
+    expect(
+      draft.text,
+      'The first option is to submit my assignment this Friday and the second is to request an extension until Monday',
+    );
+  });
+
   test('cumulative final STT results do not duplicate committed words', () {
     final draft = SpeechDraft()..start();
     draft.update('I would like to discuss both options', isFinal: true);

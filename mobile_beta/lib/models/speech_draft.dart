@@ -3,7 +3,7 @@ class SpeechDraft {
   String prefix = '';
   String segment = '';
 
-  String get text => [prefix, segment].where((s) => s.isNotEmpty).join(' ');
+  String get text => _merge(prefix, segment);
 
   void start({String retainedText = ''}) {
     prefix = retainedText.trim();
@@ -14,6 +14,9 @@ class SpeechDraft {
     final cleaned = words.trim();
     if (cleaned.isEmpty) return;
 
+    if (segment.isNotEmpty && _startsNewSegment(segment, cleaned)) {
+      prefix = _merge(prefix, segment);
+    }
     segment = cleaned;
     if (isFinal) {
       prefix = _merge(prefix, segment);
@@ -21,8 +24,44 @@ class SpeechDraft {
     }
   }
 
+  bool _startsNewSegment(String previous, String incoming) {
+    final previousWords = previous.split(RegExp(r'\s+'));
+    final incomingWords = incoming.split(RegExp(r'\s+'));
+    if (previousWords.length < 4 || incomingWords.isEmpty) return false;
+
+    final first = incomingWords.first.toLowerCase().replaceAll(
+      RegExp(r"[^a-z0-9']"),
+      '',
+    );
+    if (const {
+      'and',
+      'but',
+      'because',
+      'so',
+      'then',
+      'also',
+      'however',
+    }.contains(first)) {
+      return true;
+    }
+
+    if (previousWords.length < 6 || incomingWords.length > 4) return false;
+    final previousVocabulary = previousWords
+        .map((word) => word.toLowerCase().replaceAll(RegExp(r"[^a-z0-9']"), ''))
+        .toSet();
+    final sharedWords = incomingWords.where((word) {
+      final normalized = word.toLowerCase().replaceAll(
+        RegExp(r"[^a-z0-9']"),
+        '',
+      );
+      return normalized.isNotEmpty && previousVocabulary.contains(normalized);
+    }).length;
+    return sharedWords <= 1;
+  }
+
   String _merge(String stable, String incoming) {
     if (stable.isEmpty) return incoming;
+    if (incoming.isEmpty) return stable;
 
     final stableWords = stable.split(RegExp(r'\s+'));
     final incomingWords = incoming.split(RegExp(r'\s+'));
