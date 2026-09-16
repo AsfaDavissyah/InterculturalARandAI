@@ -186,6 +186,7 @@ export function PracticeResultsView({ user }) {
     Boolean(startDate) ||
     Boolean(endDate);
   const sessionScores = sessionDetail?.score_breakdown || sessionDetail?.scores || {};
+  const assessmentLabel = (assessment) => ({ insufficient_evidence: 'Insufficient evidence', evaluation_pending: 'Evaluation pending', partial: 'Partial assessment', assessed: 'Assessed' }[assessment?.status] || 'Not assessed');
 
   const closeSessionDetail = () => {
     setSelectedSessionId(null);
@@ -252,13 +253,13 @@ export function PracticeResultsView({ user }) {
               <div className="space-y-1 rounded-lg border border-primary/20 bg-primary/5 p-4">
                 <span className="text-[10px] font-bold uppercase text-primary">Overall Score</span>
                 <div className="text-2xl font-bold text-primary">
-                  {formatScore(sessionDetail.overall_score, '0.0')}{' '}
-                  <span className="text-xs text-muted-foreground">/ 5.0</span>
+                  {isNumericScore(sessionDetail.overall_score) ? <>{formatScore(sessionDetail.overall_score)} <span className="text-xs text-muted-foreground">/ 5.0</span></> : <span className="text-base">{assessmentLabel(sessionDetail.assessment)}</span>}
                 </div>
                 <div className="text-[10px] text-muted-foreground">
                   {formatDuration(sessionDetail.duration_seconds)} ·{' '}
                   {sessionDetail.total_student_responses ?? sessionDetail.student_response_count ?? 0} student responses
                 </div>
+                {sessionDetail.assessment && <div className="text-xs text-muted-foreground">{sessionDetail.assessment.completed_objectives}/{sessionDetail.assessment.total_objectives} objectives</div>}
               </div>
             </div>
 
@@ -518,7 +519,7 @@ export function PracticeResultsView({ user }) {
                           {formatScore(item.overall_score)} <span className="text-[10px] text-muted-foreground">/ 5.0</span>
                         </span>
                       ) : (
-                        <span className="text-muted-foreground/60">—</span>
+                        <span className="text-xs text-muted-foreground">{assessmentLabel(item.assessment)}</span>
                       )}
                     </TableCell>
 

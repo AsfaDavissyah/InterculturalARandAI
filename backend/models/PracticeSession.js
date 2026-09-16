@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 
 const TranscriptItemSchema = new mongoose.Schema({
+  confirmed: { type: Boolean, default: false },
   speaker: {
     type: String,
     required: true,
@@ -53,8 +54,9 @@ const PracticeSessionSchema = new mongoose.Schema({
   transcript: [TranscriptItemSchema],
   overallScore: {
     type: Number,
-    required: true,
+    default: null,
   },
+  assessment: { type: mongoose.Schema.Types.Mixed, default: null },
   averageScores: ScoreBreakdownSchema,
   status: {
     type: String,

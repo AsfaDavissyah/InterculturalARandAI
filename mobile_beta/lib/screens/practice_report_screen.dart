@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/ai_response.dart';
+import '../models/assessment.dart';
 import '../models/practice_session.dart';
 import '../models/scenario_topic.dart';
 import '../theme/engora_theme.dart';
@@ -35,6 +36,7 @@ class PracticeReportData {
   ];
 
   final String title;
+  final Assessment? assessment;
   final String aiName;
   final double overallScore;
   final String status;
@@ -46,6 +48,7 @@ class PracticeReportData {
   final List<PracticeReportTurn> transcript;
 
   const PracticeReportData({
+    this.assessment,
     required this.title,
     required this.aiName,
     required this.overallScore,
@@ -65,8 +68,10 @@ class PracticeReportData {
     required List<Map<String, String>> conversation,
   }) {
     final results = evaluations.isEmpty ? [finalResponse] : evaluations;
-    final scores = _averageScores(results);
+    final assessment = Assessment.calculate(conversation, results);
+    final scores = assessment.scores;
     return PracticeReportData(
+      assessment: Assessment.calculate(conversation, results),
       title: scenario.title,
       aiName: _cleanAiName(scenario.aiRole),
       overallScore: _overall(scores),
@@ -75,7 +80,9 @@ class PracticeReportData {
           : 'Ended manually',
       responseCount: results.length,
       scores: scores,
-      performanceSummary: _performanceSummary(finalResponse),
+      performanceSummary: assessment.status == 'assessed'
+          ? _performanceSummary(finalResponse)
+          : assessment.label,
       doneWell: _doneWell(scores, finalResponse),
       suggestions: _suggestions(finalResponse),
       transcript: _buildTranscript(
@@ -89,10 +96,9 @@ class PracticeReportData {
   factory PracticeReportData.fromSession(PracticeSession session) {
     final results = session.evaluations;
     final finalResponse = results.isEmpty ? null : results.last;
-    final scores = <String, double>{
-      for (final key in scoreKeys) key: session.averageScores[key] ?? 0,
-    };
+    final scores = session.assessment.scores;
     return PracticeReportData(
+      assessment: session.assessment,
       title: (session.settingTitle?.trim().isNotEmpty ?? false)
           ? session.settingTitle!.trim()
           : session.scenario.title,
@@ -101,7 +107,9 @@ class PracticeReportData {
       status: session.status == 'completed' ? 'Completed' : 'Ended manually',
       responseCount: session.studentResponseCount,
       scores: scores,
-      performanceSummary: finalResponse == null
+      performanceSummary: session.assessment.status != 'assessed'
+          ? session.assessment.label
+          : finalResponse == null
           ? 'This practice session was saved without a written performance summary.'
           : _performanceSummary(finalResponse),
       doneWell: _doneWell(scores, finalResponse),
@@ -114,20 +122,6 @@ class PracticeReportData {
         _cleanAiName(session.scenario.aiRole),
       ),
     );
-  }
-
-  static Map<String, double> _averageScores(List<AiResponse> results) {
-    return {
-      for (final key in scoreKeys)
-        key: results.isEmpty
-            ? 0
-            : results.fold<double>(
-                    0,
-                    (sum, result) =>
-                        sum + ((result.scores[key] as num?)?.toDouble() ?? 0),
-                  ) /
-                  results.length,
-    };
   }
 
   static double _overall(Map<String, double> scores) {
@@ -278,7 +272,7 @@ class PracticeReportScreen extends StatelessWidget {
                   const SizedBox(height: 24),
                   _OverallSummary(data: data),
                   const SizedBox(height: 14),
-                  _ScoreGrid(scores: data.scores),
+                  _ScoreGrid(scores: data.assessment?.scores ?? data.scores),
                   const SizedBox(height: 14),
                   _TextSection(
                     title: 'Performance Summary',
@@ -389,9 +383,13 @@ class _OverallSummary extends StatelessWidget {
               ),
               const SizedBox(height: 5),
               Text(
-                '${data.overallScore.clamp(0, 5).toStringAsFixed(1)} / 5',
+                data.assessment != null
+                    ? (data.assessment!.overall == null
+                          ? data.assessment!.label
+                          : '${data.assessment!.overall!.toStringAsFixed(1)} / 5')
+                    : '${data.overallScore.clamp(0, 5).toStringAsFixed(1)} / 5',
                 style: EngoraTheme.display(
-                  fontSize: 30,
+                  fontSize: data.assessment?.overall == null ? 16 : 30,
                   color: EngoraColors.brand,
                   height: 1,
                 ),
@@ -415,6 +413,11 @@ class _OverallSummary extends StatelessWidget {
               '${data.responseCount} speaking turns',
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
             ),
+            if (data.assessment != null)
+              Text(
+                '${data.assessment!.completedObjectives}/${data.assessment!.totalObjectives} objectives',
+                style: const TextStyle(fontSize: 12),
+              ),
           ],
         ),
       ],
@@ -433,7 +436,7 @@ class _ScoreGrid extends StatelessWidget {
         .map(
           (key) => _ScoreCard(
             label: PracticeReportData._scoreLabel(key),
-            score: scores[key] ?? 0,
+            score: scores[key],
           ),
         )
         .toList();
@@ -462,7 +465,7 @@ class _ScoreGrid extends StatelessWidget {
 
 class _ScoreCard extends StatelessWidget {
   final String label;
-  final double score;
+  final double? score;
 
   const _ScoreCard({required this.label, required this.score});
 
@@ -492,7 +495,9 @@ class _ScoreCard extends StatelessWidget {
           ),
           const SizedBox(height: 7),
           Text(
-            '${score.clamp(0, 5).toStringAsFixed(1)} / 5',
+            score == null
+                ? 'Not assessed'
+                : '${score!.clamp(0, 5).toStringAsFixed(1)} / 5',
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           ),

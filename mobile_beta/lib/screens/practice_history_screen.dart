@@ -339,7 +339,9 @@ class _HistoryCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      '${session.overallScore.toStringAsFixed(1)} / 5',
+                      session.assessment.overall == null
+                          ? session.assessment.label
+                          : '${session.assessment.overall!.toStringAsFixed(1)} / 5',
                       style: EngoraTheme.display(
                         fontSize: 27,
                         color: EngoraColors.brand,

@@ -955,13 +955,20 @@ function normalizeDialogueForComparison(value) {
     .trim();
 }
 
-function isRepeatedAiMessage(message, conversationHistory = []) {
+function requestsRepetition(text) {
+  return /\b(?:repeat(?: that| it| yourself)?|say (?:that|it) again|did(?:n't| not) hear|could(?:n't| not) hear)\b/i.test(String(text || "")) &&
+    !/\b(?:do not|don't|stop) repeat\b/i.test(String(text || ""));
+}
+
+function isRepeatedAiMessage(message, conversationHistory = [], studentResponse = "") {
   const candidate = normalizeDialogueForComparison(message);
   if (!candidate) return true;
+  if (requestsRepetition(studentResponse)) return false;
   return recentAiMessages(conversationHistory).some((recent) => {
     const normalizedRecent = normalizeDialogueForComparison(recent);
     return normalizedRecent === candidate ||
       (candidate.length > 28 &&
+        normalizedRecent.length > 28 &&
         (normalizedRecent.includes(candidate) || candidate.includes(normalizedRecent)));
   });
 }
@@ -985,6 +992,26 @@ function generateContextualFallback(
   ).toLowerCase();
   const isRestaurant = /restaurant|london/.test(setting);
   const isCafe = /cafe|melbourne/.test(setting);
+
+  const previous = recentAiMessages(conversationHistory).at(-1);
+  // Repair the current exchange before interpreting keywords as a new topic.
+  if (requestsRepetition(text)) {
+    return previous || "Which part would you like me to repeat?";
+  }
+  if (/\b(what do you mean|do you mean|clarify|explain that|don't understand|do not understand)\b/.test(text)) {
+    if ((isRestaurant || isCafe) && /what can i get|like to order/.test(String(previous || "").toLowerCase())) {
+      return "I mean, would you like a drink or a snack?";
+    }
+    return previous
+      ? `Which part of what I just said would you like me to explain: "${previous}"?`
+      : "Which part would you like me to explain?";
+  }
+  if (/\b(allerg(?:y|ic|ies)|vegetarian|vegan|halal|cannot eat|can't eat|don't eat|do not eat)\b/.test(text)) {
+    return selectFreshFallback([
+      "Thanks for telling me. What ingredients or dietary requirements should we check before choosing?",
+      "Let's check the ingredients first so we can find something suitable for you.",
+    ], conversationHistory);
+  }
 
   if (/\b(menu|western|food options?|dish|meal)\b/.test(text)) {
     if (isRestaurant) {
@@ -1018,7 +1045,7 @@ function generateContextualFallback(
 
   if (/\b(pizza|burger|sandwich|noodles?|rice|salad|chicken)\b/.test(text)) {
     return selectFreshFallback([
-      "That sounds good to me. Pizza would be a nice choice.",
+      "That sounds like an option. How would you like it prepared?",
       "I'd be happy with that. Shall we choose something we can both enjoy?",
       "Good idea. Let's go with that and see what else is available.",
     ], conversationHistory);
@@ -1030,7 +1057,7 @@ function generateContextualFallback(
       : "Certainly. How would you like to handle that?";
   }
 
-  if (/\b(repeat|say that again|what do you mean|do you mean|clarify|understand)\b/.test(text)) {
+  if (/\b(repeat|say that again|what do you mean|do you mean|clarify)\b/.test(text)) {
     if (isRestaurant) {
       return "Of course. I mean I can show you the menu or help you choose a meal. Which would you prefer?";
     }
@@ -1049,6 +1076,14 @@ function generateContextualFallback(
       "No problem. Tell me what you would prefer, and we can continue from there.",
       "That's all right. What would work better for you?",
       "Understood. We can change direction. What would you rather discuss?",
+    ], conversationHistory);
+  }
+
+  if (/lecturer|office|academic|class/.test(setting) && /\b(assignment|essay|deadline|feedback|research|course|topic)\b/.test(text)) {
+    return selectFreshFallback([
+      "Of course. Which part of your work would you like us to look at together?",
+      "Let's focus on that. What have you tried so far, and where are you getting stuck?",
+      "I can help you work through it. Could you show me the part you are unsure about?",
     ], conversationHistory);
   }
 
@@ -1343,12 +1378,16 @@ function generateAIMessage(
     conversationHistory
   );
 
-  if (/\b(menu|western|food options?|dish|meal|coffee|drink|snack|pastr|tea|repeat|say that again|what do you mean|clarify|not that|instead)\b/.test(shortResponse)) {
+  if (/\b(menu|western|food options?|dish|meal|coffee|drink|snack|pastr|tea|repeat|say that again|what do you mean|clarify|not that|instead|pizza|burger|sandwich|noodles?|rice|salad|chicken|allergic|allergy|vegetarian|vegan|halal|assignment|essay|deadline|research)\b/.test(shortResponse)) {
     return contextualResponse;
   }
 
   if (/^(yes|yeah|yep|okay|ok|sure|right|of course)[.!]*$/.test(shortResponse)) {
-    return "Great. Tell me a little more about that.";
+    return selectFreshFallback([
+      "Great. Tell me a little more about that.",
+      "All right. What would you like to know about that?",
+      "Okay. Is there anything about that you would like to clarify?",
+    ], conversationHistory);
   }
 
   if (/^(no|nope)[.!]*$/.test(shortResponse)) {
@@ -1563,7 +1602,7 @@ function normalizeOpenAIResult(
     ...getExperienceMetadata(scenarioData),
     turn_number: numericTurn,
     detected_category: detectedCategory,
-    scores: aiResult?.scores || generateScores(detectedCategory),
+    scores: aiResult?.scores || {},
     feedback: cleanScenarioText(
       aiResult?.feedback || generateFeedback(detectedCategory, studentResponse, scenarioData),
       scenarioData
@@ -1805,6 +1844,8 @@ function combineSessionFilters(ownershipFilter, requestedFilter = {}) {
   return { $and: [ownershipFilter, requestedFilter] };
 }
 
+const { assessSession, assessmentFields, averageAssessedScore } = require("./services/assessment_service");
+
 function normalizePracticeSessionPayload(rawSession, userId) {
   const student = rawSession.student || {};
   const scenario = rawSession.scenario || {};
@@ -1834,6 +1875,7 @@ function normalizePracticeSessionPayload(rawSession, userId) {
           speaker: item.speaker,
           message: item.message,
           timestamp: item.timestamp,
+          confirmed: item.confirmed === true || item.confirmed === "true",
         }))
       : [],
     overallScore: Number(rawSession.overallScore ?? rawSession.overall_score ?? 0),
@@ -1884,7 +1926,7 @@ function serializePracticeSession(session) {
   const data = typeof session.toObject === "function" ? session.toObject() : session;
 
   return {
-    schema_version: 3,
+    schema_version: 4,
     session_id: data.sessionId,
     student: data.student || {
       student_id: "local_student",
@@ -1903,6 +1945,7 @@ function serializePracticeSession(session) {
     transcript: (data.transcript || []).map((item) => ({
       speaker: item.speaker,
       message: item.message,
+      confirmed: String(item.confirmed === true || item.confirmed === "true"),
     })),
     evaluations: data.evaluations || [],
     average_scores: data.averageScores || {},
@@ -1922,6 +1965,7 @@ function serializePracticeSession(session) {
     latency_metrics: data.latencyMetrics || [],
     latency_summary: data.latencySummary || {},
     pilot_metadata: data.pilotMetadata || null,
+    ...assessmentFields(data),
   };
 }
 
@@ -1948,6 +1992,7 @@ function serializeLecturerSession(session) {
     end_reason: data.endReason || null,
     overall_score: data.overallScore,
     average_scores: data.averageScores || {},
+    ...assessmentFields(data),
     duration_seconds: data.durationSeconds || 0,
     student_response_count: data.studentResponseCount || 0,
     completed_objective_ids: data.completedObjectiveIds || [],
@@ -2004,9 +2049,7 @@ app.get("/api/analytics/summary", authenticateJWT, requireRole(["admin", "lectur
     const totalSessions = sessions.length;
     const completedCount = completed.length;
 
-    const avgScore = completed.length
-      ? completed.reduce((sum, s) => sum + Number(s.overallScore || 0), 0) / completed.length
-      : 0;
+    const avgScore = averageAssessedScore(completed);
 
     const avgDuration = completed.length
       ? completed.reduce((sum, s) => sum + Number(s.durationSeconds || 0), 0) / completed.length
@@ -2018,7 +2061,7 @@ app.get("/api/analytics/summary", authenticateJWT, requireRole(["admin", "lectur
         totalStudents,
         totalSessions,
         completedCount,
-        averageScore: Number(avgScore.toFixed(2)),
+        averageScore: avgScore,
         averageDurationSeconds: Math.round(avgDuration),
       },
     });
@@ -2049,9 +2092,9 @@ app.get("/api/analytics/longitudinal", authenticateJWT, requireRole(["admin", "l
       studentId: s.userId?.studentId || "-",
       scenarioId: s.scenario?.scenario_id || "G-ICC-001",
       scenarioTitle: s.scenario?.title || "-",
-      overallScore: Number((s.overallScore || 0).toFixed(2)),
+      overallScore: assessSession(s).overall_score,
       completedAt: s.completedAt || s.createdAt,
-      averageScores: s.averageScores || {},
+      averageScores: assessSession(s).scores,
     }));
 
     res.json({
@@ -2222,6 +2265,10 @@ app.get("/api/history", authenticateJWT, async (req, res) => {
 app.post("/api/history", authenticateJWT, async (req, res) => {
   try {
     const sessionData = normalizePracticeSessionPayload(req.body, req.user.userId);
+    const assessment = assessSession(sessionData);
+    sessionData.overallScore = assessment.overall_score;
+    sessionData.averageScores = assessment.scores;
+    sessionData.assessment = assessment;
 
     if (!sessionData.sessionId) {
       return res.status(400).json({ error: "session_id is required" });
@@ -2499,9 +2546,7 @@ app.get("/api/lecturer/research-summary", authenticateJWT, requireRole(["lecture
       completion_rate: items.length
         ? Number((items.filter((item) => completedStatuses.has(item.status)).length / items.length).toFixed(4))
         : 0,
-      average_score: items.length
-        ? Number((items.reduce((sum, item) => sum + Number(item.overallScore || 0), 0) / items.length).toFixed(2))
-        : 0,
+      average_score: averageAssessedScore(items),
       average_duration_seconds: items.length
         ? Number((items.reduce((sum, item) => sum + Number(item.durationSeconds || 0), 0) / items.length).toFixed(2))
         : 0,
@@ -3400,14 +3445,19 @@ app.post("/api/chat/respond-turn", async (req, res) => {
         getOpenAIChatTimeoutMs(),
         "openai_chat_timeout"
       );
-      aiMessage = chatResult?.ai_message || aiMessage;
-      if (isRepeatedAiMessage(aiMessage, normalizedHistory)) {
+      if (typeof chatResult?.ai_message !== "string" || !chatResult.ai_message.trim()) {
+        throw new Error("openai_empty_dialogue");
+      }
+      aiMessage = cleanAiDialogue(chatResult.ai_message, versionedScenarioData, learnerProfile);
+      source = "openai_chat";
+      if (isRepeatedAiMessage(aiMessage, normalizedHistory, student_response)) {
         aiMessage = generateContextualFallback(
           versionedScenarioData,
           student_response,
           normalizedHistory
         );
         fallbackReason = "openai_repetition_filtered";
+        source = "local_fast_fallback";
       }
       completedObjectiveIds = normalizeCompletedObjectiveIds(
         versionedScenarioData,
@@ -3415,7 +3465,6 @@ app.post("/api/chat/respond-turn", async (req, res) => {
         cueDetectedObjectiveIds,
         chatResult?.completed_objective_ids
       );
-      source = "openai_chat";
     } catch (error) {
       console.error("OpenAI chat response error:", error.message);
       fallbackReason = error.message === "openai_chat_timeout"
@@ -3782,9 +3831,7 @@ app.get("/api/lecturer/analytics", authenticateJWT, requireRole(["admin", "lectu
       ? sessions.reduce((sum, s) => sum + (s.studentResponseCount || 0), 0) / totalSessions
       : 0;
 
-    const overallScoreAvg = totalSessions > 0
-      ? sessions.reduce((sum, s) => sum + (s.overallScore || 0), 0) / totalSessions
-      : 0;
+    const overallScoreAvg = averageAssessedScore(sessions);
 
     const coachingCategories = {};
     sessions.forEach((s) => {
@@ -3802,7 +3849,7 @@ app.get("/api/lecturer/analytics", authenticateJWT, requireRole(["admin", "lectu
       completion_rate: Math.round(completionRate * 10) / 10,
       average_duration_seconds: Math.round(avgDuration),
       average_response_count: Math.round(avgResponseCount * 10) / 10,
-      overall_score_average: Math.round(overallScoreAvg * 100) / 100,
+      overall_score_average: overallScoreAvg,
       frequent_coaching_categories: coachingCategories,
     });
   } catch (err) {
@@ -3862,7 +3909,7 @@ app.get("/api/lecturer/export/csv", authenticateJWT, requireRole(["admin", "lect
         `"${s.moduleId || ""}"`,
         `"${s.unitId || ""}"`,
         `"${s.pageId || ""}"`,
-        s.overallScore || 0,
+        assessSession(s).overall_score ?? "",
         s.durationSeconds || 0,
         s.studentResponseCount || 0,
         `"${s.status || ""}"`,

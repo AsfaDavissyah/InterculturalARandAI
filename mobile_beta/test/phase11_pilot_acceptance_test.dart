@@ -81,7 +81,7 @@ void main() {
     expect(restored.pilotMetadata?.networkProfile, 'mobile_data');
     expect(restored.moduleId, 'ICC-PILOT-01');
     expect(restored.pageId, 'PAGE-LECTURER-OFFICE-01');
-    expect(restored.toJson()['schema_version'], 3);
+    expect(restored.toJson()['schema_version'], 4);
   });
 
   test('saving the same session twice does not duplicate history', () async {

@@ -172,7 +172,7 @@ export function OverviewView({ user, onNavigate }) {
               label="Cohort Avg Score"
               value={formatScore(
                 summary.average_cohort_score ?? summary.average_overall_score,
-                '0.0',
+                'Not assessed',
               )}
               icon={Activity}
               color="blue"

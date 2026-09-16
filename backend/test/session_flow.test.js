@@ -13,6 +13,7 @@ const {
   detectCompletedObjectives,
   generateAIMessage,
   generateContextualFallback,
+  isRepeatedAiMessage,
   getOpenAIChatTimeoutMs,
   normalizePracticeSessionPayload,
   serializePracticeSession,
@@ -25,6 +26,41 @@ const airportScenario = JSON.parse(
   )
 );
 const allObjectiveIds = airportScenario.session_rules.required_objective_ids;
+
+test("requested repetition preserves the previous message instead of advancing", () => {
+  const previous = "Would you prefer to discuss your essay or your research proposal?";
+  const history = [{ speaker: "AI", message: previous }];
+  assert.equal(generateContextualFallback(airportScenario, "Could you repeat that please?", history), previous);
+  assert.equal(isRepeatedAiMessage(previous, history, "Please say that again"), false);
+  assert.equal(isRepeatedAiMessage(previous, history, "Don't repeat that"), true);
+  assert.equal(isRepeatedAiMessage("", history, "repeat please"), true);
+});
+
+test("short earlier acknowledgement does not reject a substantive answer", () => {
+  assert.equal(isRepeatedAiMessage("Yes, we can discuss your research proposal today.", [{ speaker: "AI", message: "Yes" }]), false);
+});
+
+test("clarification stays with previous question rather than resetting the setting", () => {
+  const scenario = { ...airportScenario, setting_id: "ACADEMIC-LECTURER-OFFICE" };
+  const answer = generateContextualFallback(scenario, "What do you mean?", [{ speaker: "AI", message: "Which part of your essay needs feedback?" }]);
+  assert.match(answer, /essay needs feedback/);
+  assert.doesNotMatch(answer, /menu|payment/);
+});
+
+test("food fallback does not replace rice with pizza or ignore dietary restrictions", () => {
+  const scenario = { ...airportScenario, setting_id: "SOCIAL-LONDON-RESTAURANT" };
+  assert.doesNotMatch(generateContextualFallback(scenario, "I would like rice", []), /pizza/i);
+  assert.match(generateContextualFallback(scenario, "I am allergic to chicken. What is on the menu?", []), /ingredients|dietary/i);
+});
+
+test("academic fallback does not advance objectives and avoids immediate repetition", () => {
+  const scenario = { ...airportScenario, setting_id: "ACADEMIC-LECTURER-OFFICE" };
+  const first = generateAIMessage("GOOD", scenario, [], "Can we discuss my assignment?", []);
+  const next = generateAIMessage("GOOD", scenario, allObjectiveIds, "Can we discuss my assignment?", [{ speaker: "AI", message: first }]);
+  assert.match(first, /work|assignment/);
+  assert.notEqual(first, next);
+  assert.equal(first, generateAIMessage("GOOD", scenario, allObjectiveIds, "Can we discuss my assignment?", []));
+});
 
 test("chat timeout leaves enough time for a normal OpenAI response", () => {
   const previous = process.env.OPENAI_CHAT_TIMEOUT_MS;
@@ -604,7 +640,8 @@ test("history payload maps between mobile snake_case and MongoDB fields", () => 
   assert.equal(serialized.completed_at, "2026-07-12T01:05:00.000Z");
   assert.equal(serialized.duration_seconds, 300);
   assert.equal(serialized.student_response_count, 5);
-  assert.equal(serialized.overall_score, 4.5);
+  assert.equal(serialized.overall_score, null);
+  assert.equal(serialized.assessment.status, "insufficient_evidence");
   assert.deepEqual(serialized.completed_objective_ids, ["confirm_and_welcome"]);
 });
 

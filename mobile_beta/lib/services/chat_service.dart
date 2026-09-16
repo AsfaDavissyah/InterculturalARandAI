@@ -4,6 +4,7 @@ import '../models/ai_response.dart';
 import '../models/guided_setting.dart';
 import '../models/guided_topic.dart';
 import '../models/scenario_topic.dart';
+import 'tts_audio_service.dart';
 
 class ChatService {
   final String baseUrl;
@@ -74,20 +75,14 @@ class ChatService {
     String? settingId,
   }) async {
     if (text.trim().isEmpty) return;
-    await http
-        .post(
-          Uri.parse('$baseUrl/api/tts'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'text': text,
-            'gender': gender,
-            'ai_role': aiRole,
-            'experience_type': experienceType,
-            if (scenarioId != null) 'scenario_id': scenarioId,
-            if (settingId != null) 'setting_id': settingId,
-          }),
-        )
-        .timeout(const Duration(seconds: 10));
+    await TtsAudioService.shared.request(baseUrl, {
+      'text': text,
+      'gender': gender,
+      'ai_role': aiRole,
+      'experience_type': experienceType,
+      if (scenarioId != null) 'scenario_id': scenarioId,
+      if (settingId != null) 'setting_id': settingId,
+    });
   }
 
   Future<List<ScenarioTopic>> getScenarios() async {

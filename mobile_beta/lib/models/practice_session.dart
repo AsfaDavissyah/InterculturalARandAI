@@ -1,12 +1,14 @@
 import 'dart:math';
 
 import 'ai_response.dart';
+import 'assessment.dart';
 import 'conversation_latency.dart';
 import 'pilot_metadata.dart';
 import 'scenario_topic.dart';
 
 class PracticeSession {
-  static const schemaVersion = 3;
+  static const schemaVersion = 4;
+  Assessment get assessment => Assessment.calculate(transcript, evaluations);
   static const scoreKeys = [
     'grammar',
     'vocabulary',
@@ -223,8 +225,8 @@ class PracticeSession {
     'student_response_count': studentResponseCount,
     'transcript': transcript,
     'evaluations': evaluations.map((item) => item.toJson()).toList(),
-    'average_scores': averageScores,
-    'overall_score': overallScore,
+    'average_scores': assessment.scores,
+    'overall_score': assessment.overall,
     'completed_objective_ids': completedObjectiveIds,
     'experience_type': experienceType,
     if (topicId != null) 'topic_id': topicId,
@@ -257,8 +259,8 @@ class PracticeSession {
     'duration_seconds': durationSeconds,
     'status': status,
     'student_response_count': studentResponseCount,
-    'overall_score': overallScore,
-    'average_scores': averageScores,
+    'overall_score': assessment.overall,
+    'average_scores': assessment.scores,
     'completed_objective_ids': completedObjectiveIds,
     'transcript': transcript,
     'experience_type': experienceType,

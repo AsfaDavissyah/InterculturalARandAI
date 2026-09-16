@@ -2,6 +2,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const User = require("../models/User");
 const PracticeSession = require("../models/PracticeSession");
+const { assessmentFields, assessSession, averageAssessedScore } = require("../services/assessment_service");
 const Scenario = require("../models/Scenario");
 const Topic = require("../models/Topic");
 const Setting = require("../models/Setting");
@@ -191,7 +192,7 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
             session_id: s.sessionId,
             student_name: s.userId?.name || s.student?.display_name || "Student",
             scenario_title: s.scenario?.title || s.settingTitle || "Speaking Practice",
-            overall_score: s.overallScore || 0,
+            ...assessmentFields(s),
             status: s.status,
             completed_at: s.completedAt || s.createdAt,
           })),
@@ -222,9 +223,7 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
         const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
         const practicesThisWeek = sessions.filter((s) => new Date(s.completedAt || s.createdAt) >= oneWeekAgo).length;
         const completedSessions = sessions.filter((s) => s.status === "completed");
-        const avgScore = completedSessions.length
-          ? Number((completedSessions.reduce((sum, s) => sum + (s.overallScore || 0), 0) / completedSessions.length).toFixed(2))
-          : 0;
+        const avgScore = averageAssessedScore(completedSessions);
 
         const studentsNeedingAttention = [];
         const studentLatestMap = new Map();
@@ -241,7 +240,7 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
               session_id: s.sessionId,
               student_name: s.student?.display_name || "Student",
               scenario_title: s.scenario?.title || "Practice",
-              overall_score: s.overallScore || 0,
+              ...assessmentFields(s),
               status: s.status,
               completed_at: s.completedAt || s.createdAt,
             });
@@ -260,7 +259,7 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
             session_id: s.sessionId,
             student_name: s.student?.display_name || "Student",
             scenario_title: s.scenario?.title || "Practice",
-            overall_score: s.overallScore || 0,
+            ...assessmentFields(s),
             status: s.status,
             completed_at: s.completedAt || s.createdAt,
           })),
@@ -1330,9 +1329,7 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
         students.map(async (s) => {
           const sessions = await PracticeSession.find({ userId: s._id }).lean();
           const completed = sessions.filter((sess) => sess.status === "completed");
-          const avgScore = completed.length
-            ? Number((completed.reduce((sum, sess) => sum + (sess.overallScore || 0), 0) / completed.length).toFixed(2))
-            : 0;
+          const avgScore = averageAssessedScore(completed);
           const lastSession = sessions.sort((a, b) => new Date(b.completedAt || b.createdAt) - new Date(a.completedAt || a.createdAt))[0];
 
           return {
@@ -1414,6 +1411,7 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
 
       if (min_score || max_score) {
         filter.overallScore = {};
+        filter["assessment.status"] = "assessed";
         if (min_score) filter.overallScore.$gte = Number(min_score);
         if (max_score) filter.overallScore.$lte = Number(max_score);
       }
@@ -1453,7 +1451,7 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
         category_id: s.topicId || "-",
         duration_seconds: deriveDurationSeconds(s),
         student_response_count: deriveStudentResponseCount(s),
-        overall_score: s.overallScore || 0,
+        ...assessmentFields(s),
         status: s.status,
         end_reason: s.endReason || null,
         completed_at: s.completedAt || s.createdAt,
@@ -1571,12 +1569,14 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
         "Status",
         "End Reason",
         "Completed At",
+        "Assessment Status",
       ];
 
       const rows = [headers.map(sanitizeCsvField).join(",")];
 
       sessions.forEach((s) => {
-        const scores = s.averageScores || {};
+        const assessment = assessSession(s);
+        const scores = assessment.scores;
         rows.push(
           [
             sanitizeCsvField(s.sessionId),
@@ -1586,18 +1586,19 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
             sanitizeCsvField(s.scenario?.scenario_id || s.settingId || ""),
             sanitizeCsvField(s.scenario?.title || s.settingTitle || ""),
             sanitizeCsvField(s.topicId || ""),
-            s.overallScore || 0,
-            scores.grammar || 0,
-            scores.vocabulary || 0,
-            scores.fluency || 0,
-            scores.politeness || 0,
-            scores.pragmatic_appropriateness || 0,
-            scores.intercultural_awareness || 0,
+            assessSession(s).overall_score ?? "",
+            scores.grammar ?? "",
+            scores.vocabulary ?? "",
+            scores.fluency ?? "",
+            scores.politeness ?? "",
+            scores.pragmatic_appropriateness ?? "",
+            scores.intercultural_awareness ?? "",
             deriveDurationSeconds(s),
             deriveStudentResponseCount(s),
             sanitizeCsvField(s.status || ""),
             sanitizeCsvField(s.endReason || ""),
             sanitizeCsvField(s.completedAt ? new Date(s.completedAt).toISOString() : ""),
+            sanitizeCsvField(assessment.status),
           ].join(",")
         );
       });
@@ -1660,6 +1661,7 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
         evaluations: session.evaluations || [],
         coaching_events: session.coachingEvents || [],
         latency_summary: session.latencySummary || {},
+        ...assessmentFields(session),
       });
     } catch (err) {
       return res.status(500).json({ error: err.message });

@@ -28,6 +28,32 @@ async function mockDashboardApi(page) {
   });
 }
 
+test('insufficient evidence is shown without a fabricated perfect score', async ({ page }, testInfo) => {
+  await mockDashboardApi(page);
+  const session = {
+    session_id: 'evidence-test', student_name: 'Test Student', student: { display_name: 'Test Student', student_id: 'TEST001' },
+    scenario_title: 'Office Consultation', scenario: { title: 'Office Consultation' },
+    status: 'ended_manually', overall_score: null, score_breakdown: {}, student_response_count: 1,
+    assessment: { status: 'insufficient_evidence', completed_objectives: 2, total_objectives: 5 },
+    transcript: [{ speaker: 'Student', message: 'Could you help with my assignment?' }],
+  };
+  await page.route('**/api/dashboard/practice-results**', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify(new URL(route.request().url()).pathname.endsWith('/evidence-test') ? session : { items: [session], total_items: 1, total_pages: 1 }),
+  }));
+  await page.goto('/#/practice-results');
+  await page.getByLabel('Email').fill('admin@engora.test');
+  await page.getByLabel('Password').fill('valid-password');
+  await page.getByRole('button', { name: 'Log in to Portal' }).click();
+  await expect(page.getByText('Insufficient evidence')).toBeVisible();
+  await page.getByRole('button', { name: 'View', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Practice Session Analysis' })).toBeVisible();
+  await expect(page.getByText('Insufficient evidence')).toBeVisible();
+  await expect(page.getByText('2/5 objectives')).toBeVisible();
+  await expect(page.getByText('Could you help with my assignment?')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+  await page.screenshot({ path: testInfo.outputPath('assessment.png'), fullPage: true });
+});
+
 test('direct Scenario create route survives login', async ({ page }) => {
   await mockDashboardApi(page);
   await page.goto('/#/scenarios/new');

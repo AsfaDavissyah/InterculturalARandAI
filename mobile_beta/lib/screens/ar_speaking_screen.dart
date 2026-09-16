@@ -1,10 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
-import 'package:http/http.dart' as http;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:speech_to_text/speech_recognition_error.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
@@ -15,10 +13,13 @@ import '../models/conversation_latency.dart';
 import '../models/guided_setting.dart';
 import '../models/practice_session.dart';
 import '../models/scenario_topic.dart';
+import '../models/speech_draft.dart';
+import '../models/pending_turn.dart';
 import '../services/app_settings.dart';
 import '../services/auth_service.dart';
 import '../services/avatar_registry.dart';
 import '../services/chat_service.dart';
+import '../services/tts_audio_service.dart';
 import '../services/practice_history_store.dart';
 import '../services/pilot_evidence_service.dart';
 import '../theme/engora_theme.dart';
@@ -108,6 +109,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   final FlutterTts _tts = FlutterTts();
   final List<ConversationMessage> _messages = [];
   final List<AiResponse> _evaluationResults = [];
+  final Set<Future<void>> _pendingEvaluations = {};
   final List<ConversationLatencyTrace> _latencyMetrics = [];
   final Set<String> _completedObjectiveIds = {};
   final PracticeHistoryStore _historyStore = const PracticeHistoryStore();
@@ -127,6 +129,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   bool _sessionLoading = true;
   bool _speechAvailable = false;
   bool _showSubtitles = true;
+  bool _playbackBusy = false;
   ConversationMessage? _activeSubtitle;
 
   bool _cameraEnabled = true;
@@ -138,8 +141,13 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   String _recognizedWords = '';
   List<String> _speechAlternatives = const [];
   double? _speechConfidence;
-  String _accumulatedWords = '';
-  String _currentSegmentWords = '';
+  final SpeechDraft _speechDraft = SpeechDraft();
+  Timer? _speechEndTimer;
+  Completer<void>? _speechFinal;
+  bool _captureActive = false;
+  final PendingTurn _pendingTurn = PendingTurn();
+  bool get _requestInFlight => _pendingTurn.sending;
+  String? get _pendingResponse => _pendingTurn.text;
   String? _cameraError;
   String? _sessionError;
   CoachingEvent? _activeCoachingEvent;
@@ -171,7 +179,10 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
           }
         } else if (state == PlayerState.completed ||
             state == PlayerState.stopped) {
-          if (!_sessionLoading && _sessionError == null) {
+          if (!_sessionLoading &&
+              _sessionError == null &&
+              !_captureActive &&
+              _activity == AvatarActivity.speaking) {
             _activity = AvatarActivity.idle;
           }
         }
@@ -227,7 +238,19 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         _activeSubtitle = _messages.last;
       });
       unawaited(captureInitialization);
-      await _speak(openingMessage, preparedAudioUrl: openingAudio);
+      try {
+        await _speak(openingMessage, preparedAudioUrl: openingAudio);
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _activity = AvatarActivity.idle);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Opening audio is unavailable. You can replay it or continue with the text.',
+            ),
+          ),
+        );
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -240,8 +263,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   }
 
   Future<void> _initializeCaptureDevices() async {
-    await _initializeCamera();
     await _initializeSpeech();
+    await _initializeCamera();
   }
 
   Future<String> _loadOpeningMessage() async {
@@ -346,7 +369,11 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       });
 
       _tts.setCompletionHandler(() {
-        if (!mounted) return;
+        if (!mounted ||
+            _captureActive ||
+            _activity != AvatarActivity.speaking) {
+          return;
+        }
         setState(() {
           _activity = AvatarActivity.idle;
         });
@@ -406,45 +433,48 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   }
 
   Future<String?> _requestNeuralAudioUrl(String text) async {
-    try {
-      final service = _chatService;
-      if (service == null) return null;
-      final response = await http
-          .post(
-            Uri.parse('${service.baseUrl}/api/tts'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'text': text,
-              'gender': _voiceGender(),
-              'ai_role': widget.scenario.aiRole,
-              'experience_type': widget.experienceType,
-              'scenario_id': widget.scenario.id,
-              if (widget.settingId != null) 'setting_id': widget.settingId,
-            }),
-          )
-          .timeout(const Duration(seconds: 8));
-      if (response.statusCode != 200) return null;
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      return data['audio_url']?.toString();
-    } catch (error) {
-      debugPrint('Neural TTS failed, falling back to local TTS. Error: $error');
-      return null;
-    }
+    final service = _chatService;
+    if (service == null) return null;
+    return TtsAudioService.shared.request(service.baseUrl, {
+      'text': text,
+      'gender': _voiceGender(),
+      'ai_role': widget.scenario.aiRole,
+      'experience_type': widget.experienceType,
+      'scenario_id': widget.scenario.id,
+      if (widget.settingId != null) 'setting_id': widget.settingId!,
+    });
   }
 
   Future<void> _speak(String text, {Future<String?>? preparedAudioUrl}) async {
+    if (_playbackBusy) return;
+    _playbackBusy = true;
+    try {
+      await _playSpeech(text, preparedAudioUrl: preparedAudioUrl);
+    } finally {
+      _playbackBusy = false;
+      if (mounted) setState(() {});
+    }
+  }
+
+  Future<void> _playSpeech(
+    String text, {
+    Future<String?>? preparedAudioUrl,
+  }) async {
     if (text.trim().isEmpty || !mounted) {
       if (mounted) setState(() => _activity = AvatarActivity.idle);
       return;
     }
 
-    // Pastikan semua media terhenti sebelum memutar yang baru
+    final audioRequest = preparedAudioUrl ?? _requestNeuralAudioUrl(text);
+    setState(() => _activity = AvatarActivity.loading);
+    // Prepare audio while stopping the previous capture and playback.
     try {
       await _speech.stop();
       await _tts.stop();
       await _audioPlayer.stop();
     } catch (_) {}
 
+    if (!mounted || _navigatingToResult) return;
     setState(() {
       _activity = AvatarActivity.loading;
       if (_messages.isNotEmpty && _messages.last.speaker == 'AI') {
@@ -454,20 +484,29 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
     bool success = false;
     try {
-      final url = preparedAudioUrl != null
-          ? await preparedAudioUrl
-          : await _requestNeuralAudioUrl(text);
+      final url = await audioRequest;
+      if (!mounted || _navigatingToResult) return;
       if (url != null && url.isNotEmpty) {
         _markTtsReady('neural');
-        await _audioPlayer.play(UrlSource(url));
+        await _audioPlayer
+            .play(UrlSource(url))
+            .timeout(const Duration(seconds: 5));
         success = true;
       }
     } catch (error) {
       debugPrint('Unable to play neural TTS audio. Error: $error');
+      await _audioPlayer.stop();
     }
 
     if (!success) {
       if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Using device voice. The AI voice is temporarily unavailable.',
+          ),
+        ),
+      );
       setState(() {
         _activity = AvatarActivity.loading;
         if (_messages.isNotEmpty && _messages.last.speaker == 'AI') {
@@ -479,7 +518,11 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         final isMaleVoice = _voiceGender() == 'male';
         await _tts.setPitch(isMaleVoice ? 0.95 : 1.02);
         _markTtsReady('local');
-        await _tts.speak(text);
+        await _tts.speak(text).timeout(const Duration(seconds: 60));
+      } catch (_) {
+        _activeLatencyDraft = null;
+        await _tts.stop();
+        rethrow;
       } finally {
         if (mounted && !_sessionLoading && _sessionError == null) {
           setState(() => _activity = AvatarActivity.idle);
@@ -511,10 +554,20 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   }
 
   Future<void> _toggleListening() async {
-    if (_sessionLoading ||
+    if (_playbackBusy ||
+        _submissionStarted ||
+        _reviewingTranscript ||
+        _requestInFlight ||
+        _sessionLoading ||
         _sessionError != null ||
+        _activity == AvatarActivity.loading ||
         _activity == AvatarActivity.thinking ||
         _activity == AvatarActivity.speaking) {
+      return;
+    }
+
+    if (_pendingResponse != null) {
+      await _submitResponse(_pendingResponse!);
       return;
     }
 
@@ -531,7 +584,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       return;
     }
 
-    if (_speech.isListening) {
+    if (_captureActive) {
       _pulsingController.stop();
       await _stopListeningAndReview();
       return;
@@ -540,13 +593,25 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     await _startListening();
   }
 
-  Future<void> _startListening() async {
-    if (!_speechAvailable || _speech.isListening || !mounted) return;
+  Future<void> _startListening({String retainedText = ''}) async {
+    if (_playbackBusy ||
+        !_speechAvailable ||
+        _captureActive ||
+        _reviewingTranscript ||
+        _sessionLoading ||
+        _activity == AvatarActivity.speaking ||
+        _requestInFlight ||
+        _pendingResponse != null ||
+        !mounted) {
+      return;
+    }
+    _speechEndTimer?.cancel();
+    _speechFinal = Completer<void>();
     _submissionStarted = false;
-    _accumulatedWords = '';
-    _currentSegmentWords = '';
+    _captureActive = true;
+    _speechDraft.start(retainedText: retainedText);
     setState(() {
-      _recognizedWords = '';
+      _recognizedWords = _speechDraft.text;
       _speechAlternatives = const [];
       _speechConfidence = null;
       _reviewingTranscript = false;
@@ -555,83 +620,82 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
     _pulsingController.repeat(reverse: true);
 
-    await _speech.listen(
-      onResult: _onSpeechResult,
-      listenOptions: SpeechListenOptions(
-        localeId: 'en_US',
-        listenMode: ListenMode.dictation,
-        partialResults: true,
-        cancelOnError: true,
-        onDevice: false,
-        autoPunctuation: true,
-        pauseFor: const Duration(seconds: 3),
-        listenFor: const Duration(seconds: 60),
-      ),
-    );
+    try {
+      await _tts.stop();
+      await _audioPlayer.stop();
+      if (!mounted) return;
+      setState(() => _activity = AvatarActivity.listening);
+      await _speech.listen(
+        onResult: _onSpeechResult,
+        listenOptions: SpeechListenOptions(
+          localeId: 'en_US',
+          listenMode: ListenMode.dictation,
+          partialResults: true,
+          cancelOnError: false,
+          onDevice: false,
+          autoPunctuation: true,
+          pauseFor: const Duration(seconds: 6),
+          listenFor: const Duration(seconds: 60),
+        ),
+      );
+      if (!_speech.isListening && _captureActive) _scheduleSpeechReview();
+    } catch (_) {
+      _scheduleSpeechReview();
+    }
   }
 
   void _onSpeechResult(SpeechRecognitionResult result) {
-    if (!mounted) return;
+    if (!mounted || !_captureActive) return;
+    if (result.finalResult && !(_speechFinal?.isCompleted ?? true)) {
+      _speechFinal!.complete();
+    }
     final current = result.recognizedWords.trim();
     if (current.isEmpty) return;
 
-    final lowerCurrent = current.toLowerCase();
-    final lowerPrevSegment = _currentSegmentWords.trim().toLowerCase();
-
-    if (lowerPrevSegment.isNotEmpty &&
-        !lowerCurrent.startsWith(lowerPrevSegment) &&
-        !lowerCurrent.contains(lowerPrevSegment)) {
-      if (_accumulatedWords.isNotEmpty) {
-        _accumulatedWords = '$_accumulatedWords $_currentSegmentWords'.trim();
-      } else {
-        _accumulatedWords = _currentSegmentWords.trim();
-      }
-      _currentSegmentWords = current;
-    } else {
-      _currentSegmentWords = current;
-    }
-
-    final fullWords = _accumulatedWords.isEmpty
-        ? _currentSegmentWords
-        : '$_accumulatedWords $_currentSegmentWords'.trim();
+    _speechDraft.update(current);
 
     final alternatives = buildTranscriptAlternatives(
       primary: current,
       alternatives: result.alternates
           .skip(1)
           .map((alternate) => alternate.recognizedWords),
-      accumulatedPrefix: _accumulatedWords,
+      accumulatedPrefix: _speechDraft.prefix,
     );
 
     setState(() {
-      _recognizedWords = fullWords;
+      _recognizedWords = _speechDraft.text;
       _speechAlternatives = alternatives;
       _speechConfidence = result.hasConfidenceRating ? result.confidence : null;
+    });
+    if (result.finalResult) _scheduleSpeechReview();
+  }
+
+  void _scheduleSpeechReview() {
+    if (!_captureActive || !mounted) return;
+    _speechEndTimer?.cancel();
+    // Android can signal notListening before delivering its final transcript.
+    _speechEndTimer = Timer(const Duration(milliseconds: 500), () {
+      if (mounted && _captureActive) unawaited(_stopListeningAndReview());
     });
   }
 
   void _onSpeechStatus(String status) {
-    if (!mounted || _submissionStarted) return;
+    if (!mounted || !_captureActive || _submissionStarted) return;
     if ((status == SpeechToText.doneStatus ||
             status == SpeechToText.notListeningStatus) &&
         _activity == AvatarActivity.listening) {
-      _pulsingController.stop();
-      final words = _recognizedWords.trim();
-      if (words.isNotEmpty) {
-        unawaited(
-          _reviewTranscriptAndSubmit(
-            words,
-            speechFinalAt: DateTime.now().toUtc(),
-          ),
-        );
-      } else {
-        setState(() => _activity = AvatarActivity.idle);
-      }
+      _scheduleSpeechReview();
     }
   }
 
   void _onSpeechError(SpeechRecognitionError error) {
-    if (!mounted) return;
+    if (!mounted || !_captureActive || _submissionStarted) return;
+    if (_recognizedWords.trim().isNotEmpty) {
+      _scheduleSpeechReview();
+      return;
+    }
+    _speechEndTimer?.cancel();
+    _captureActive = false;
     _pulsingController.stop();
     setState(() {
       _activity = AvatarActivity.idle;
@@ -661,10 +725,29 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   Future<void> _stopListeningAndReview() async {
     _pulsingController.stop();
     if (_submissionStarted) return;
+    _submissionStarted = true;
+    _speechEndTimer?.cancel();
+    try {
+      await _speech.stop();
+      await _speechFinal?.future.timeout(
+        SpeechToText.defaultFinalTimeout + const Duration(milliseconds: 100),
+        onTimeout: () {},
+      );
+    } catch (_) {}
+    _speechEndTimer?.cancel();
+    if (!mounted) return;
+    _captureActive = false;
+    _submissionStarted = false;
     final words = _recognizedWords.trim();
     if (words.isEmpty) {
-      await _speech.stop();
       if (mounted) setState(() => _activity = AvatarActivity.idle);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No speech was captured. Tap the microphone to try again.',
+          ),
+        ),
+      );
       return;
     }
     await _reviewTranscriptAndSubmit(
@@ -679,8 +762,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   }) async {
     if (_submissionStarted || !mounted) return;
     _submissionStarted = true;
+    _captureActive = false;
     _pulsingController.stop();
-    await _speech.stop();
     if (!mounted) return;
 
     final controller = TextEditingController(text: words);
@@ -693,6 +776,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       _reviewingTranscript = true;
     });
 
+    var continueSpeaking = false;
     final confirmedText = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -788,6 +872,14 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                   ),
                 ],
                 const SizedBox(height: 20),
+                TextButton.icon(
+                  icon: const Icon(Icons.mic_rounded),
+                  label: const Text('Continue speaking'),
+                  onPressed: () {
+                    continueSpeaking = true;
+                    Navigator.pop(sheetContext, controller.text.trim());
+                  },
+                ),
                 Row(
                   children: [
                     Expanded(
@@ -828,6 +920,12 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     if (!mounted) return;
     setState(() => _reviewingTranscript = false);
 
+    if (continueSpeaking) {
+      _submissionStarted = false;
+      await _startListening(retainedText: confirmedText ?? words);
+      return;
+    }
+
     if (confirmedText == null) {
       _submissionStarted = false;
       await _startListening();
@@ -837,38 +935,27 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     await _submitResponse(confirmedText, speechFinalAt: speechFinalAt);
   }
 
-  Future<void> _submitResponse(
-    String text, {
-    bool addStudentMessage = true,
-    DateTime? speechFinalAt,
-  }) async {
-    if (text.trim().isEmpty || _chatService == null || !mounted) return;
+  Future<void> _submitResponse(String text, {DateTime? speechFinalAt}) async {
+    if (_requestInFlight ||
+        text.trim().isEmpty ||
+        _chatService == null ||
+        !mounted) {
+      return;
+    }
+    if (!_pendingTurn.begin(text)) return;
+    _submissionStarted = true;
+    var responseAccepted = false;
     _pulsingController.stop();
-    await _speech.stop();
-    await _tts.stop();
 
     setState(() {
-      _recognizedWords = '';
-      if (addStudentMessage) {
-        final studentMsg = ConversationMessage(
-          speaker: 'Student',
-          message: text,
-        );
-        _messages.add(studentMsg);
-        _activeSubtitle = studentMsg;
-      }
+      _recognizedWords = text;
+      _activeSubtitle = ConversationMessage(speaker: 'Student', message: text);
       _activity = AvatarActivity.thinking;
     });
     final thinkingVisibleAt = DateTime.now().toUtc();
 
     try {
-      final historyMessages =
-          _messages.isNotEmpty &&
-              _messages.last.speaker == 'Student' &&
-              _messages.last.message == text
-          ? _messages.take(_messages.length - 1)
-          : _messages;
-      final history = historyMessages
+      final history = _messages
           .map(
             (message) => {
               'speaker': message.speaker,
@@ -902,7 +989,11 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       }
 
       if (!mounted) return;
+      responseAccepted = true;
       setState(() {
+        _pendingTurn.accept();
+        _recognizedWords = '';
+        _messages.add(ConversationMessage(speaker: 'Student', message: text));
         _lastResponse = result;
         _completedObjectiveIds.addAll(result.completedObjectiveIds);
         _evaluationResults.add(result);
@@ -917,40 +1008,48 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
       _triggerCoachingBanner(result.coachingEvent);
 
-      await _speak(result.aiMessage);
-      unawaited(
-        _refreshTurnEvaluation(
-          turnNumber: turnNumber,
-          history: history,
-          studentResponse: text,
-          completedObjectiveIds: _completedObjectiveIds.toList(growable: false),
-        ),
-      );
+      final audioRequest = _requestNeuralAudioUrl(result.aiMessage);
+
+      late final Future<void> evaluation;
+      evaluation = _refreshTurnEvaluation(
+        turnNumber: turnNumber,
+        history: history,
+        studentResponse: text,
+        completedObjectiveIds: _completedObjectiveIds.toList(growable: false),
+      ).whenComplete(() => _pendingEvaluations.remove(evaluation));
+      _pendingEvaluations.add(evaluation);
+      unawaited(evaluation);
+      await _speak(result.aiMessage, preparedAudioUrl: audioRequest);
     } catch (error) {
       if (!mounted) return;
       setState(() => _activity = AvatarActivity.idle);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text(
-            'Agent belum berhasil merespons. Periksa jaringan lalu coba lagi.',
+          content: Text(
+            responseAccepted
+                ? 'Your response was received, but audio could not play.'
+                : 'Your response is saved here. Check your connection and tap Retry.',
           ),
-          action: SnackBarAction(
-            label: 'Retry',
-            onPressed: () {
-              _submissionStarted = true;
-              unawaited(
-                _submitResponse(
-                  text,
-                  addStudentMessage: false,
-                  speechFinalAt: DateTime.now().toUtc(),
+          action: responseAccepted
+              ? null
+              : SnackBarAction(
+                  label: 'Retry',
+                  onPressed: () {
+                    if (_pendingResponse != text || _requestInFlight) return;
+                    unawaited(
+                      _submitResponse(
+                        text,
+                        speechFinalAt: DateTime.now().toUtc(),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
         ),
       );
     } finally {
+      _pendingTurn.finishAttempt();
       _submissionStarted = false;
+      if (mounted) setState(() {});
     }
   }
 
@@ -995,6 +1094,13 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   }
 
   Future<void> _requestManualFinish() async {
+    if (_playbackBusy ||
+        _requestInFlight ||
+        _captureActive ||
+        _reviewingTranscript ||
+        _pendingResponse != null) {
+      return;
+    }
     if (_lastResponse == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Give at least one response first.')),
@@ -1028,6 +1134,13 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   }
 
   Future<void> _requestObjectiveFinish() async {
+    if (_playbackBusy ||
+        _requestInFlight ||
+        _captureActive ||
+        _reviewingTranscript ||
+        _pendingResponse != null) {
+      return;
+    }
     if (!_completionEligible || _lastResponse == null) return;
     final shouldFinish = await showDialog<bool>(
       context: context,
@@ -1057,12 +1170,27 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   Future<void> _openResult({required bool completedByObjectives}) async {
     if (_lastResponse == null || _navigatingToResult) return;
     _navigatingToResult = true;
+    setState(() {});
+    try {
+      await Future.wait(
+        _pendingEvaluations.toList(),
+      ).timeout(const Duration(seconds: 12));
+    } on TimeoutException {
+      // Missing evaluations remain unscored; never substitute fallback scores.
+    }
+    if (!mounted) return;
+    _captureActive = false;
+    _speechEndTimer?.cancel();
     await _speech.stop();
     await _tts.stop();
     if (!mounted) return;
     final history = _messages
         .map(
-          (message) => {'speaker': message.speaker, 'message': message.message},
+          (message) => {
+            'speaker': message.speaker,
+            'message': message.message,
+            'confirmed': (message.speaker == 'Student').toString(),
+          },
         )
         .toList();
     final pilotMetadata = await PilotEvidenceService.capture(context);
@@ -1103,6 +1231,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
           evaluationResults: _evaluationResults,
           conversationHistory: history,
           latencyMetrics: List.unmodifiable(_latencyMetrics),
+          session: session,
         ),
       ),
     );
@@ -1112,7 +1241,10 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     // Unfocus keyboard first to prevent layout crash with O3D webview on pop
     FocusScope.of(context).unfocus();
 
-    if (_evaluationResults.isEmpty) {
+    if (_evaluationResults.isEmpty &&
+        _pendingResponse == null &&
+        !_captureActive &&
+        !_requestInFlight) {
       if (mounted) Navigator.pop(context);
       return;
     }
@@ -1247,7 +1379,11 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   }
 
   String get _statusLabel {
+    if (_navigatingToResult) return 'Finalizing assessment';
     if (_reviewingTranscript) return 'Review transcript';
+    if (_pendingResponse != null && !_requestInFlight) {
+      return 'Response kept in this session - retry';
+    }
     final activityLabel = switch (_activity) {
       AvatarActivity.loading =>
         _sessionLoading ? 'Preparing session' : 'AI is preparing to speak',
@@ -1589,6 +1725,11 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   @override
   Widget build(BuildContext context) {
     final canInteract =
+        !_navigatingToResult &&
+        !_playbackBusy &&
+        !_requestInFlight &&
+        !_submissionStarted &&
+        !_reviewingTranscript &&
         !_sessionLoading &&
         _sessionError == null &&
         _activity != AvatarActivity.thinking &&
@@ -1596,7 +1737,11 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         _activity != AvatarActivity.loading;
 
     return PopScope(
-      canPop: _evaluationResults.isEmpty,
+      canPop:
+          _evaluationResults.isEmpty &&
+          _pendingResponse == null &&
+          !_captureActive &&
+          !_requestInFlight,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) unawaited(_confirmExit());
       },
@@ -1792,7 +1937,9 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                                   );
                                 },
                                 child: IconButton.filled(
-                                  tooltip: _speech.isListening
+                                  tooltip: _pendingResponse != null
+                                      ? 'Retry response'
+                                      : _captureActive
                                       ? 'Stop listening'
                                       : 'Speak',
                                   onPressed: canInteract
@@ -1808,19 +1955,56 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                                     disabledForegroundColor: EngoraColors.muted,
                                   ),
                                   iconSize: 29,
-                                  icon: AppSvgIcon(
-                                    _speech.isListening
-                                        ? AppIcons.microphoneSlash
-                                        : AppIcons.microphone,
-                                    size: 28,
-                                  ),
+                                  icon: _pendingResponse != null
+                                      ? const Icon(Icons.refresh_rounded)
+                                      : AppSvgIcon(
+                                          _captureActive
+                                              ? AppIcons.microphoneSlash
+                                              : AppIcons.microphone,
+                                          size: 28,
+                                        ),
                                 ),
                               ),
                             ),
                             _buildIconButton(
+                              tooltip: 'Replay AI response',
+                              icon: const Icon(Icons.volume_up_outlined),
+                              onPressed:
+                                  canInteract &&
+                                      !_captureActive &&
+                                      _pendingResponse == null &&
+                                      _messages.any(
+                                        (message) => message.speaker == 'AI',
+                                      )
+                                  ? () async {
+                                      final message = _messages.lastWhere(
+                                        (message) => message.speaker == 'AI',
+                                      );
+                                      try {
+                                        await _speak(message.message);
+                                      } catch (_) {
+                                        if (!context.mounted) return;
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Audio unavailable. Please read the response and try again.',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  : null,
+                            ),
+                            _buildIconButton(
                               tooltip: 'End practice manually',
                               icon: const AppSvgIcon(AppIcons.finish, size: 24),
-                              onPressed: _lastResponse == null
+                              onPressed:
+                                  _lastResponse == null ||
+                                      !canInteract ||
+                                      _captureActive ||
+                                      _pendingResponse != null
                                   ? null
                                   : _requestManualFinish,
                             ),
@@ -1865,6 +2049,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
   @override
   void dispose() {
+    _captureActive = false;
+    _speechEndTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_audioSubscription?.cancel());
     unawaited(_positionSubscription?.cancel());
