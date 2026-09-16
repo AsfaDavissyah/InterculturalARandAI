@@ -41,7 +41,7 @@ test("Phase 11 session normalization preserves pilot and QR attribution", () => 
   assert.equal(normalized.latencySummary.sample_count, 6);
 });
 
-test("Phase 11 history serializer is schema v3 and backward compatible", () => {
+test("Phase 11 history serializer is schema v4 and backward compatible", () => {
   const serialized = serializePracticeSession({
     sessionId: "phase11-session-002",
     scenario: { scenario_id: "G-ICC-008", title: "Archived Scenario Snapshot" },
@@ -49,7 +49,7 @@ test("Phase 11 history serializer is schema v3 and backward compatible", () => {
     completedAt: new Date("2026-08-15T08:05:00.000Z"),
   });
 
-  assert.equal(serialized.schema_version, 3);
+  assert.equal(serialized.schema_version, 4);
   assert.equal(serialized.scenario.title, "Archived Scenario Snapshot");
   assert.equal(serialized.pilot_metadata, null);
 });
