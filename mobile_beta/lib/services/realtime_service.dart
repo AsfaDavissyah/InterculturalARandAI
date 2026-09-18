@@ -113,6 +113,7 @@ class RealtimeService {
   final RTCVideoRenderer remoteRenderer = RTCVideoRenderer();
   bool _rendererInitialized = false;
   bool _microphoneEnabled = false;
+  bool _responseActive = false;
   bool _disposed = false;
   String? _researchSessionId;
   String? _realtimeSessionId;
@@ -294,13 +295,34 @@ class RealtimeService {
     return RealtimeSessionGrant.fromJson(payload);
   }
 
-  Future<void> setMicrophoneEnabled(bool enabled) async {
+  Future<void> setMicrophoneEnabled(bool enabled, {bool submit = true}) async {
     final stream = _localStream;
     if (stream == null) throw StateError('Realtime is not connected.');
+    if (_microphoneEnabled == enabled) return;
+
+    if (enabled) {
+      if (_responseActive) {
+        await _sendControlEvent('response.cancel');
+        await _sendControlEvent('output_audio_buffer.clear');
+        _responseActive = false;
+      }
+      await _sendControlEvent('input_audio_buffer.clear');
+    }
+
     for (final track in stream.getAudioTracks()) {
       track.enabled = enabled;
     }
     _microphoneEnabled = enabled;
+
+    if (!enabled) {
+      if (submit) {
+        await _sendControlEvent('input_audio_buffer.commit');
+        await _sendControlEvent('response.create');
+      } else {
+        await _sendControlEvent('input_audio_buffer.clear');
+      }
+    }
+
     _emit(
       RealtimePilotEvent(
         type: enabled ? 'microphone_started' : 'microphone_stopped',
@@ -308,14 +330,21 @@ class RealtimeService {
     );
   }
 
+  Future<void> _sendControlEvent(String type) async {
+    final channel = _dataChannel;
+    if (channel == null ||
+        channel.state != RTCDataChannelState.RTCDataChannelOpen) {
+      throw StateError('Realtime control channel is not ready.');
+    }
+    await channel.send(RTCDataChannelMessage(jsonEncode({'type': type})));
+  }
+
   void _handleDataChannelMessage(RTCDataChannelMessage message) {
     if (message.isBinary || message.text.isEmpty) return;
     try {
       final event = parseRealtimeServerEvent(message.text);
-      if (event.type == 'input_audio_buffer.speech_stopped' &&
-          _microphoneEnabled) {
-        unawaited(setMicrophoneEnabled(false));
-      }
+      if (event.type == 'response.created') _responseActive = true;
+      if (event.type == 'response.done') _responseActive = false;
       _emit(event);
     } catch (_) {
       _emit(const RealtimePilotEvent(type: 'unparsed_event'));

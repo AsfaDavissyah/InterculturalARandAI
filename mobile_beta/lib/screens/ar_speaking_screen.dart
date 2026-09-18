@@ -1506,7 +1506,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     if (!mounted) return;
     _captureActive = false;
     _speechEndTimer?.cancel();
-    await _realtimeService?.setMicrophoneEnabled(false);
+    await _realtimeService?.setMicrophoneEnabled(false, submit: false);
     await _speech.stop();
     await _tts.stop();
     if (!mounted) return;
@@ -2408,7 +2408,9 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused) {
       if (_usesLiveRealtime && _captureActive) {
-        unawaited(_realtimeService?.setMicrophoneEnabled(false));
+        unawaited(
+          _realtimeService?.setMicrophoneEnabled(false, submit: false),
+        );
       }
       final controller = _cameraController;
       if (controller == null) return;

@@ -69,14 +69,7 @@ function buildRealtimeSessionConfig({ scenarioData, student }) {
           ).trim(),
           language: "en",
         },
-        turn_detection: {
-          type: "server_vad",
-          threshold: 0.5,
-          prefix_padding_ms: 300,
-          silence_duration_ms: 650,
-          create_response: true,
-          interrupt_response: true,
-        },
+        turn_detection: null,
       },
       output: {
         voice: String(process.env.OPENAI_REALTIME_VOICE || DEFAULT_REALTIME_VOICE).trim(),

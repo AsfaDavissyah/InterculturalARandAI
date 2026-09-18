@@ -27,8 +27,7 @@ test("Realtime configuration is scoped to the lecturer office pilot", () => {
   assert.equal(isRealtimePilotSetting("SOCIAL-LONDON-RESTAURANT"), false);
   assert.equal(config.type, "realtime");
   assert.deepEqual(config.output_modalities, ["audio"]);
-  assert.equal(config.audio.input.turn_detection.type, "server_vad");
-  assert.equal(config.audio.input.turn_detection.create_response, true);
+  assert.equal(config.audio.input.turn_detection, null);
   assert.match(config.instructions, /Alya/);
   assert.match(config.instructions, /one or two short sentences/i);
   assert.match(config.instructions, /learner to speak first/i);
