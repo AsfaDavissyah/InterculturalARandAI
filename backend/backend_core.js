@@ -39,6 +39,10 @@ const {
 const { createDashboardRouter } = require("./routes/dashboard_router");
 const AuditEvent = require("./models/AuditEvent");
 const AudioCache = require("./models/AudioCache");
+const {
+  createRealtimeClientSecret,
+  isRealtimePilotSetting,
+} = require("./services/realtime_service");
 
 function requireFeature(flagName) {
   return (req, res, next) => {
@@ -2024,8 +2028,20 @@ const openAILimiter = rateLimit({
   message: { error: "Batas permintaan OpenAI tercapai. Harap tunggu beberapa saat." },
 });
 
+const realtimeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: "REALTIME_SESSION_LIMIT_REACHED",
+    message: "Too many Realtime sessions. Please wait before trying again.",
+  },
+});
+
 app.use("/api/auth", authLimiter);
 app.use("/api/openai", openAILimiter);
+app.use("/api/realtime", realtimeLimiter);
 app.use("/api/dashboard", createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }));
 
 // ─── Analytics Endpoints ───
@@ -3344,6 +3360,96 @@ app.post("/api/launch/resolve", requireFeature("qr"), async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ error: true, message: error.message });
+  }
+});
+
+app.post("/api/realtime/session", authenticateJWT, async (req, res) => {
+  if (process.env.OPENAI_REALTIME_ENABLED !== "true") {
+    return res.status(403).json({
+      error: "REALTIME_DISABLED",
+      message: "The Realtime pilot is not enabled on this server.",
+      request_id: req.requestId,
+    });
+  }
+
+  const scenarioId = String(req.body?.scenario_id || "").trim();
+  const settingId = String(req.body?.setting_id || scenarioId).trim().toUpperCase();
+  if (!settingId || !isRealtimePilotSetting(settingId)) {
+    return res.status(403).json({
+      error: "REALTIME_PILOT_NOT_AVAILABLE",
+      message: "Realtime is currently limited to the approved pilot setting.",
+      request_id: req.requestId,
+    });
+  }
+
+  try {
+    const resolution = await resolveConversationScenario({
+      scenarioId: scenarioId || settingId,
+      topicId: req.body?.topic_id,
+      settingId,
+    });
+    if (resolution.error || !resolution.scenarioData) {
+      return res.status(404).json({
+        error: "REALTIME_SCENARIO_NOT_FOUND",
+        message: resolution.error || "The pilot setting is unavailable.",
+        request_id: req.requestId,
+      });
+    }
+
+    let studentName = String(req.body?.student_display_name || "").trim();
+    if (mongoose.connection.readyState === 1) {
+      const user = await User.findById(req.user.userId).select("name role").lean();
+      if (!user || user.role !== "student") {
+        return res.status(403).json({
+          error: "REALTIME_STUDENT_ONLY",
+          message: "Realtime practice sessions are available to student accounts.",
+          request_id: req.requestId,
+        });
+      }
+      studentName = user.name || studentName;
+    } else if (req.user.role !== "student") {
+      return res.status(403).json({
+        error: "REALTIME_STUDENT_ONLY",
+        message: "Realtime practice sessions are available to student accounts.",
+        request_id: req.requestId,
+      });
+    }
+
+    const grant = await createRealtimeClientSecret({
+      scenarioData: resolution.scenarioData,
+      student: { name: studentName || "the student" },
+    });
+
+    logAuditEvent({
+      event: "realtime.session_issued",
+      actorId: req.user.userId,
+      role: req.user.role,
+      recordId: settingId,
+      requestId: req.requestId,
+      details: { model: grant.model, voice: grant.voice },
+    });
+
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(201).json({
+      client_secret: grant.clientSecret,
+      expires_at: grant.expiresAt,
+      realtime_session_id: grant.sessionId,
+      model: grant.model,
+      voice: grant.voice,
+      setting_id: settingId,
+      webrtc_url: "https://api.openai.com/v1/realtime/calls",
+    });
+  } catch (error) {
+    const status = Number(error.statusCode) || 500;
+    console.error(`[Realtime] session_issue_failed request_id=${req.requestId}`, error.message);
+    return res.status(status).json({
+      error: "REALTIME_SESSION_FAILED",
+      message:
+        status >= 500
+          ? "Realtime is temporarily unavailable. Please use the standard conversation mode."
+          : error.message,
+      request_id: req.requestId,
+    });
   }
 });
 

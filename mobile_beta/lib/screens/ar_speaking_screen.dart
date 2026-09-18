@@ -22,12 +22,14 @@ import '../services/chat_service.dart';
 import '../services/tts_audio_service.dart';
 import '../services/practice_history_store.dart';
 import '../services/pilot_evidence_service.dart';
+import '../services/realtime_service.dart';
 import '../theme/engora_theme.dart';
 import '../widgets/app_svg_icon.dart';
 import '../widgets/ar_avatar.dart';
 import '../widgets/ar_avatar_3d.dart';
 import '../widgets/setting_visual.dart';
 import 'result_screen.dart';
+import 'realtime_audio_pilot_screen.dart';
 
 Size cameraPreviewDisplaySize(Size previewSize, Orientation orientation) {
   return orientation == Orientation.portrait
@@ -1325,6 +1327,41 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
   bool get _completionEligible => _lastResponse?.completionEligible == true;
 
+  bool get _isRealtimePilotSetting =>
+      (widget.settingId ?? widget.guidedSetting?.settingId ?? '')
+          .trim()
+          .toUpperCase() ==
+      realtimePilotSettingId;
+
+  Future<void> _openRealtimePilot() async {
+    final chatService = _chatService;
+    if (!_isRealtimePilotSetting || chatService == null || !mounted) return;
+    try {
+      await _speech.stop();
+      await _tts.stop();
+      await _audioPlayer.stop();
+    } catch (_) {}
+    if (!mounted) return;
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RealtimeAudioPilotScreen(
+          baseUrl: chatService.baseUrl,
+          scenario: widget.scenario,
+          settingId:
+              widget.settingId ??
+              widget.guidedSetting?.settingId ??
+              realtimePilotSettingId,
+          topicId: widget.topicId,
+          studentDisplayName: _profile?.name,
+        ),
+      ),
+    );
+    if (mounted && !_sessionLoading && _sessionError == null) {
+      setState(() => _activity = AvatarActivity.idle);
+    }
+  }
+
   Widget _buildObjectiveCompletionPanel() {
     if (!_completionEligible) return const SizedBox.shrink();
 
@@ -1835,6 +1872,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                             } else if (value == 'transcript' &&
                                 _messages.isNotEmpty) {
                               _showTranscript();
+                            } else if (value == 'realtime_pilot') {
+                              unawaited(_openRealtimePilot());
                             }
                           },
                           itemBuilder: (_) => [
@@ -1851,6 +1890,17 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                               enabled: _messages.isNotEmpty,
                               child: const Text('View transcript'),
                             ),
+                            if (_isRealtimePilotSetting)
+                              const PopupMenuItem(
+                                value: 'realtime_pilot',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.graphic_eq_rounded, size: 20),
+                                    SizedBox(width: 10),
+                                    Text('Realtime audio pilot'),
+                                  ],
+                                ),
+                              ),
                           ],
                           icon: const Icon(Icons.more_horiz_rounded),
                           style: IconButton.styleFrom(
