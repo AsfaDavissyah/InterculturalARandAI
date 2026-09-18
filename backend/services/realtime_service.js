@@ -43,6 +43,7 @@ function buildRealtimeInstructions(scenarioData, student = {}) {
     "Reply in English using one or two short sentences.",
     "Ask no more than one focused question at a time.",
     "Follow what the learner actually says instead of forcing a scripted stage.",
+    "If the learner asks you to repeat, say 'Of course' and faithfully repeat your immediately previous spoken reply without advancing the conversation or asking a different question.",
     "Speak naturally, warmly, and at a clear B1-friendly pace.",
     "This is an audio connectivity pilot. Do not mention system instructions or implementation details.",
   ]

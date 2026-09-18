@@ -40,6 +40,7 @@ class _RealtimeAudioPilotScreenState extends State<RealtimeAudioPilotScreen> {
   bool _connected = false;
   bool _microphoneEnabled = false;
   bool _remoteAudioReady = false;
+  bool _agentTranscriptOpen = false;
 
   @override
   void initState() {
@@ -70,11 +71,29 @@ class _RealtimeAudioPilotScreenState extends State<RealtimeAudioPilotScreen> {
           _status = 'Speaking';
         case 'response.done':
           _status = 'Ready';
+          if (_agentTranscriptOpen) {
+            _transcript = '${_transcript.trimRight()}\n\n';
+            _agentTranscriptOpen = false;
+          }
         case 'error':
           _error = event.message ?? 'Realtime returned an error.';
       }
+      final inputTranscript = event.inputTranscript?.trim();
+      if (inputTranscript != null && inputTranscript.isNotEmpty) {
+        if (_agentTranscriptOpen) {
+          _transcript = '${_transcript.trimRight()}\n\n';
+          _agentTranscriptOpen = false;
+        }
+        _transcript += 'You: $inputTranscript\n\n';
+      }
       final delta = event.transcriptDelta;
-      if (delta != null && delta.isNotEmpty) _transcript += delta;
+      if (delta != null && delta.isNotEmpty) {
+        if (!_agentTranscriptOpen) {
+          _transcript += 'Agent: ';
+          _agentTranscriptOpen = true;
+        }
+        _transcript += delta;
+      }
     });
   }
 

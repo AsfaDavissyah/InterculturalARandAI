@@ -43,13 +43,36 @@ class RealtimeSessionGrant {
 class RealtimePilotEvent {
   final String type;
   final String? transcriptDelta;
+  final String? inputTranscript;
   final String? message;
 
   const RealtimePilotEvent({
     required this.type,
     this.transcriptDelta,
+    this.inputTranscript,
     this.message,
   });
+}
+
+RealtimePilotEvent parseRealtimeServerEvent(String message) {
+  final payload = jsonDecode(message) as Map<String, dynamic>;
+  final type = payload['type']?.toString() ?? 'unknown';
+  final isAgentTranscriptDelta =
+      type == 'response.output_audio_transcript.delta' ||
+      type == 'response.audio_transcript.delta';
+  final isInputTranscriptComplete =
+      type == 'conversation.item.input_audio_transcription.completed';
+
+  return RealtimePilotEvent(
+    type: type,
+    transcriptDelta: isAgentTranscriptDelta
+        ? payload['delta']?.toString()
+        : null,
+    inputTranscript: isInputTranscriptComplete
+        ? payload['transcript']?.toString()
+        : null,
+    message: payload['error']?['message']?.toString(),
+  );
 }
 
 class RealtimeService {
@@ -244,19 +267,12 @@ class RealtimeService {
   void _handleDataChannelMessage(RTCDataChannelMessage message) {
     if (message.isBinary || message.text.isEmpty) return;
     try {
-      final payload = jsonDecode(message.text) as Map<String, dynamic>;
-      final type = payload['type']?.toString() ?? 'unknown';
-      final delta = payload['delta']?.toString();
-      if (type == 'input_audio_buffer.speech_stopped' && _microphoneEnabled) {
+      final event = parseRealtimeServerEvent(message.text);
+      if (event.type == 'input_audio_buffer.speech_stopped' &&
+          _microphoneEnabled) {
         unawaited(setMicrophoneEnabled(false));
       }
-      _emit(
-        RealtimePilotEvent(
-          type: type,
-          transcriptDelta: type.contains('transcript.delta') ? delta : null,
-          message: payload['error']?['message']?.toString(),
-        ),
-      );
+      _emit(event);
     } catch (_) {
       _emit(const RealtimePilotEvent(type: 'unparsed_event'));
     }

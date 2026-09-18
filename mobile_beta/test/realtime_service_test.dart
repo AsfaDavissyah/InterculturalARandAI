@@ -17,4 +17,20 @@ void main() {
     expect(grant.webRtcUrl.host, 'api.openai.com');
     expect(grant.model, 'gpt-realtime');
   });
+
+  test('Realtime parser separates learner and agent transcripts', () {
+    final learner = parseRealtimeServerEvent(
+      '{"type":"conversation.item.input_audio_transcription.completed",'
+      '"transcript":"Could you repeat that?"}',
+    );
+    final agent = parseRealtimeServerEvent(
+      '{"type":"response.output_audio_transcript.delta",'
+      '"delta":"Of course."}',
+    );
+
+    expect(learner.inputTranscript, 'Could you repeat that?');
+    expect(learner.transcriptDelta, isNull);
+    expect(agent.transcriptDelta, 'Of course.');
+    expect(agent.inputTranscript, isNull);
+  });
 }
