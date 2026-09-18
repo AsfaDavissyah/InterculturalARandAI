@@ -42,14 +42,18 @@ class RealtimeSessionGrant {
 
 class RealtimePilotEvent {
   final String type;
+  final String? itemId;
   final String? transcriptDelta;
   final String? inputTranscript;
+  final String? completedTranscript;
   final String? message;
 
   const RealtimePilotEvent({
     required this.type,
+    this.itemId,
     this.transcriptDelta,
     this.inputTranscript,
+    this.completedTranscript,
     this.message,
   });
 }
@@ -62,13 +66,22 @@ RealtimePilotEvent parseRealtimeServerEvent(String message) {
       type == 'response.audio_transcript.delta';
   final isInputTranscriptComplete =
       type == 'conversation.item.input_audio_transcription.completed';
+  final isAgentTranscriptComplete =
+      type == 'response.output_audio_transcript.done' ||
+      type == 'response.audio_transcript.done';
 
   return RealtimePilotEvent(
     type: type,
+    itemId:
+        payload['item_id']?.toString() ??
+        (payload['item'] as Map<String, dynamic>?)?['id']?.toString(),
     transcriptDelta: isAgentTranscriptDelta
         ? payload['delta']?.toString()
         : null,
     inputTranscript: isInputTranscriptComplete
+        ? payload['transcript']?.toString()
+        : null,
+    completedTranscript: isAgentTranscriptComplete
         ? payload['transcript']?.toString()
         : null,
     message: payload['error']?['message']?.toString(),
@@ -164,12 +177,14 @@ class RealtimeService {
       'oai-events',
       RTCDataChannelInit()..ordered = true,
     );
+    final dataChannelReady = Completer<void>();
     _dataChannel = channel;
     channel.onDataChannelState = (state) {
       _emit(
         RealtimePilotEvent(type: 'data_channel_state', message: state.name),
       );
       if (state == RTCDataChannelState.RTCDataChannelOpen) {
+        if (!dataChannelReady.isCompleted) dataChannelReady.complete();
         _emit(
           RealtimePilotEvent(
             type: 'connected',
@@ -207,6 +222,12 @@ class RealtimeService {
     }
     await peerConnection.setRemoteDescription(
       RTCSessionDescription(response.body, 'answer'),
+    );
+    await dataChannelReady.future.timeout(
+      const Duration(seconds: 10),
+      onTimeout: () => throw TimeoutException(
+        'Realtime audio channel did not become ready.',
+      ),
     );
   }
 

@@ -7,6 +7,13 @@ import '../models/scenario_topic.dart';
 import '../services/realtime_service.dart';
 import '../theme/engora_theme.dart';
 
+class _RealtimeTranscriptTurn {
+  final String speaker;
+  final String message;
+
+  const _RealtimeTranscriptTurn({required this.speaker, required this.message});
+}
+
 class RealtimeAudioPilotScreen extends StatefulWidget {
   final String baseUrl;
   final ScenarioTopic scenario;
@@ -34,13 +41,37 @@ class _RealtimeAudioPilotScreenState extends State<RealtimeAudioPilotScreen> {
   );
   StreamSubscription<RealtimePilotEvent>? _subscription;
   String _status = 'Ready to connect';
-  String _transcript = '';
+  final List<_RealtimeTranscriptTurn> _transcriptTurns = [];
+  final Set<String> _committedInputItems = {};
+  final Set<String> _committedAgentItems = {};
+  String _agentTranscriptDraft = '';
+  String? _agentTranscriptItemId;
   String? _error;
   bool _connecting = false;
   bool _connected = false;
   bool _microphoneEnabled = false;
   bool _remoteAudioReady = false;
-  bool _agentTranscriptOpen = false;
+
+  String get _transcript {
+    final lines = _transcriptTurns
+        .map((turn) => '${turn.speaker}: ${turn.message}')
+        .toList();
+    final draft = _agentTranscriptDraft.trim();
+    if (draft.isNotEmpty) lines.add('Agent: $draft');
+    return lines.join('\n\n');
+  }
+
+  void _commitAgentTranscript(String text, String? itemId) {
+    final normalized = text.trim();
+    if (normalized.isEmpty) return;
+    final dedupeKey = itemId ?? normalized;
+    if (!_committedAgentItems.add(dedupeKey)) return;
+    _transcriptTurns.add(
+      _RealtimeTranscriptTurn(speaker: 'Agent', message: normalized),
+    );
+    _agentTranscriptDraft = '';
+    _agentTranscriptItemId = null;
+  }
 
   @override
   void initState() {
@@ -71,28 +102,32 @@ class _RealtimeAudioPilotScreenState extends State<RealtimeAudioPilotScreen> {
           _status = 'Speaking';
         case 'response.done':
           _status = 'Ready';
-          if (_agentTranscriptOpen) {
-            _transcript = '${_transcript.trimRight()}\n\n';
-            _agentTranscriptOpen = false;
-          }
+          _commitAgentTranscript(_agentTranscriptDraft, _agentTranscriptItemId);
         case 'error':
           _error = event.message ?? 'Realtime returned an error.';
       }
       final inputTranscript = event.inputTranscript?.trim();
       if (inputTranscript != null && inputTranscript.isNotEmpty) {
-        if (_agentTranscriptOpen) {
-          _transcript = '${_transcript.trimRight()}\n\n';
-          _agentTranscriptOpen = false;
+        final dedupeKey = event.itemId ?? inputTranscript;
+        if (_committedInputItems.add(dedupeKey)) {
+          _transcriptTurns.add(
+            _RealtimeTranscriptTurn(speaker: 'You', message: inputTranscript),
+          );
         }
-        _transcript += 'You: $inputTranscript\n\n';
       }
       final delta = event.transcriptDelta;
       if (delta != null && delta.isNotEmpty) {
-        if (!_agentTranscriptOpen) {
-          _transcript += 'Agent: ';
-          _agentTranscriptOpen = true;
+        if (_agentTranscriptItemId != null &&
+            event.itemId != null &&
+            _agentTranscriptItemId != event.itemId) {
+          _commitAgentTranscript(_agentTranscriptDraft, _agentTranscriptItemId);
         }
-        _transcript += delta;
+        _agentTranscriptItemId ??= event.itemId;
+        _agentTranscriptDraft += delta;
+      }
+      final completedTranscript = event.completedTranscript?.trim();
+      if (completedTranscript != null && completedTranscript.isNotEmpty) {
+        _commitAgentTranscript(completedTranscript, event.itemId);
       }
     });
   }

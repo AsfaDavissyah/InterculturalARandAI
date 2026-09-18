@@ -31,6 +31,7 @@ test("Realtime configuration is scoped to the lecturer office pilot", () => {
   assert.equal(config.audio.input.turn_detection.create_response, true);
   assert.match(config.instructions, /Alya/);
   assert.match(config.instructions, /one or two short sentences/i);
+  assert.match(config.instructions, /faithfully repeat your immediately previous/i);
 });
 
 test("authenticated student receives an ephemeral secret without exposing the API key", async () => {

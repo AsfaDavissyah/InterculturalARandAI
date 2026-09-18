@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:speech_to_text/speech_recognition_error.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -29,7 +30,6 @@ import '../widgets/ar_avatar.dart';
 import '../widgets/ar_avatar_3d.dart';
 import '../widgets/setting_visual.dart';
 import 'result_screen.dart';
-import 'realtime_audio_pilot_screen.dart';
 
 Size cameraPreviewDisplaySize(Size previewSize, Orientation orientation) {
   return orientation == Orientation.portrait
@@ -126,6 +126,15 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   late final AudioPlayer _audioPlayer;
   StreamSubscription<PlayerState>? _audioSubscription;
   StreamSubscription<Duration>? _positionSubscription;
+  RealtimeService? _realtimeService;
+  StreamSubscription<RealtimePilotEvent>? _realtimeSubscription;
+  final Set<String> _realtimeInputItems = {};
+  final Set<String> _realtimeAgentItems = {};
+  String _realtimeAgentDraft = '';
+  String? _realtimeAgentItemId;
+  bool _realtimeConnecting = false;
+  bool _realtimeConnected = false;
+  bool _realtimeFallback = false;
 
   int _studentResponseCount = 0;
   bool _sessionLoading = true;
@@ -222,10 +231,27 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     _chatService = ChatService(baseUrl: baseUrl);
     _profile = await profileFuture;
 
+    final ttsInitialization = _initializeTts();
+    final cameraInitialization = _initializeCamera();
+    if (_isRealtimePilotSetting) {
+      final connected = await _initializeRealtimeConnection(baseUrl);
+      if (connected) {
+        if (!mounted) return;
+        setState(() {
+          _messages.clear();
+          _sessionLoading = false;
+          _activity = AvatarActivity.idle;
+          _activeSubtitle = null;
+        });
+        unawaited(ttsInitialization);
+        unawaited(cameraInitialization);
+        return;
+      }
+    }
+
+    final speechInitialization = _initializeSpeech();
     try {
       final openingFuture = _loadOpeningMessage();
-      final ttsInitialization = _initializeTts();
-      final captureInitialization = _initializeCaptureDevices();
       final openingMessage = await openingFuture;
       final openingAudio = _requestNeuralAudioUrl(openingMessage);
       await ttsInitialization;
@@ -239,7 +265,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         _activity = AvatarActivity.loading;
         _activeSubtitle = _messages.last;
       });
-      unawaited(captureInitialization);
+      unawaited(cameraInitialization);
+      unawaited(speechInitialization);
       try {
         await _speak(openingMessage, preparedAudioUrl: openingAudio);
       } catch (_) {
@@ -264,9 +291,206 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     }
   }
 
-  Future<void> _initializeCaptureDevices() async {
-    await _initializeSpeech();
-    await _initializeCamera();
+  Future<bool> _initializeRealtimeConnection(String baseUrl) async {
+    await _realtimeSubscription?.cancel();
+    await _realtimeService?.dispose();
+    final service = RealtimeService(baseUrl: baseUrl);
+    _realtimeService = service;
+    _realtimeSubscription = service.events.listen(_onRealtimeEvent);
+    if (mounted) {
+      setState(() {
+        _realtimeConnecting = true;
+        _realtimeConnected = false;
+        _realtimeFallback = false;
+        _activity = AvatarActivity.loading;
+      });
+    }
+    try {
+      await service.connect(
+        scenarioId: widget.scenario.id,
+        settingId:
+            widget.settingId ??
+            widget.guidedSetting?.settingId ??
+            realtimePilotSettingId,
+        topicId: widget.topicId,
+        studentDisplayName: _profile?.name,
+      );
+      return true;
+    } catch (error) {
+      await _realtimeSubscription?.cancel();
+      _realtimeSubscription = null;
+      await service.dispose();
+      if (_realtimeService == service) _realtimeService = null;
+      if (!mounted) return false;
+      setState(() {
+        _realtimeConnecting = false;
+        _realtimeConnected = false;
+        _realtimeFallback = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Realtime audio is unavailable. Continuing with standard conversation mode.',
+          ),
+        ),
+      );
+      return false;
+    }
+  }
+
+  void _onRealtimeEvent(RealtimePilotEvent event) {
+    if (!mounted || !_isRealtimePilotSetting) return;
+    List<Map<String, String>>? evaluationHistory;
+    String? studentResponse;
+    int? turnNumber;
+    List<String>? completedObjectives;
+
+    setState(() {
+      switch (event.type) {
+        case 'connected':
+          _realtimeConnecting = false;
+          _realtimeConnected = true;
+          _realtimeFallback = false;
+          _activity = AvatarActivity.idle;
+        case 'microphone_started':
+          _captureActive = true;
+          _activity = AvatarActivity.listening;
+          _pulsingController.repeat(reverse: true);
+        case 'microphone_stopped':
+          _captureActive = false;
+          _pulsingController.stop();
+          _activity = AvatarActivity.thinking;
+        case 'response.created':
+          _activity = AvatarActivity.thinking;
+        case 'response.output_audio.delta':
+        case 'response.audio.delta':
+        case 'output_audio_buffer.started':
+          _activity = AvatarActivity.speaking;
+        case 'response.done':
+        case 'output_audio_buffer.stopped':
+          if (!_captureActive) _activity = AvatarActivity.idle;
+        case 'error':
+          _realtimeConnected = false;
+          _realtimeFallback = true;
+          _activity = AvatarActivity.idle;
+      }
+
+      final inputTranscript = event.inputTranscript?.trim();
+      if (inputTranscript != null && inputTranscript.isNotEmpty) {
+        final itemKey = event.itemId ?? 'input:$inputTranscript';
+        if (_realtimeInputItems.add(itemKey)) {
+          evaluationHistory = _messages
+              .map(
+                (message) => {
+                  'speaker': message.speaker,
+                  'message': message.message,
+                },
+              )
+              .toList();
+          turnNumber = _studentResponseCount + 1;
+          studentResponse = inputTranscript;
+          completedObjectives = _completedObjectiveIds.toList(growable: false);
+          final message = ConversationMessage(
+            speaker: 'Student',
+            message: inputTranscript,
+          );
+          _messages.add(message);
+          _activeSubtitle = message;
+          _recognizedWords = '';
+          _studentResponseCount++;
+        }
+      }
+
+      final delta = event.transcriptDelta;
+      if (delta != null && delta.isNotEmpty) {
+        if (_realtimeAgentItemId != null &&
+            event.itemId != null &&
+            _realtimeAgentItemId != event.itemId) {
+          _commitRealtimeAgentTranscript(
+            _realtimeAgentDraft,
+            _realtimeAgentItemId,
+          );
+        }
+        _realtimeAgentItemId ??= event.itemId;
+        _realtimeAgentDraft += delta;
+        _activeSubtitle = ConversationMessage(
+          speaker: 'AI',
+          message: _realtimeAgentDraft.trim(),
+        );
+        _activity = AvatarActivity.speaking;
+      }
+
+      final completedTranscript = event.completedTranscript?.trim();
+      if (completedTranscript != null && completedTranscript.isNotEmpty) {
+        _commitRealtimeAgentTranscript(completedTranscript, event.itemId);
+      } else if (event.type == 'response.done' &&
+          _realtimeAgentDraft.trim().isNotEmpty) {
+        _commitRealtimeAgentTranscript(
+          _realtimeAgentDraft,
+          _realtimeAgentItemId,
+        );
+      }
+    });
+
+    final connectionFailed =
+        event.type == 'error' ||
+        (event.type == 'connection_state' &&
+            const {'failed', 'disconnected', 'closed'}.contains(event.message));
+    if (connectionFailed) unawaited(_activateRealtimeFallback());
+
+    if (studentResponse != null &&
+        turnNumber != null &&
+        evaluationHistory != null &&
+        completedObjectives != null) {
+      late final Future<void> evaluation;
+      evaluation = _refreshTurnEvaluation(
+        turnNumber: turnNumber!,
+        history: evaluationHistory!,
+        studentResponse: studentResponse!,
+        completedObjectiveIds: completedObjectives!,
+        adoptAsLatest: true,
+      ).whenComplete(() => _pendingEvaluations.remove(evaluation));
+      _pendingEvaluations.add(evaluation);
+      unawaited(evaluation);
+    }
+  }
+
+  void _commitRealtimeAgentTranscript(String text, String? itemId) {
+    final normalized = text.trim();
+    if (normalized.isEmpty) return;
+    final itemKey = itemId ?? 'agent:$normalized';
+    if (!_realtimeAgentItems.add(itemKey)) return;
+    final message = ConversationMessage(speaker: 'AI', message: normalized);
+    _messages.add(message);
+    _activeSubtitle = message;
+    _realtimeAgentDraft = '';
+    _realtimeAgentItemId = null;
+  }
+
+  Future<void> _activateRealtimeFallback() async {
+    final service = _realtimeService;
+    _realtimeService = null;
+    await _realtimeSubscription?.cancel();
+    _realtimeSubscription = null;
+    await service?.dispose();
+    if (!mounted) return;
+    _pulsingController.stop();
+    setState(() {
+      _captureActive = false;
+      _realtimeConnecting = false;
+      _realtimeConnected = false;
+      _realtimeFallback = true;
+      if (_activity != AvatarActivity.loading) {
+        _activity = AvatarActivity.idle;
+      }
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Live conversation disconnected. Standard mode is ready to continue.',
+        ),
+      ),
+    );
   }
 
   Future<String> _loadOpeningMessage() async {
@@ -556,6 +780,11 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   }
 
   Future<void> _toggleListening() async {
+    if (_usesLiveRealtime) {
+      await _toggleRealtimeMicrophone();
+      return;
+    }
+    if (_isRealtimePilotSetting && _realtimeConnecting) return;
     if (_playbackBusy ||
         _submissionStarted ||
         _reviewingTranscript ||
@@ -593,6 +822,34 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     }
 
     await _startListening();
+  }
+
+  Future<void> _toggleRealtimeMicrophone() async {
+    final service = _realtimeService;
+    if (service == null || !_realtimeConnected) return;
+    try {
+      if (!_captureActive) {
+        await _tts.stop();
+        await _audioPlayer.stop();
+      }
+      await service.setMicrophoneEnabled(!_captureActive);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _captureActive = false;
+        _realtimeConnected = false;
+        _realtimeFallback = true;
+        _activity = AvatarActivity.idle;
+      });
+      _pulsingController.stop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Realtime microphone disconnected. Standard conversation mode is still available.',
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _startListening({String retainedText = ''}) async {
@@ -1065,6 +1322,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     required List<Map<String, String>> history,
     required String studentResponse,
     required List<String> completedObjectiveIds,
+    bool adoptAsLatest = false,
   }) async {
     if (_chatService == null) return;
     try {
@@ -1091,7 +1349,9 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         } else {
           _evaluationResults.add(detailedResult);
         }
-        if (_lastResponse?.turnNumber == turnNumber) {
+        final latestTurnNumber = _lastResponse?.turnNumber ?? 0;
+        if ((adoptAsLatest && turnNumber >= latestTurnNumber) ||
+            _lastResponse?.turnNumber == turnNumber) {
           _lastResponse = detailedResult;
         }
       });
@@ -1188,6 +1448,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     if (!mounted) return;
     _captureActive = false;
     _speechEndTimer?.cancel();
+    await _realtimeService?.setMicrophoneEnabled(false);
     await _speech.stop();
     await _tts.stop();
     if (!mounted) return;
@@ -1333,34 +1594,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
           .toUpperCase() ==
       realtimePilotSettingId;
 
-  Future<void> _openRealtimePilot() async {
-    final chatService = _chatService;
-    if (!_isRealtimePilotSetting || chatService == null || !mounted) return;
-    try {
-      await _speech.stop();
-      await _tts.stop();
-      await _audioPlayer.stop();
-    } catch (_) {}
-    if (!mounted) return;
-    await Navigator.push<void>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => RealtimeAudioPilotScreen(
-          baseUrl: chatService.baseUrl,
-          scenario: widget.scenario,
-          settingId:
-              widget.settingId ??
-              widget.guidedSetting?.settingId ??
-              realtimePilotSettingId,
-          topicId: widget.topicId,
-          studentDisplayName: _profile?.name,
-        ),
-      ),
-    );
-    if (mounted && !_sessionLoading && _sessionError == null) {
-      setState(() => _activity = AvatarActivity.idle);
-    }
-  }
+  bool get _usesLiveRealtime =>
+      _isRealtimePilotSetting && _realtimeConnected && !_realtimeFallback;
 
   Widget _buildObjectiveCompletionPanel() {
     if (!_completionEligible) return const SizedBox.shrink();
@@ -1422,6 +1657,9 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
   String get _statusLabel {
     if (_navigatingToResult) return 'Finalizing assessment';
+    if (_isRealtimePilotSetting && _realtimeConnecting) {
+      return 'Connecting live conversation';
+    }
     if (_reviewingTranscript) return 'Review transcript';
     if (_pendingResponse != null && !_requestInFlight) {
       return 'Response kept in this session - retry';
@@ -1446,7 +1684,13 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     final objectiveProgress = completed + remaining > 0
         ? ' | Goals $completed/${completed + remaining}'
         : '';
-    return '$activityLabel | Response $_studentResponseCount$objectiveProgress';
+    final mode = _usesLiveRealtime
+        ? 'Live'
+        : _isRealtimePilotSetting && _realtimeFallback
+        ? 'Standard fallback'
+        : null;
+    final modeLabel = mode == null ? '' : ' | $mode';
+    return '$activityLabel | Response $_studentResponseCount$objectiveProgress$modeLabel';
   }
 
   void _triggerCoachingBanner(CoachingEvent? event) {
@@ -1780,6 +2024,12 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         _activity != AvatarActivity.thinking &&
         _activity != AvatarActivity.speaking &&
         _activity != AvatarActivity.loading;
+    final canUseMicrophone =
+        canInteract ||
+        (_usesLiveRealtime &&
+            !_navigatingToResult &&
+            !_sessionLoading &&
+            _sessionError == null);
 
     return PopScope(
       canPop:
@@ -1829,6 +2079,20 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                   ),
                 ),
               ),
+            if (_realtimeService != null)
+              Positioned(
+                left: 0,
+                top: 0,
+                width: 1,
+                height: 1,
+                child: IgnorePointer(
+                  child: RTCVideoView(
+                    _realtimeService!.remoteRenderer,
+                    objectFit:
+                        RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+                  ),
+                ),
+              ),
             SafeArea(
               child: Column(
                 children: [
@@ -1872,8 +2136,6 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                             } else if (value == 'transcript' &&
                                 _messages.isNotEmpty) {
                               _showTranscript();
-                            } else if (value == 'realtime_pilot') {
-                              unawaited(_openRealtimePilot());
                             }
                           },
                           itemBuilder: (_) => [
@@ -1890,17 +2152,6 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                               enabled: _messages.isNotEmpty,
                               child: const Text('View transcript'),
                             ),
-                            if (_isRealtimePilotSetting)
-                              const PopupMenuItem(
-                                value: 'realtime_pilot',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.graphic_eq_rounded, size: 20),
-                                    SizedBox(width: 10),
-                                    Text('Realtime audio pilot'),
-                                  ],
-                                ),
-                              ),
                           ],
                           icon: const Icon(Icons.more_horiz_rounded),
                           style: IconButton.styleFrom(
@@ -1965,7 +2216,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                             ),
                             Semantics(
                               button: true,
-                              label: _speech.isListening
+                              label: _captureActive
                                   ? 'Stop listening'
                                   : 'Start speaking',
                               child: AnimatedBuilder(
@@ -1978,7 +2229,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                                     child: Stack(
                                       alignment: Alignment.center,
                                       children: [
-                                        if (_speech.isListening)
+                                        if (_captureActive)
                                           Container(
                                             width: 62 + (pulse * 20),
                                             height: 62 + (pulse * 20),
@@ -2000,12 +2251,12 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
                                       : _captureActive
                                       ? 'Stop listening'
                                       : 'Speak',
-                                  onPressed: canInteract
+                                  onPressed: canUseMicrophone
                                       ? _toggleListening
                                       : null,
                                   style: IconButton.styleFrom(
                                     minimumSize: const Size(64, 64),
-                                    backgroundColor: _speech.isListening
+                                    backgroundColor: _captureActive
                                         ? _danger
                                         : _orange,
                                     foregroundColor: Colors.white,
@@ -2094,6 +2345,9 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused) {
+      if (_usesLiveRealtime && _captureActive) {
+        unawaited(_realtimeService?.setMicrophoneEnabled(false));
+      }
       final controller = _cameraController;
       if (controller == null) return;
       if (mounted) {
@@ -2112,6 +2366,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_audioSubscription?.cancel());
     unawaited(_positionSubscription?.cancel());
+    unawaited(_realtimeSubscription?.cancel());
+    unawaited(_realtimeService?.dispose());
     unawaited(_cameraController?.dispose());
     unawaited(_speech.cancel());
     unawaited(_tts.stop());
