@@ -7,6 +7,18 @@ import 'package:http/http.dart' as http;
 import 'auth_service.dart';
 
 const String realtimePilotSettingId = 'ACADEMIC-LECTURER-OFFICE';
+const Duration _realtimeAudioDrainDelay = Duration(milliseconds: 450);
+const Duration _realtimeAudioCommitDelay = Duration(milliseconds: 150);
+
+Map<String, dynamic> buildRealtimeManualTurnSessionUpdate() => {
+  'type': 'session.update',
+  'session': {
+    'type': 'realtime',
+    'audio': {
+      'input': {'turn_detection': null},
+    },
+  },
+};
 
 class RealtimeSessionGrant {
   final String clientSecret;
@@ -114,6 +126,7 @@ class RealtimeService {
   bool _rendererInitialized = false;
   bool _microphoneEnabled = false;
   bool _responseActive = false;
+  Completer<void>? _manualTurnConfiguration;
   bool _disposed = false;
   String? _researchSessionId;
   String? _realtimeSessionId;
@@ -207,12 +220,6 @@ class RealtimeService {
       );
       if (state == RTCDataChannelState.RTCDataChannelOpen) {
         if (!dataChannelReady.isCompleted) dataChannelReady.complete();
-        _emit(
-          RealtimePilotEvent(
-            type: 'connected',
-            message: '${grant.model} · ${grant.voice}',
-          ),
-        );
       }
     };
     channel.onMessage = _handleDataChannelMessage;
@@ -249,6 +256,22 @@ class RealtimeService {
       const Duration(seconds: 10),
       onTimeout: () => throw TimeoutException(
         'Realtime audio channel did not become ready.',
+      ),
+    );
+
+    _manualTurnConfiguration = Completer<void>();
+    await _sendEvent(buildRealtimeManualTurnSessionUpdate());
+    await _manualTurnConfiguration!.future.timeout(
+      const Duration(seconds: 5),
+      onTimeout: () => throw TimeoutException(
+        'Realtime did not confirm manual turn control.',
+      ),
+    );
+    _manualTurnConfiguration = null;
+    _emit(
+      RealtimePilotEvent(
+        type: 'connected',
+        message: '${grant.model} · ${grant.voice}',
       ),
     );
   }
@@ -309,6 +332,12 @@ class RealtimeService {
       await _sendControlEvent('input_audio_buffer.clear');
     }
 
+    if (!enabled && submit) {
+      // WebRTC audio and control events use separate channels. Keep the track
+      // open briefly so the last RTP packets arrive before the commit event.
+      await Future<void>.delayed(_realtimeAudioDrainDelay);
+    }
+
     for (final track in stream.getAudioTracks()) {
       track.enabled = enabled;
     }
@@ -316,6 +345,7 @@ class RealtimeService {
 
     if (!enabled) {
       if (submit) {
+        await Future<void>.delayed(_realtimeAudioCommitDelay);
         await _sendControlEvent('input_audio_buffer.commit');
         await _sendControlEvent('response.create');
       } else {
@@ -331,18 +361,36 @@ class RealtimeService {
   }
 
   Future<void> _sendControlEvent(String type) async {
+    await _sendEvent({'type': type});
+  }
+
+  Future<void> _sendEvent(Map<String, dynamic> event) async {
     final channel = _dataChannel;
     if (channel == null ||
         channel.state != RTCDataChannelState.RTCDataChannelOpen) {
       throw StateError('Realtime control channel is not ready.');
     }
-    await channel.send(RTCDataChannelMessage(jsonEncode({'type': type})));
+    await channel.send(RTCDataChannelMessage(jsonEncode(event)));
   }
 
   void _handleDataChannelMessage(RTCDataChannelMessage message) {
     if (message.isBinary || message.text.isEmpty) return;
     try {
       final event = parseRealtimeServerEvent(message.text);
+      if (event.type == 'session.updated') {
+        final configuration = _manualTurnConfiguration;
+        if (configuration != null && !configuration.isCompleted) {
+          configuration.complete();
+        }
+      }
+      if (event.type == 'error') {
+        final configuration = _manualTurnConfiguration;
+        if (configuration != null && !configuration.isCompleted) {
+          configuration.completeError(
+            StateError(event.message ?? 'Realtime session update failed.'),
+          );
+        }
+      }
       if (event.type == 'response.created') _responseActive = true;
       if (event.type == 'response.done') _responseActive = false;
       _emit(event);

@@ -2,6 +2,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_beta/services/realtime_service.dart';
 
 void main() {
+  test('Realtime manual turns explicitly disable VAD', () {
+    final event = buildRealtimeManualTurnSessionUpdate();
+    final session = event['session'] as Map<String, dynamic>;
+    final audio = session['audio'] as Map<String, dynamic>;
+    final input = audio['input'] as Map<String, dynamic>;
+
+    expect(event['type'], 'session.update');
+    expect(session['type'], 'realtime');
+    expect(input.containsKey('turn_detection'), isTrue);
+    expect(input['turn_detection'], isNull);
+  });
+
   test('Realtime grant parses only the short-lived client credential', () {
     final grant = RealtimeSessionGrant.fromJson({
       'client_secret': 'ek_test_short_lived',
