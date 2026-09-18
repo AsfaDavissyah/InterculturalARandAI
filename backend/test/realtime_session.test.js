@@ -31,6 +31,7 @@ test("Realtime configuration is scoped to the lecturer office pilot", () => {
   assert.equal(config.audio.input.turn_detection.create_response, true);
   assert.match(config.instructions, /Alya/);
   assert.match(config.instructions, /one or two short sentences/i);
+  assert.match(config.instructions, /learner to speak first/i);
   assert.match(config.instructions, /faithfully repeat your immediately previous/i);
 });
 
@@ -105,6 +106,7 @@ test("authenticated student receives an ephemeral secret without exposing the AP
         body: JSON.stringify({
           scenario_id: "ACADEMIC-LECTURER-OFFICE",
           setting_id: "ACADEMIC-LECTURER-OFFICE",
+          research_session_id: "session_research_test_12345678",
           topic_id: "academic-communication",
           student_display_name: "Alya",
         }),
@@ -115,6 +117,8 @@ test("authenticated student receives an ephemeral secret without exposing the AP
     assert.equal(response.status, 201);
     assert.equal(body.client_secret, "ek_test_ephemeral");
     assert.equal(body.setting_id, "ACADEMIC-LECTURER-OFFICE");
+    assert.equal(body.research_session_id, "session_research_test_12345678");
+    assert.equal(body.realtime_session_id, "sess_realtime_test");
     assert.equal(upstreamCalls, 1);
     assert.equal(JSON.stringify(body).includes(process.env.OPENAI_API_KEY), false);
     assert.match(upstreamRequest.url, /realtime\/client_secrets$/);

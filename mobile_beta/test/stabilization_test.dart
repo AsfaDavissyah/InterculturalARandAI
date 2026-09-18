@@ -137,12 +137,19 @@ void main() {
       ],
       evaluations: [response],
       completedByObjectives: true,
+      conversationMode: 'realtime',
+      realtimeSessionId: 'sess_realtime_test',
+      studentResponseCount: 2,
     );
     final dashboardRecord = session.toDashboardRecord();
 
     expect(session.durationSeconds, 180);
     expect(session.overallScore, 4);
     expect(session.status, 'completed');
+    expect(session.studentResponseCount, 2);
+    expect(dashboardRecord['conversation_mode'], 'realtime');
+    expect(dashboardRecord['realtime_session_id'], 'sess_realtime_test');
+    expect(dashboardRecord['end_reason'], 'objectives_completed');
     expect(dashboardRecord['session_id'], 'session_test');
     expect(dashboardRecord['scenario_id'], 'G-ICC-008');
     expect(dashboardRecord['average_scores'], isA<Map<String, double>>());

@@ -59,8 +59,13 @@ List<String> buildTranscriptAlternatives({
 class ConversationMessage {
   final String speaker;
   final String message;
+  final DateTime timestamp;
 
-  const ConversationMessage({required this.speaker, required this.message});
+  ConversationMessage({
+    required this.speaker,
+    required this.message,
+    DateTime? timestamp,
+  }) : timestamp = (timestamp ?? DateTime.now()).toUtc();
 }
 
 class ArSpeakingScreen extends StatefulWidget {
@@ -130,8 +135,11 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   StreamSubscription<RealtimePilotEvent>? _realtimeSubscription;
   final Set<String> _realtimeInputItems = {};
   final Set<String> _realtimeAgentItems = {};
+  final Map<String, StringBuffer> _realtimeInputDrafts = {};
   String _realtimeAgentDraft = '';
   String? _realtimeAgentItemId;
+  String? _realtimeSessionId;
+  bool _realtimeWasUsed = false;
   bool _realtimeConnecting = false;
   bool _realtimeConnected = false;
   bool _realtimeFallback = false;
@@ -312,9 +320,12 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
             widget.settingId ??
             widget.guidedSetting?.settingId ??
             realtimePilotSettingId,
+        researchSessionId: _sessionId,
         topicId: widget.topicId,
         studentDisplayName: _profile?.name,
       );
+      _realtimeWasUsed = true;
+      _realtimeSessionId = service.realtimeSessionId;
       return true;
     } catch (error) {
       await _realtimeSubscription?.cancel();
@@ -360,12 +371,20 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
           _captureActive = false;
           _pulsingController.stop();
           _activity = AvatarActivity.thinking;
+          final now = DateTime.now().toUtc();
+          _activeLatencyDraft = ConversationLatencyDraft(
+            turnNumber: _studentResponseCount + 1,
+            speechFinalAt: now,
+            thinkingVisibleAt: now,
+            chatRequestStartedAt: now,
+          );
         case 'response.created':
           _activity = AvatarActivity.thinking;
         case 'response.output_audio.delta':
         case 'response.audio.delta':
         case 'output_audio_buffer.started':
           _activity = AvatarActivity.speaking;
+          _recordRealtimeAudioStart();
         case 'response.done':
         case 'output_audio_buffer.stopped':
           if (!_captureActive) _activity = AvatarActivity.idle;
@@ -375,7 +394,29 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
           _activity = AvatarActivity.idle;
       }
 
-      final inputTranscript = event.inputTranscript?.trim();
+      final inputDelta = event.inputTranscriptDelta;
+      if (inputDelta != null && inputDelta.isNotEmpty) {
+        final itemKey = event.itemId ?? 'active-input';
+        final draft = _realtimeInputDrafts.putIfAbsent(
+          itemKey,
+          StringBuffer.new,
+        );
+        draft.write(inputDelta);
+        _recognizedWords = draft.toString().trim();
+        if (_recognizedWords.isNotEmpty) {
+          _activeSubtitle = ConversationMessage(
+            speaker: 'Student',
+            message: _recognizedWords,
+          );
+        }
+      }
+
+      final draftKey = event.itemId ?? 'active-input';
+      final inputTranscript =
+          (event.inputTranscript?.trim().isNotEmpty == true
+                  ? event.inputTranscript
+                  : _realtimeInputDrafts[draftKey]?.toString())
+              ?.trim();
       if (inputTranscript != null && inputTranscript.isNotEmpty) {
         final itemKey = event.itemId ?? 'input:$inputTranscript';
         if (_realtimeInputItems.add(itemKey)) {
@@ -399,10 +440,13 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
           _recognizedWords = '';
           _studentResponseCount++;
         }
+        _realtimeInputDrafts.remove(draftKey);
       }
 
       final delta = event.transcriptDelta;
       if (delta != null && delta.isNotEmpty) {
+        final now = DateTime.now().toUtc();
+        _activeLatencyDraft?.aiTextReceivedAt ??= now;
         if (_realtimeAgentItemId != null &&
             event.itemId != null &&
             _realtimeAgentItemId != event.itemId) {
@@ -452,6 +496,20 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       ).whenComplete(() => _pendingEvaluations.remove(evaluation));
       _pendingEvaluations.add(evaluation);
       unawaited(evaluation);
+    }
+  }
+
+  void _recordRealtimeAudioStart() {
+    final draft = _activeLatencyDraft;
+    if (draft == null || draft.completed) return;
+    final now = DateTime.now().toUtc();
+    draft.aiTextReceivedAt ??= now;
+    draft.ttsReadyAt ??= now;
+    draft.audioSource = 'openai_realtime';
+    final trace = draft.complete(now);
+    if (trace != null) {
+      _latencyMetrics.add(trace);
+      _activeLatencyDraft = null;
     }
   }
 
@@ -1458,6 +1516,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
             'speaker': message.speaker,
             'message': message.message,
             'confirmed': (message.speaker == 'Student').toString(),
+            'timestamp': message.timestamp.toIso8601String(),
           },
         )
         .toList();
@@ -1481,12 +1540,15 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       settingTitle: widget.settingTitle,
       avatarKey: widget.avatarKey,
       launchSource: widget.launchSource,
+      conversationMode: _realtimeWasUsed ? 'realtime' : 'standard',
+      realtimeSessionId: _realtimeSessionId,
       moduleId: widget.moduleId,
       unitId: widget.unitId,
       pageId: widget.pageId,
       latencyMetrics: List.unmodifiable(_latencyMetrics),
       pilotMetadata: pilotMetadata,
       completedByObjectives: completedByObjectives,
+      studentResponseCount: _studentResponseCount,
     );
     await _historyStore.saveSession(session);
     if (!mounted) return;

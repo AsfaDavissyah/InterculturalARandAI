@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../models/scenario_topic.dart';
+import '../models/practice_session.dart';
 import '../services/realtime_service.dart';
 import '../theme/engora_theme.dart';
 
@@ -36,6 +37,7 @@ class RealtimeAudioPilotScreen extends StatefulWidget {
 }
 
 class _RealtimeAudioPilotScreenState extends State<RealtimeAudioPilotScreen> {
+  late final String _researchSessionId = PracticeSession.createSessionId();
   late final RealtimeService _service = RealtimeService(
     baseUrl: widget.baseUrl,
   );
@@ -143,6 +145,7 @@ class _RealtimeAudioPilotScreenState extends State<RealtimeAudioPilotScreen> {
       await _service.connect(
         scenarioId: widget.scenario.id,
         settingId: widget.settingId,
+        researchSessionId: _researchSessionId,
         topicId: widget.topicId,
         studentDisplayName: widget.studentDisplayName,
       );

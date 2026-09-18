@@ -664,6 +664,8 @@ test("guided session metadata survives history normalization and serialization",
       setting_title: "Lecturer's Office Consultation",
       avatar_key: "female_lecturer_v1",
       launch_source: "module_qr",
+      conversation_mode: "realtime",
+      realtime_session_id: "sess_realtime_research_1",
       module_id: "module_001",
       unit_id: "unit_01",
       page_id: "page_12",
@@ -672,6 +674,14 @@ test("guided session metadata survives history normalization and serialization",
           turn_number: 1,
           student_utterance: "Hey teacher.",
           hint: "Use a formal academic greeting.",
+        },
+      ],
+      transcript: [
+        {
+          speaker: "Student",
+          message: "Good morning, Dr Emma.",
+          confirmed: true,
+          timestamp: "2026-08-04T01:58:00.000Z",
         },
       ],
       latency_metrics: [
@@ -698,6 +708,8 @@ test("guided session metadata survives history normalization and serialization",
   assert.equal(normalized.settingId, "ACADEMIC-LECTURER-OFFICE");
   assert.equal(normalized.avatarKey, "female_lecturer_v1");
   assert.equal(normalized.launchSource, "module_qr");
+  assert.equal(normalized.conversationMode, "realtime");
+  assert.equal(normalized.realtimeSessionId, "sess_realtime_research_1");
   assert.equal(normalized.coachingEvents.length, 1);
   assert.equal(normalized.latencyMetrics.length, 1);
   assert.equal(normalized.latencySummary.median_first_audio_ms, 1850);
@@ -717,6 +729,9 @@ test("guided session metadata survives history normalization and serialization",
   );
   assert.equal(serialized.avatar_key, "female_lecturer_v1");
   assert.equal(serialized.launch_source, "module_qr");
+  assert.equal(serialized.conversation_mode, "realtime");
+  assert.equal(serialized.realtime_session_id, "sess_realtime_research_1");
+  assert.equal(serialized.transcript[0].timestamp, "2026-08-04T01:58:00.000Z");
   assert.equal(serialized.module_id, "module_001");
   assert.equal(serialized.unit_id, "unit_01");
   assert.equal(serialized.page_id, "page_12");

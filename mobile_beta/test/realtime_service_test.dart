@@ -9,6 +9,8 @@ void main() {
       'model': 'gpt-realtime',
       'voice': 'marin',
       'setting_id': realtimePilotSettingId,
+      'research_session_id': 'session_research_1',
+      'realtime_session_id': 'sess_realtime_1',
       'webrtc_url': 'https://api.openai.com/v1/realtime/calls',
     });
 
@@ -16,9 +18,15 @@ void main() {
     expect(grant.settingId, realtimePilotSettingId);
     expect(grant.webRtcUrl.host, 'api.openai.com');
     expect(grant.model, 'gpt-realtime');
+    expect(grant.researchSessionId, 'session_research_1');
+    expect(grant.realtimeSessionId, 'sess_realtime_1');
   });
 
   test('Realtime parser separates learner and agent transcripts', () {
+    final learnerDelta = parseRealtimeServerEvent(
+      '{"type":"conversation.item.input_audio_transcription.delta",'
+      '"item_id":"student-1","delta":"Could you "}',
+    );
     final learner = parseRealtimeServerEvent(
       '{"type":"conversation.item.input_audio_transcription.completed",'
       '"item_id":"student-1",'
@@ -35,6 +43,7 @@ void main() {
     );
 
     expect(learner.itemId, 'student-1');
+    expect(learnerDelta.inputTranscriptDelta, 'Could you ');
     expect(learner.inputTranscript, 'Could you repeat that?');
     expect(learner.transcriptDelta, isNull);
     expect(agent.itemId, 'agent-1');

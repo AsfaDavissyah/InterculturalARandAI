@@ -1906,6 +1906,10 @@ function normalizePracticeSessionPayload(rawSession, userId) {
     settingTitle: rawSession.settingTitle || rawSession.setting_title || null,
     avatarKey: rawSession.avatarKey || rawSession.avatar_key || null,
     launchSource,
+    conversationMode:
+      rawSession.conversationMode || rawSession.conversation_mode || "standard",
+    realtimeSessionId:
+      rawSession.realtimeSessionId || rawSession.realtime_session_id || null,
     moduleId: rawSession.moduleId || rawSession.module_id || null,
     unitId: rawSession.unitId || rawSession.unit_id || null,
     pageId: rawSession.pageId || rawSession.page_id || null,
@@ -1950,6 +1954,9 @@ function serializePracticeSession(session) {
       speaker: item.speaker,
       message: item.message,
       confirmed: String(item.confirmed === true || item.confirmed === "true"),
+      ...(item.timestamp
+        ? { timestamp: new Date(item.timestamp).toISOString() }
+        : {}),
     })),
     evaluations: data.evaluations || [],
     average_scores: data.averageScores || {},
@@ -1962,6 +1969,8 @@ function serializePracticeSession(session) {
     setting_title: data.settingTitle || null,
     avatar_key: data.avatarKey || null,
     launch_source: data.launchSource || "legacy",
+    conversation_mode: data.conversationMode || "standard",
+    realtime_session_id: data.realtimeSessionId || null,
     module_id: data.moduleId || null,
     unit_id: data.unitId || null,
     page_id: data.pageId || null,
@@ -3374,10 +3383,18 @@ app.post("/api/realtime/session", authenticateJWT, async (req, res) => {
 
   const scenarioId = String(req.body?.scenario_id || "").trim();
   const settingId = String(req.body?.setting_id || scenarioId).trim().toUpperCase();
+  const researchSessionId = String(req.body?.research_session_id || "").trim();
   if (!settingId || !isRealtimePilotSetting(settingId)) {
     return res.status(403).json({
       error: "REALTIME_PILOT_NOT_AVAILABLE",
       message: "Realtime is currently limited to the approved pilot setting.",
+      request_id: req.requestId,
+    });
+  }
+  if (!/^session_[A-Za-z0-9_-]{8,120}$/.test(researchSessionId)) {
+    return res.status(400).json({
+      error: "INVALID_RESEARCH_SESSION_ID",
+      message: "A valid research_session_id is required.",
       request_id: req.requestId,
     });
   }
@@ -3426,7 +3443,12 @@ app.post("/api/realtime/session", authenticateJWT, async (req, res) => {
       role: req.user.role,
       recordId: settingId,
       requestId: req.requestId,
-      details: { model: grant.model, voice: grant.voice },
+      details: {
+        model: grant.model,
+        voice: grant.voice,
+        research_session_id: researchSessionId,
+        realtime_session_id: grant.sessionId,
+      },
     });
 
     res.setHeader("Cache-Control", "no-store");
@@ -3437,6 +3459,7 @@ app.post("/api/realtime/session", authenticateJWT, async (req, res) => {
       model: grant.model,
       voice: grant.voice,
       setting_id: settingId,
+      research_session_id: researchSessionId,
       webrtc_url: "https://api.openai.com/v1/realtime/calls",
     });
   } catch (error) {

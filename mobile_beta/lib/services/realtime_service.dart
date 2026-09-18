@@ -14,6 +14,8 @@ class RealtimeSessionGrant {
   final String model;
   final String voice;
   final String settingId;
+  final String researchSessionId;
+  final String? realtimeSessionId;
   final Uri webRtcUrl;
 
   const RealtimeSessionGrant({
@@ -22,6 +24,8 @@ class RealtimeSessionGrant {
     required this.model,
     required this.voice,
     required this.settingId,
+    required this.researchSessionId,
+    required this.realtimeSessionId,
     required this.webRtcUrl,
   });
 
@@ -32,6 +36,8 @@ class RealtimeSessionGrant {
       model: json['model']?.toString() ?? 'gpt-realtime',
       voice: json['voice']?.toString() ?? 'marin',
       settingId: json['setting_id']?.toString() ?? '',
+      researchSessionId: json['research_session_id']?.toString() ?? '',
+      realtimeSessionId: json['realtime_session_id']?.toString(),
       webRtcUrl: Uri.parse(
         json['webrtc_url']?.toString() ??
             'https://api.openai.com/v1/realtime/calls',
@@ -44,6 +50,7 @@ class RealtimePilotEvent {
   final String type;
   final String? itemId;
   final String? transcriptDelta;
+  final String? inputTranscriptDelta;
   final String? inputTranscript;
   final String? completedTranscript;
   final String? message;
@@ -52,6 +59,7 @@ class RealtimePilotEvent {
     required this.type,
     this.itemId,
     this.transcriptDelta,
+    this.inputTranscriptDelta,
     this.inputTranscript,
     this.completedTranscript,
     this.message,
@@ -66,6 +74,8 @@ RealtimePilotEvent parseRealtimeServerEvent(String message) {
       type == 'response.audio_transcript.delta';
   final isInputTranscriptComplete =
       type == 'conversation.item.input_audio_transcription.completed';
+  final isInputTranscriptDelta =
+      type == 'conversation.item.input_audio_transcription.delta';
   final isAgentTranscriptComplete =
       type == 'response.output_audio_transcript.done' ||
       type == 'response.audio_transcript.done';
@@ -76,6 +86,9 @@ RealtimePilotEvent parseRealtimeServerEvent(String message) {
         payload['item_id']?.toString() ??
         (payload['item'] as Map<String, dynamic>?)?['id']?.toString(),
     transcriptDelta: isAgentTranscriptDelta
+        ? payload['delta']?.toString()
+        : null,
+    inputTranscriptDelta: isInputTranscriptDelta
         ? payload['delta']?.toString()
         : null,
     inputTranscript: isInputTranscriptComplete
@@ -101,16 +114,21 @@ class RealtimeService {
   bool _rendererInitialized = false;
   bool _microphoneEnabled = false;
   bool _disposed = false;
+  String? _researchSessionId;
+  String? _realtimeSessionId;
 
   RealtimeService({required this.baseUrl, http.Client? httpClient})
     : _httpClient = httpClient ?? http.Client();
 
   Stream<RealtimePilotEvent> get events => _events.stream;
   bool get microphoneEnabled => _microphoneEnabled;
+  String? get researchSessionId => _researchSessionId;
+  String? get realtimeSessionId => _realtimeSessionId;
 
   Future<void> connect({
     required String scenarioId,
     required String settingId,
+    required String researchSessionId,
     String? topicId,
     String? studentDisplayName,
   }) async {
@@ -125,12 +143,15 @@ class RealtimeService {
     final grant = await _requestSessionGrant(
       scenarioId: scenarioId,
       settingId: normalizedSettingId,
+      researchSessionId: researchSessionId,
       topicId: topicId,
       studentDisplayName: studentDisplayName,
     );
     if (grant.clientSecret.isEmpty) {
       throw StateError('The server returned an invalid Realtime session.');
     }
+    _researchSessionId = grant.researchSessionId;
+    _realtimeSessionId = grant.realtimeSessionId;
 
     if (!_rendererInitialized) {
       await remoteRenderer.initialize();
@@ -234,6 +255,7 @@ class RealtimeService {
   Future<RealtimeSessionGrant> _requestSessionGrant({
     required String scenarioId,
     required String settingId,
+    required String researchSessionId,
     String? topicId,
     String? studentDisplayName,
   }) async {
@@ -251,6 +273,7 @@ class RealtimeService {
           body: jsonEncode({
             'scenario_id': scenarioId,
             'setting_id': settingId,
+            'research_session_id': researchSessionId,
             if (topicId != null && topicId.isNotEmpty) 'topic_id': topicId,
             if (studentDisplayName != null && studentDisplayName.isNotEmpty)
               'student_display_name': studentDisplayName,

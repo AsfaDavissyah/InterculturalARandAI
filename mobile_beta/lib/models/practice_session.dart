@@ -40,6 +40,8 @@ class PracticeSession {
   final String? settingTitle;
   final String? avatarKey;
   final String launchSource;
+  final String conversationMode;
+  final String? realtimeSessionId;
   final String? moduleId;
   final String? unitId;
   final String? pageId;
@@ -69,6 +71,8 @@ class PracticeSession {
     this.settingTitle,
     this.avatarKey,
     this.launchSource = 'legacy',
+    this.conversationMode = 'standard',
+    this.realtimeSessionId,
     this.moduleId,
     this.unitId,
     this.pageId,
@@ -98,12 +102,15 @@ class PracticeSession {
     String? settingTitle,
     String? avatarKey,
     String launchSource = 'legacy',
+    String conversationMode = 'standard',
+    String? realtimeSessionId,
     String? moduleId,
     String? unitId,
     String? pageId,
     List<ConversationLatencyTrace> latencyMetrics = const [],
     PilotMetadata? pilotMetadata,
     bool completedByObjectives = false,
+    int? studentResponseCount,
   }) {
     final averages = <String, double>{};
     for (final key in scoreKeys) {
@@ -117,7 +124,14 @@ class PracticeSession {
         ? 0.0
         : averages.values.reduce((left, right) => left + right) /
               averages.length;
-    final finalResponse = evaluations.isEmpty ? null : evaluations.last;
+    final finalResponse = evaluations.isEmpty
+        ? null
+        : evaluations.reduce(
+            (left, right) => left.turnNumber >= right.turnNumber ? left : right,
+          );
+    final completedObjectives = <String>{
+      for (final evaluation in evaluations) ...evaluation.completedObjectiveIds,
+    }.toList(growable: false);
     final naturallyCompleted =
         completedByObjectives ||
         finalResponse?.sessionProgress['session_complete'] == true;
@@ -134,12 +148,12 @@ class PracticeSession {
       endReason: naturallyCompleted
           ? 'objectives_completed'
           : finalResponse?.endReason ?? 'manual_finish',
-      studentResponseCount: evaluations.length,
+      studentResponseCount: studentResponseCount ?? evaluations.length,
       transcript: transcript,
       evaluations: evaluations,
       averageScores: averages,
       overallScore: overall,
-      completedObjectiveIds: finalResponse?.completedObjectiveIds ?? const [],
+      completedObjectiveIds: completedObjectives,
       experienceType: experienceType,
       topicId: topicId,
       topicTitle: topicTitle,
@@ -147,6 +161,8 @@ class PracticeSession {
       settingTitle: settingTitle,
       avatarKey: avatarKey,
       launchSource: launchSource,
+      conversationMode: conversationMode,
+      realtimeSessionId: realtimeSessionId,
       moduleId: moduleId,
       unitId: unitId,
       pageId: pageId,
@@ -194,6 +210,8 @@ class PracticeSession {
       settingTitle: json['setting_title'] as String?,
       avatarKey: json['avatar_key'] as String?,
       launchSource: json['launch_source'] as String? ?? 'legacy',
+      conversationMode: json['conversation_mode'] as String? ?? 'standard',
+      realtimeSessionId: json['realtime_session_id'] as String?,
       moduleId: json['module_id'] as String?,
       unitId: json['unit_id'] as String?,
       pageId: json['page_id'] as String?,
@@ -235,6 +253,8 @@ class PracticeSession {
     if (settingTitle != null) 'setting_title': settingTitle,
     if (avatarKey != null) 'avatar_key': avatarKey,
     'launch_source': launchSource,
+    'conversation_mode': conversationMode,
+    if (realtimeSessionId != null) 'realtime_session_id': realtimeSessionId,
     if (moduleId != null) 'module_id': moduleId,
     if (unitId != null) 'unit_id': unitId,
     if (pageId != null) 'page_id': pageId,
@@ -258,6 +278,7 @@ class PracticeSession {
     'practiced_at': completedAt.toUtc().toIso8601String(),
     'duration_seconds': durationSeconds,
     'status': status,
+    'end_reason': endReason,
     'student_response_count': studentResponseCount,
     'overall_score': assessment.overall,
     'average_scores': assessment.scores,
@@ -270,6 +291,8 @@ class PracticeSession {
     if (settingTitle != null) 'setting_title': settingTitle,
     if (avatarKey != null) 'avatar_key': avatarKey,
     'launch_source': launchSource,
+    'conversation_mode': conversationMode,
+    if (realtimeSessionId != null) 'realtime_session_id': realtimeSessionId,
     if (moduleId != null) 'module_id': moduleId,
     if (unitId != null) 'unit_id': unitId,
     if (pageId != null) 'page_id': pageId,

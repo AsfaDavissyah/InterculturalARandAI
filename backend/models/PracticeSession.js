@@ -135,6 +135,15 @@ const PracticeSessionSchema = new mongoose.Schema({
     type: [mongoose.Schema.Types.Mixed],
     default: [],
   },
+  conversationMode: {
+    type: String,
+    enum: ["standard", "realtime"],
+    default: "standard",
+  },
+  realtimeSessionId: {
+    type: String,
+    trim: true,
+  },
   latencyMetrics: {
     type: [mongoose.Schema.Types.Mixed],
     default: [],

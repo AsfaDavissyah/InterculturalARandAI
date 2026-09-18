@@ -40,6 +40,7 @@ function buildRealtimeInstructions(scenarioData, student = {}) {
       ? `Boundaries:\n${context.boundaries.map((item) => `- ${item}`).join("\n")}`
       : "",
     objectiveText ? `Practice objectives:\n${objectiveText}` : "",
+    "Wait silently for the learner to speak first. Do not open the conversation yourself.",
     "Reply in English using one or two short sentences.",
     "Ask no more than one focused question at a time.",
     "Follow what the learner actually says instead of forcing a scripted stage.",
