@@ -33,12 +33,19 @@ test("Phase 11 session normalization preserves pilot and QR attribution", () => 
     unit_id: "UNIT-ACADEMIC-01",
     page_id: "PAGE-LECTURER-OFFICE-01",
     latency_summary: { sample_count: 6, median_first_audio_ms: 1700 },
+    realtime_usage: {
+      response_count: 4,
+      estimated_response_cost_usd: 0.021,
+      reconnect_attempts: 1,
+      fallback_used: false,
+    },
     pilot_metadata: pilotMetadata,
   }, "507f1f77bcf86cd799439011");
 
   assert.equal(normalized.moduleId, "ICC-PILOT-01");
   assert.equal(normalized.pilotMetadata.device_label, "Samsung A52");
   assert.equal(normalized.latencySummary.sample_count, 6);
+  assert.equal(normalized.realtimeUsage.response_count, 4);
 });
 
 test("Phase 11 history serializer is schema v4 and backward compatible", () => {
@@ -67,6 +74,7 @@ test("Phase 11 lecturer serializer exposes complete research evidence", () => {
     unitId: "UNIT-SOCIAL-01",
     pageId: "PAGE-CAFE-01",
     latencySummary: { sample_count: 7, median_first_audio_ms: 1600, p95_first_audio_ms: 2400 },
+    realtimeUsage: { response_count: 5, estimated_response_cost_usd: 0.027 },
     pilotMetadata,
     overallScore: 4.4,
     completedAt: new Date("2026-08-15T08:05:00.000Z"),
@@ -75,5 +83,6 @@ test("Phase 11 lecturer serializer exposes complete research evidence", () => {
   assert.equal(serialized.scenario.title, "Melbourne Cafe");
   assert.equal(serialized.module_id, "ICC-PILOT-01");
   assert.equal(serialized.latency_summary.p95_first_audio_ms, 2400);
+  assert.equal(serialized.realtime_usage.response_count, 5);
   assert.equal(serialized.pilot_metadata.install_type, "fresh_install");
 });

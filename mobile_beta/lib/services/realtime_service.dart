@@ -9,6 +9,7 @@ import 'auth_service.dart';
 const String realtimePilotSettingId = 'ACADEMIC-LECTURER-OFFICE';
 const Duration _realtimeAudioDrainDelay = Duration(milliseconds: 450);
 const Duration _realtimeAudioCommitDelay = Duration(milliseconds: 150);
+const Duration realtimeResponseTimeout = Duration(seconds: 15);
 
 Map<String, dynamic> buildRealtimeManualTurnSessionUpdate() => {
   'type': 'session.update',
@@ -19,6 +20,11 @@ Map<String, dynamic> buildRealtimeManualTurnSessionUpdate() => {
     },
   },
 };
+
+bool shouldCreateRealtimeResponse({
+  required bool responseActive,
+  required bool responseRequested,
+}) => !responseActive && !responseRequested;
 
 class RealtimeSessionGrant {
   final String clientSecret;
@@ -58,6 +64,98 @@ class RealtimeSessionGrant {
   }
 }
 
+class RealtimeUsage {
+  final int responseCount;
+  final int inputTextTokens;
+  final int inputAudioTokens;
+  final int cachedTextTokens;
+  final int cachedAudioTokens;
+  final int outputTextTokens;
+  final int outputAudioTokens;
+
+  const RealtimeUsage({
+    this.responseCount = 0,
+    this.inputTextTokens = 0,
+    this.inputAudioTokens = 0,
+    this.cachedTextTokens = 0,
+    this.cachedAudioTokens = 0,
+    this.outputTextTokens = 0,
+    this.outputAudioTokens = 0,
+  });
+
+  factory RealtimeUsage.fromResponseDone(Map<String, dynamic> payload) {
+    final response = Map<String, dynamic>.from(
+      payload['response'] as Map? ?? const {},
+    );
+    final usage = Map<String, dynamic>.from(
+      response['usage'] as Map? ?? const {},
+    );
+    if (usage.isEmpty) return const RealtimeUsage();
+    final input = Map<String, dynamic>.from(
+      usage['input_token_details'] as Map? ??
+          usage['input_tokens_details'] as Map? ??
+          const {},
+    );
+    final cached = Map<String, dynamic>.from(
+      input['cached_tokens_details'] as Map? ?? const {},
+    );
+    final output = Map<String, dynamic>.from(
+      usage['output_token_details'] as Map? ??
+          usage['output_tokens_details'] as Map? ??
+          const {},
+    );
+    return RealtimeUsage(
+      responseCount: 1,
+      inputTextTokens: (input['text_tokens'] as num?)?.toInt() ?? 0,
+      inputAudioTokens: (input['audio_tokens'] as num?)?.toInt() ?? 0,
+      cachedTextTokens: (cached['text_tokens'] as num?)?.toInt() ?? 0,
+      cachedAudioTokens: (cached['audio_tokens'] as num?)?.toInt() ?? 0,
+      outputTextTokens: (output['text_tokens'] as num?)?.toInt() ?? 0,
+      outputAudioTokens: (output['audio_tokens'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  double get estimatedResponseCostUsd {
+    final uncachedText = (inputTextTokens - cachedTextTokens).clamp(
+      0,
+      inputTextTokens,
+    );
+    final uncachedAudio = (inputAudioTokens - cachedAudioTokens).clamp(
+      0,
+      inputAudioTokens,
+    );
+    return (uncachedText * 4.0 +
+            cachedTextTokens * 0.4 +
+            uncachedAudio * 32.0 +
+            cachedAudioTokens * 0.4 +
+            outputTextTokens * 16.0 +
+            outputAudioTokens * 64.0) /
+        1000000;
+  }
+
+  RealtimeUsage operator +(RealtimeUsage other) => RealtimeUsage(
+    responseCount: responseCount + other.responseCount,
+    inputTextTokens: inputTextTokens + other.inputTextTokens,
+    inputAudioTokens: inputAudioTokens + other.inputAudioTokens,
+    cachedTextTokens: cachedTextTokens + other.cachedTextTokens,
+    cachedAudioTokens: cachedAudioTokens + other.cachedAudioTokens,
+    outputTextTokens: outputTextTokens + other.outputTextTokens,
+    outputAudioTokens: outputAudioTokens + other.outputAudioTokens,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'response_count': responseCount,
+    'input_text_tokens': inputTextTokens,
+    'input_audio_tokens': inputAudioTokens,
+    'cached_text_tokens': cachedTextTokens,
+    'cached_audio_tokens': cachedAudioTokens,
+    'output_text_tokens': outputTextTokens,
+    'output_audio_tokens': outputAudioTokens,
+    'estimated_response_cost_usd': estimatedResponseCostUsd,
+    'excludes_input_transcription_cost': true,
+  };
+}
+
 class RealtimePilotEvent {
   final String type;
   final String? itemId;
@@ -66,6 +164,7 @@ class RealtimePilotEvent {
   final String? inputTranscript;
   final String? completedTranscript;
   final String? message;
+  final RealtimeUsage? usage;
 
   const RealtimePilotEvent({
     required this.type,
@@ -75,6 +174,7 @@ class RealtimePilotEvent {
     this.inputTranscript,
     this.completedTranscript,
     this.message,
+    this.usage,
   });
 }
 
@@ -110,6 +210,9 @@ RealtimePilotEvent parseRealtimeServerEvent(String message) {
         ? payload['transcript']?.toString()
         : null,
     message: payload['error']?['message']?.toString(),
+    usage: type == 'response.done'
+        ? RealtimeUsage.fromResponseDone(payload)
+        : null,
   );
 }
 
@@ -126,7 +229,11 @@ class RealtimeService {
   bool _rendererInitialized = false;
   bool _microphoneEnabled = false;
   bool _responseActive = false;
+  bool _responseRequested = false;
+  bool _turnSubmissionInProgress = false;
   Completer<void>? _manualTurnConfiguration;
+  Timer? _responseTimeoutTimer;
+  RealtimeUsage _usage = const RealtimeUsage();
   bool _disposed = false;
   String? _researchSessionId;
   String? _realtimeSessionId;
@@ -138,6 +245,7 @@ class RealtimeService {
   bool get microphoneEnabled => _microphoneEnabled;
   String? get researchSessionId => _researchSessionId;
   String? get realtimeSessionId => _realtimeSessionId;
+  RealtimeUsage get usage => _usage;
 
   Future<void> connect({
     required String scenarioId,
@@ -322,40 +430,105 @@ class RealtimeService {
     final stream = _localStream;
     if (stream == null) throw StateError('Realtime is not connected.');
     if (_microphoneEnabled == enabled) return;
+    if (!enabled && _turnSubmissionInProgress) return;
 
     if (enabled) {
-      if (_responseActive) {
-        await _sendControlEvent('response.cancel');
-        await _sendControlEvent('output_audio_buffer.clear');
-        _responseActive = false;
+      if (_responseActive || _responseRequested) {
+        await cancelActiveResponse();
       }
       await _sendControlEvent('input_audio_buffer.clear');
     }
 
-    if (!enabled && submit) {
-      // WebRTC audio and control events use separate channels. Keep the track
-      // open briefly so the last RTP packets arrive before the commit event.
-      await Future<void>.delayed(_realtimeAudioDrainDelay);
-    }
-
-    for (final track in stream.getAudioTracks()) {
-      track.enabled = enabled;
-    }
-    _microphoneEnabled = enabled;
-
-    if (!enabled) {
-      if (submit) {
-        await Future<void>.delayed(_realtimeAudioCommitDelay);
-        await _sendControlEvent('input_audio_buffer.commit');
-        await _sendControlEvent('response.create');
-      } else {
-        await _sendControlEvent('input_audio_buffer.clear');
+    if (!enabled) _turnSubmissionInProgress = true;
+    try {
+      if (!enabled && submit) {
+        // WebRTC audio and control events use separate channels. Keep the track
+        // open briefly so the last RTP packets arrive before the commit event.
+        await Future<void>.delayed(_realtimeAudioDrainDelay);
       }
-    }
 
+      for (final track in stream.getAudioTracks()) {
+        track.enabled = enabled;
+      }
+      _microphoneEnabled = enabled;
+
+      if (!enabled) {
+        if (submit) {
+          await Future<void>.delayed(_realtimeAudioCommitDelay);
+          await _sendControlEvent('input_audio_buffer.commit');
+          if (shouldCreateRealtimeResponse(
+            responseActive: _responseActive,
+            responseRequested: _responseRequested,
+          )) {
+            _responseRequested = true;
+            await _sendControlEvent('response.create');
+            _startResponseTimeout();
+          }
+        } else {
+          await _sendControlEvent('input_audio_buffer.clear');
+        }
+      }
+
+      _emit(
+        RealtimePilotEvent(
+          type: enabled ? 'microphone_started' : 'microphone_stopped',
+        ),
+      );
+    } finally {
+      if (!enabled) _turnSubmissionInProgress = false;
+    }
+  }
+
+  Future<void> restoreConversation(
+    List<Map<String, String>> conversation,
+  ) async {
+    for (final turn in conversation.reversed.take(12).toList().reversed) {
+      final text = turn['message']?.trim() ?? '';
+      if (text.isEmpty) continue;
+      final isStudent = turn['speaker']?.toLowerCase() == 'student';
+      await _sendEvent({
+        'type': 'conversation.item.create',
+        'item': {
+          'type': 'message',
+          'role': isStudent ? 'user' : 'assistant',
+          'content': [
+            {'type': isStudent ? 'input_text' : 'output_text', 'text': text},
+          ],
+        },
+      });
+    }
+  }
+
+  Future<void> cancelActiveResponse() async {
+    _responseTimeoutTimer?.cancel();
+    _responseTimeoutTimer = null;
+    if (_responseActive || _responseRequested) {
+      await _sendControlEvent('response.cancel');
+      await _sendControlEvent('output_audio_buffer.clear');
+    }
+    _responseActive = false;
+    _responseRequested = false;
+  }
+
+  void _startResponseTimeout() {
+    _responseTimeoutTimer?.cancel();
+    _responseTimeoutTimer = Timer(realtimeResponseTimeout, () {
+      unawaited(_handleResponseTimeout());
+    });
+  }
+
+  Future<void> _handleResponseTimeout() async {
+    if (!_responseActive && !_responseRequested) return;
+    try {
+      await cancelActiveResponse();
+    } catch (_) {
+      _responseActive = false;
+      _responseRequested = false;
+    }
     _emit(
-      RealtimePilotEvent(
-        type: enabled ? 'microphone_started' : 'microphone_stopped',
+      const RealtimePilotEvent(
+        type: 'response_timeout',
+        message: 'Realtime response exceeded the time limit.',
       ),
     );
   }
@@ -391,8 +564,17 @@ class RealtimeService {
           );
         }
       }
-      if (event.type == 'response.created') _responseActive = true;
-      if (event.type == 'response.done') _responseActive = false;
+      if (event.type == 'response.created') {
+        _responseRequested = false;
+        _responseActive = true;
+      }
+      if (event.type == 'response.done') {
+        _responseTimeoutTimer?.cancel();
+        _responseTimeoutTimer = null;
+        _responseRequested = false;
+        _responseActive = false;
+        if (event.usage != null) _usage += event.usage!;
+      }
       _emit(event);
     } catch (_) {
       _emit(const RealtimePilotEvent(type: 'unparsed_event'));
@@ -406,6 +588,7 @@ class RealtimeService {
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
+    _responseTimeoutTimer?.cancel();
     for (final track in _localStream?.getTracks() ?? <MediaStreamTrack>[]) {
       await track.stop();
     }

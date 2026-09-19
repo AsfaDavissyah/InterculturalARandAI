@@ -144,6 +144,10 @@ const PracticeSessionSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  realtimeUsage: {
+    type: mongoose.Schema.Types.Mixed,
+    default: () => ({}),
+  },
   latencyMetrics: {
     type: [mongoose.Schema.Types.Mixed],
     default: [],

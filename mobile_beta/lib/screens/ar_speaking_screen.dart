@@ -143,6 +143,10 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   bool _realtimeConnecting = false;
   bool _realtimeConnected = false;
   bool _realtimeFallback = false;
+  bool _realtimeRecoveryActive = false;
+  int _realtimeReconnectAttempts = 0;
+  Timer? _realtimeDisconnectTimer;
+  RealtimeUsage _realtimeUsage = const RealtimeUsage();
 
   int _studentResponseCount = 0;
   bool _sessionLoading = true;
@@ -299,9 +303,17 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     }
   }
 
-  Future<bool> _initializeRealtimeConnection(String baseUrl) async {
+  Future<bool> _initializeRealtimeConnection(
+    String baseUrl, {
+    bool reconnecting = false,
+  }) async {
+    _realtimeDisconnectTimer?.cancel();
+    final previousService = _realtimeService;
+    if (previousService != null) {
+      _realtimeUsage += previousService.usage;
+    }
     await _realtimeSubscription?.cancel();
-    await _realtimeService?.dispose();
+    await previousService?.dispose();
     final service = RealtimeService(baseUrl: baseUrl);
     _realtimeService = service;
     _realtimeSubscription = service.events.listen(_onRealtimeEvent);
@@ -324,6 +336,18 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         topicId: widget.topicId,
         studentDisplayName: _profile?.name,
       );
+      if (_messages.isNotEmpty) {
+        await service.restoreConversation(
+          _messages
+              .map(
+                (message) => {
+                  'speaker': message.speaker,
+                  'message': message.message,
+                },
+              )
+              .toList(growable: false),
+        );
+      }
       _realtimeWasUsed = true;
       _realtimeSessionId = service.realtimeSessionId;
       return true;
@@ -338,13 +362,15 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         _realtimeConnected = false;
         _realtimeFallback = true;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Realtime audio is unavailable. Continuing with standard conversation mode.',
+      if (!reconnecting) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Realtime audio is unavailable. Continuing with standard conversation mode.',
+            ),
           ),
-        ),
-      );
+        );
+      }
       return false;
     }
   }
@@ -359,6 +385,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     setState(() {
       switch (event.type) {
         case 'connected':
+          _realtimeDisconnectTimer?.cancel();
           _realtimeConnecting = false;
           _realtimeConnected = true;
           _realtimeFallback = false;
@@ -389,8 +416,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         case 'output_audio_buffer.stopped':
           if (!_captureActive) _activity = AvatarActivity.idle;
         case 'error':
+        case 'response_timeout':
           _realtimeConnected = false;
-          _realtimeFallback = true;
           _activity = AvatarActivity.idle;
       }
 
@@ -478,9 +505,19 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
     final connectionFailed =
         event.type == 'error' ||
+        event.type == 'response_timeout' ||
         (event.type == 'connection_state' &&
-            const {'failed', 'disconnected', 'closed'}.contains(event.message));
-    if (connectionFailed) unawaited(_activateRealtimeFallback());
+            const {'failed', 'closed'}.contains(event.message));
+    if (connectionFailed && !_realtimeConnecting) {
+      unawaited(_recoverRealtimeConnection());
+    }
+    if (event.type == 'connection_state' && event.message == 'disconnected') {
+      _realtimeDisconnectTimer?.cancel();
+      _realtimeDisconnectTimer = Timer(
+        const Duration(seconds: 2),
+        () => unawaited(_recoverRealtimeConnection()),
+      );
+    }
 
     if (studentResponse != null &&
         turnNumber != null &&
@@ -528,9 +565,11 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   Future<void> _activateRealtimeFallback() async {
     final service = _realtimeService;
     _realtimeService = null;
+    if (service != null) _realtimeUsage += service.usage;
     await _realtimeSubscription?.cancel();
     _realtimeSubscription = null;
     await service?.dispose();
+    await _initializeSpeech();
     if (!mounted) return;
     _pulsingController.stop();
     setState(() {
@@ -549,6 +588,41 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         ),
       ),
     );
+  }
+
+  Future<void> _recoverRealtimeConnection() async {
+    if (_realtimeRecoveryActive || !mounted || _navigatingToResult) return;
+    _realtimeRecoveryActive = true;
+    try {
+      while (mounted && _realtimeReconnectAttempts < 2) {
+        _realtimeReconnectAttempts++;
+        setState(() {
+          _captureActive = false;
+          _realtimeConnecting = true;
+          _realtimeConnected = false;
+          _activity = AvatarActivity.loading;
+        });
+        _pulsingController.stop();
+        await Future<void>.delayed(
+          Duration(seconds: _realtimeReconnectAttempts),
+        );
+        final baseUrl = await AppSettings.getBaseUrl();
+        final recovered = await _initializeRealtimeConnection(
+          baseUrl,
+          reconnecting: true,
+        );
+        if (recovered) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Live conversation reconnected.')),
+          );
+          return;
+        }
+      }
+      await _activateRealtimeFallback();
+    } finally {
+      _realtimeRecoveryActive = false;
+    }
   }
 
   Future<String> _loadOpeningMessage() async {
@@ -892,21 +966,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       }
       await service.setMicrophoneEnabled(!_captureActive);
     } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _captureActive = false;
-        _realtimeConnected = false;
-        _realtimeFallback = true;
-        _activity = AvatarActivity.idle;
-      });
-      _pulsingController.stop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Realtime microphone disconnected. Standard conversation mode is still available.',
-          ),
-        ),
-      );
+      unawaited(_recoverRealtimeConnection());
     }
   }
 
@@ -1522,6 +1582,11 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         .toList();
     final pilotMetadata = await PilotEvidenceService.capture(context);
     if (!mounted) return;
+    final realtimeUsage =
+        (_realtimeUsage + (_realtimeService?.usage ?? const RealtimeUsage()))
+            .toJson()
+          ..['reconnect_attempts'] = _realtimeReconnectAttempts
+          ..['fallback_used'] = _realtimeFallback;
     final session = PracticeSession.fromPractice(
       sessionId: _sessionId,
       scenario: widget.scenario,
@@ -1542,6 +1607,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       launchSource: widget.launchSource,
       conversationMode: _realtimeWasUsed ? 'realtime' : 'standard',
       realtimeSessionId: _realtimeSessionId,
+      realtimeUsage: realtimeUsage,
       moduleId: widget.moduleId,
       unitId: widget.unitId,
       pageId: widget.pageId,
@@ -2408,9 +2474,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused) {
       if (_usesLiveRealtime && _captureActive) {
-        unawaited(
-          _realtimeService?.setMicrophoneEnabled(false, submit: false),
-        );
+        unawaited(_realtimeService?.setMicrophoneEnabled(false, submit: false));
       }
       final controller = _cameraController;
       if (controller == null) return;
@@ -2427,6 +2491,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   void dispose() {
     _captureActive = false;
     _speechEndTimer?.cancel();
+    _realtimeDisconnectTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_audioSubscription?.cancel());
     unawaited(_positionSubscription?.cancel());

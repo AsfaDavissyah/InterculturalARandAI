@@ -42,6 +42,7 @@ class PracticeSession {
   final String launchSource;
   final String conversationMode;
   final String? realtimeSessionId;
+  final Map<String, dynamic> realtimeUsage;
   final String? moduleId;
   final String? unitId;
   final String? pageId;
@@ -73,6 +74,7 @@ class PracticeSession {
     this.launchSource = 'legacy',
     this.conversationMode = 'standard',
     this.realtimeSessionId,
+    this.realtimeUsage = const {},
     this.moduleId,
     this.unitId,
     this.pageId,
@@ -104,6 +106,7 @@ class PracticeSession {
     String launchSource = 'legacy',
     String conversationMode = 'standard',
     String? realtimeSessionId,
+    Map<String, dynamic> realtimeUsage = const {},
     String? moduleId,
     String? unitId,
     String? pageId,
@@ -163,6 +166,7 @@ class PracticeSession {
       launchSource: launchSource,
       conversationMode: conversationMode,
       realtimeSessionId: realtimeSessionId,
+      realtimeUsage: Map.unmodifiable(realtimeUsage),
       moduleId: moduleId,
       unitId: unitId,
       pageId: pageId,
@@ -212,6 +216,9 @@ class PracticeSession {
       launchSource: json['launch_source'] as String? ?? 'legacy',
       conversationMode: json['conversation_mode'] as String? ?? 'standard',
       realtimeSessionId: json['realtime_session_id'] as String?,
+      realtimeUsage: Map<String, dynamic>.from(
+        json['realtime_usage'] as Map? ?? const {},
+      ),
       moduleId: json['module_id'] as String?,
       unitId: json['unit_id'] as String?,
       pageId: json['page_id'] as String?,
@@ -255,6 +262,7 @@ class PracticeSession {
     'launch_source': launchSource,
     'conversation_mode': conversationMode,
     if (realtimeSessionId != null) 'realtime_session_id': realtimeSessionId,
+    if (realtimeUsage.isNotEmpty) 'realtime_usage': realtimeUsage,
     if (moduleId != null) 'module_id': moduleId,
     if (unitId != null) 'unit_id': unitId,
     if (pageId != null) 'page_id': pageId,
@@ -293,6 +301,7 @@ class PracticeSession {
     'launch_source': launchSource,
     'conversation_mode': conversationMode,
     if (realtimeSessionId != null) 'realtime_session_id': realtimeSessionId,
+    if (realtimeUsage.isNotEmpty) 'realtime_usage': realtimeUsage,
     if (moduleId != null) 'module_id': moduleId,
     if (unitId != null) 'unit_id': unitId,
     if (pageId != null) 'page_id': pageId,

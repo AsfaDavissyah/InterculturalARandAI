@@ -67,4 +67,46 @@ void main() {
       'Of course. Let me repeat that.',
     );
   });
+
+  test('Realtime usage is parsed, aggregated, and costed per response', () {
+    final event = parseRealtimeServerEvent(
+      '{"type":"response.done","response":{"usage":{'
+      '"input_token_details":{"text_tokens":119,"audio_tokens":13,'
+      '"cached_tokens_details":{"text_tokens":64,"audio_tokens":0}},'
+      '"output_token_details":{"text_tokens":30,"audio_tokens":91}}}}',
+    );
+    final usage = event.usage!;
+    final total = usage + usage;
+
+    expect(usage.responseCount, 1);
+    expect(usage.inputAudioTokens, 13);
+    expect(usage.outputAudioTokens, 91);
+    expect(usage.estimatedResponseCostUsd, closeTo(0.0069656, 0.0000001));
+    expect(total.responseCount, 2);
+    expect(total.estimatedResponseCostUsd, closeTo(0.0139312, 0.0000001));
+  });
+
+  test('Realtime response guard permits only one request at a time', () {
+    expect(
+      shouldCreateRealtimeResponse(
+        responseActive: false,
+        responseRequested: false,
+      ),
+      isTrue,
+    );
+    expect(
+      shouldCreateRealtimeResponse(
+        responseActive: true,
+        responseRequested: false,
+      ),
+      isFalse,
+    );
+    expect(
+      shouldCreateRealtimeResponse(
+        responseActive: false,
+        responseRequested: true,
+      ),
+      isFalse,
+    );
+  });
 }

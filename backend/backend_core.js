@@ -1910,6 +1910,8 @@ function normalizePracticeSessionPayload(rawSession, userId) {
       rawSession.conversationMode || rawSession.conversation_mode || "standard",
     realtimeSessionId:
       rawSession.realtimeSessionId || rawSession.realtime_session_id || null,
+    realtimeUsage:
+      rawSession.realtimeUsage || rawSession.realtime_usage || {},
     moduleId: rawSession.moduleId || rawSession.module_id || null,
     unitId: rawSession.unitId || rawSession.unit_id || null,
     pageId: rawSession.pageId || rawSession.page_id || null,
@@ -1971,6 +1973,7 @@ function serializePracticeSession(session) {
     launch_source: data.launchSource || "legacy",
     conversation_mode: data.conversationMode || "standard",
     realtime_session_id: data.realtimeSessionId || null,
+    realtime_usage: data.realtimeUsage || {},
     module_id: data.moduleId || null,
     unit_id: data.unitId || null,
     page_id: data.pageId || null,
@@ -2014,6 +2017,7 @@ function serializeLecturerSession(session) {
     transcript: data.transcript || [],
     latency_metrics: data.latencyMetrics || [],
     latency_summary: data.latencySummary || {},
+    realtime_usage: data.realtimeUsage || {},
     pilot_metadata: data.pilotMetadata || null,
   };
 }
@@ -4022,6 +4026,10 @@ app.get("/api/lecturer/export/csv", authenticateJWT, requireRole(["admin", "lect
       "network_profile",
       "install_type",
       "app_build",
+      "realtime_response_count",
+      "realtime_estimated_cost_usd",
+      "realtime_reconnect_attempts",
+      "realtime_fallback_used",
     ];
 
     const rows = [headers.join(",")];
@@ -4051,6 +4059,10 @@ app.get("/api/lecturer/export/csv", authenticateJWT, requireRole(["admin", "lect
         `"${s.pilotMetadata?.network_profile || ""}"`,
         `"${s.pilotMetadata?.install_type || ""}"`,
         `"${s.pilotMetadata?.app_build || ""}"`,
+        s.realtimeUsage?.response_count || 0,
+        s.realtimeUsage?.estimated_response_cost_usd || 0,
+        s.realtimeUsage?.reconnect_attempts || 0,
+        s.realtimeUsage?.fallback_used === true,
       ].join(","));
     });
 
