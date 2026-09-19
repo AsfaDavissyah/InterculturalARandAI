@@ -216,6 +216,20 @@ RealtimePilotEvent parseRealtimeServerEvent(String message) {
   );
 }
 
+String? resolveCompletedRealtimeInputTranscript(
+  RealtimePilotEvent event, {
+  String? accumulatedDraft,
+}) {
+  if (event.type !=
+      'conversation.item.input_audio_transcription.completed') {
+    return null;
+  }
+  final completed = event.inputTranscript?.trim() ?? '';
+  if (completed.isNotEmpty) return completed;
+  final draft = accumulatedDraft?.trim() ?? '';
+  return draft.isEmpty ? null : draft;
+}
+
 class RealtimeService {
   final String baseUrl;
   final http.Client _httpClient;

@@ -109,4 +109,30 @@ void main() {
       isFalse,
     );
   });
+
+  test('Live input deltas are never committed as learner turns', () {
+    final delta = parseRealtimeServerEvent(
+      '{"type":"conversation.item.input_audio_transcription.delta",'
+      '"item_id":"item-1","delta":"The"}',
+    );
+    final completed = parseRealtimeServerEvent(
+      '{"type":"conversation.item.input_audio_transcription.completed",'
+      '"item_id":"item-1","transcript":"The first option is Friday."}',
+    );
+
+    expect(
+      resolveCompletedRealtimeInputTranscript(
+        delta,
+        accumulatedDraft: 'The',
+      ),
+      isNull,
+    );
+    expect(
+      resolveCompletedRealtimeInputTranscript(
+        completed,
+        accumulatedDraft: 'The first option is Friday.',
+      ),
+      'The first option is Friday.',
+    );
+  });
 }

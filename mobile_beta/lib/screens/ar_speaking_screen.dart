@@ -439,11 +439,10 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       }
 
       final draftKey = event.itemId ?? 'active-input';
-      final inputTranscript =
-          (event.inputTranscript?.trim().isNotEmpty == true
-                  ? event.inputTranscript
-                  : _realtimeInputDrafts[draftKey]?.toString())
-              ?.trim();
+      final inputTranscript = resolveCompletedRealtimeInputTranscript(
+        event,
+        accumulatedDraft: _realtimeInputDrafts[draftKey]?.toString(),
+      );
       if (inputTranscript != null && inputTranscript.isNotEmpty) {
         final itemKey = event.itemId ?? 'input:$inputTranscript';
         if (_realtimeInputItems.add(itemKey)) {
