@@ -6,7 +6,6 @@ import 'package:http/http.dart' as http;
 
 import 'auth_service.dart';
 
-const String realtimePilotSettingId = 'ACADEMIC-LECTURER-OFFICE';
 const Duration _realtimeAudioDrainDelay = Duration(milliseconds: 450);
 const Duration _realtimeAudioCommitDelay = Duration(milliseconds: 150);
 const Duration realtimeResponseTimeout = Duration(seconds: 15);
@@ -25,6 +24,14 @@ bool shouldCreateRealtimeResponse({
   required bool responseActive,
   required bool responseRequested,
 }) => !responseActive && !responseRequested;
+
+String resolveRealtimeTargetId({
+  required String scenarioId,
+  String? settingId,
+  String? guidedSettingId,
+}) {
+  return (settingId ?? guidedSettingId ?? scenarioId).trim().toUpperCase();
+}
 
 class RealtimeSessionGrant {
   final String clientSecret;
@@ -220,8 +227,7 @@ String? resolveCompletedRealtimeInputTranscript(
   RealtimePilotEvent event, {
   String? accumulatedDraft,
 }) {
-  if (event.type !=
-      'conversation.item.input_audio_transcription.completed') {
+  if (event.type != 'conversation.item.input_audio_transcription.completed') {
     return null;
   }
   final completed = event.inputTranscript?.trim() ?? '';
@@ -272,8 +278,8 @@ class RealtimeService {
     if (_peerConnection != null) return;
 
     final normalizedSettingId = settingId.trim().toUpperCase();
-    if (normalizedSettingId != realtimePilotSettingId) {
-      throw StateError('Realtime is not enabled for this setting.');
+    if (normalizedSettingId.isEmpty) {
+      throw StateError('A scenario or setting ID is required for Realtime.');
     }
 
     final grant = await _requestSessionGrant(

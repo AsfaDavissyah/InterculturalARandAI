@@ -245,7 +245,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
     final ttsInitialization = _initializeTts();
     final cameraInitialization = _initializeCamera();
-    if (_isRealtimePilotSetting) {
+    if (_isRealtimeEnabledForSession) {
       final connected = await _initializeRealtimeConnection(baseUrl);
       if (connected) {
         if (!mounted) return;
@@ -328,10 +328,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
     try {
       await service.connect(
         scenarioId: widget.scenario.id,
-        settingId:
-            widget.settingId ??
-            widget.guidedSetting?.settingId ??
-            realtimePilotSettingId,
+        settingId: _realtimeTargetId,
         researchSessionId: _sessionId,
         topicId: widget.topicId,
         studentDisplayName: _profile?.name,
@@ -376,7 +373,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   }
 
   void _onRealtimeEvent(RealtimePilotEvent event) {
-    if (!mounted || !_isRealtimePilotSetting) return;
+    if (!mounted || !_isRealtimeEnabledForSession) return;
     List<Map<String, String>>? evaluationHistory;
     String? studentResponse;
     int? turnNumber;
@@ -915,7 +912,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       await _toggleRealtimeMicrophone();
       return;
     }
-    if (_isRealtimePilotSetting && _realtimeConnecting) return;
+    if (_isRealtimeEnabledForSession && _realtimeConnecting) return;
     if (_playbackBusy ||
         _submissionStarted ||
         _reviewingTranscript ||
@@ -1715,14 +1712,16 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
   bool get _completionEligible => _lastResponse?.completionEligible == true;
 
-  bool get _isRealtimePilotSetting =>
-      (widget.settingId ?? widget.guidedSetting?.settingId ?? '')
-          .trim()
-          .toUpperCase() ==
-      realtimePilotSettingId;
+  String get _realtimeTargetId => resolveRealtimeTargetId(
+    scenarioId: widget.scenario.id,
+    settingId: widget.settingId,
+    guidedSettingId: widget.guidedSetting?.settingId,
+  );
+
+  bool get _isRealtimeEnabledForSession => _realtimeTargetId.isNotEmpty;
 
   bool get _usesLiveRealtime =>
-      _isRealtimePilotSetting && _realtimeConnected && !_realtimeFallback;
+      _isRealtimeEnabledForSession && _realtimeConnected && !_realtimeFallback;
 
   Widget _buildObjectiveCompletionPanel() {
     if (!_completionEligible) return const SizedBox.shrink();
@@ -1784,7 +1783,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
 
   String get _statusLabel {
     if (_navigatingToResult) return 'Finalizing assessment';
-    if (_isRealtimePilotSetting && _realtimeConnecting) {
+    if (_isRealtimeEnabledForSession && _realtimeConnecting) {
       return 'Connecting live conversation';
     }
     if (_reviewingTranscript) return 'Review transcript';
@@ -1813,7 +1812,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         : '';
     final mode = _usesLiveRealtime
         ? 'Live'
-        : _isRealtimePilotSetting && _realtimeFallback
+        : _isRealtimeEnabledForSession && _realtimeFallback
         ? 'Standard fallback'
         : null;
     final modeLabel = mode == null ? '' : ' | $mode';

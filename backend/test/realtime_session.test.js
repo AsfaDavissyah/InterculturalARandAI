@@ -4,14 +4,37 @@ const jwt = require("jsonwebtoken");
 
 const JWT_SECRET = "intercultural_ai_dev_secret_key_2026_at_least_32_bytes";
 
-test("Realtime configuration is scoped to the lecturer office pilot", () => {
+test("Realtime supports all scenarios with an optional rollback allowlist", () => {
   const {
     buildRealtimeSessionConfig,
-    isRealtimePilotSetting,
+    isRealtimeScenarioEnabled,
+    resolveRealtimeVoice,
   } = require("../services/realtime_service");
+  const previousScope = process.env.OPENAI_REALTIME_SCOPE;
+  const previousScenarioIds = process.env.OPENAI_REALTIME_SCENARIO_IDS;
+
+  process.env.OPENAI_REALTIME_SCOPE = "all";
+  assert.equal(isRealtimeScenarioEnabled("ACADEMIC-LECTURER-OFFICE"), true);
+  assert.equal(isRealtimeScenarioEnabled("SOCIAL-LONDON-RESTAURANT"), true);
+  assert.equal(isRealtimeScenarioEnabled("G-ICC-008"), true);
+
+  process.env.OPENAI_REALTIME_SCOPE = "allowlist";
+  process.env.OPENAI_REALTIME_SCENARIO_IDS = "ACADEMIC-LECTURER-OFFICE";
+  assert.equal(isRealtimeScenarioEnabled("ACADEMIC-LECTURER-OFFICE"), true);
+  assert.equal(isRealtimeScenarioEnabled("SOCIAL-LONDON-RESTAURANT"), false);
+
+  if (previousScope === undefined) delete process.env.OPENAI_REALTIME_SCOPE;
+  else process.env.OPENAI_REALTIME_SCOPE = previousScope;
+  if (previousScenarioIds === undefined) {
+    delete process.env.OPENAI_REALTIME_SCENARIO_IDS;
+  } else {
+    process.env.OPENAI_REALTIME_SCENARIO_IDS = previousScenarioIds;
+  }
 
   const config = buildRealtimeSessionConfig({
     scenarioData: {
+      experience_type: "guided_topic",
+      setting_id: "ACADEMIC-LECTURER-OFFICE",
       scenario: {
         title: "Lecturer's Office Consultation",
         ai_role: "Dr Emma Collins, foreign lecturer",
@@ -23,23 +46,41 @@ test("Realtime configuration is scoped to the lecturer office pilot", () => {
     student: { name: "Alya" },
   });
 
-  assert.equal(isRealtimePilotSetting("ACADEMIC-LECTURER-OFFICE"), true);
-  assert.equal(isRealtimePilotSetting("SOCIAL-LONDON-RESTAURANT"), false);
   assert.equal(config.type, "realtime");
   assert.deepEqual(config.output_modalities, ["audio"]);
   assert.equal(config.audio.input.turn_detection, null);
+  assert.equal(config.audio.output.voice, "marin");
   assert.match(config.instructions, /Alya/);
   assert.match(config.instructions, /one or two short sentences/i);
   assert.match(config.instructions, /learner to speak first/i);
   assert.match(config.instructions, /faithfully repeat your immediately previous/i);
+  assert.equal(
+    resolveRealtimeVoice({
+      experience_type: "guided_topic",
+      setting_id: "PROFESSIONAL-INTERVIEW-ROOM",
+      scenario: { ai_role: "Michael Harris, HR Interviewer" },
+    }),
+    "cedar"
+  );
+  assert.equal(
+    resolveRealtimeVoice({
+      experience_type: "scenario_library",
+      scenario: { ai_role: "Any scenario partner" },
+    }),
+    "alloy"
+  );
 });
 
 test("authenticated student receives an ephemeral secret without exposing the API key", async () => {
   const previousFetch = global.fetch;
   const previousEnabled = process.env.OPENAI_REALTIME_ENABLED;
   const previousKey = process.env.OPENAI_API_KEY;
+  const previousScope = process.env.OPENAI_REALTIME_SCOPE;
+  const previousScenarioIds = process.env.OPENAI_REALTIME_SCENARIO_IDS;
   process.env.OPENAI_REALTIME_ENABLED = "true";
   process.env.OPENAI_API_KEY = "sk-production-key-must-not-leak";
+  process.env.OPENAI_REALTIME_SCOPE = "allowlist";
+  process.env.OPENAI_REALTIME_SCENARIO_IDS = "ACADEMIC-LECTURER-OFFICE";
 
   let upstreamRequest;
   let upstreamCalls = 0;
@@ -118,6 +159,7 @@ test("authenticated student receives an ephemeral secret without exposing the AP
     assert.equal(body.setting_id, "ACADEMIC-LECTURER-OFFICE");
     assert.equal(body.research_session_id, "session_research_test_12345678");
     assert.equal(body.realtime_session_id, "sess_realtime_test");
+    assert.equal(body.voice, "marin");
     assert.equal(upstreamCalls, 1);
     assert.equal(JSON.stringify(body).includes(process.env.OPENAI_API_KEY), false);
     assert.match(upstreamRequest.url, /realtime\/client_secrets$/);
@@ -125,6 +167,30 @@ test("authenticated student receives an ephemeral secret without exposing the AP
       upstreamRequest.options.headers.Authorization,
       `Bearer ${process.env.OPENAI_API_KEY}`
     );
+
+    process.env.OPENAI_REALTIME_SCOPE = "all";
+    const expandedResponse = await previousFetch(
+      `http://127.0.0.1:${server.address().port}/api/realtime/session`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Connection: "close",
+        },
+        body: JSON.stringify({
+          scenario_id: "G-ICC-008",
+          setting_id: "G-ICC-008",
+          research_session_id: "session_research_expanded_12345678",
+          student_display_name: "Alya",
+        }),
+      }
+    );
+    const expandedBody = await expandedResponse.json();
+    assert.equal(expandedResponse.status, 201);
+    assert.equal(expandedBody.setting_id, "G-ICC-008");
+    assert.equal(expandedBody.voice, "alloy");
+    assert.equal(upstreamCalls, 2);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     global.fetch = previousFetch;
@@ -132,5 +198,12 @@ test("authenticated student receives an ephemeral secret without exposing the AP
     else process.env.OPENAI_REALTIME_ENABLED = previousEnabled;
     if (previousKey === undefined) delete process.env.OPENAI_API_KEY;
     else process.env.OPENAI_API_KEY = previousKey;
+    if (previousScope === undefined) delete process.env.OPENAI_REALTIME_SCOPE;
+    else process.env.OPENAI_REALTIME_SCOPE = previousScope;
+    if (previousScenarioIds === undefined) {
+      delete process.env.OPENAI_REALTIME_SCENARIO_IDS;
+    } else {
+      process.env.OPENAI_REALTIME_SCENARIO_IDS = previousScenarioIds;
+    }
   }
 });

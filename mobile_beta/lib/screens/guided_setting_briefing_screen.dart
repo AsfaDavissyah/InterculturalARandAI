@@ -1,12 +1,8 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../models/guided_setting.dart';
 import '../models/guided_topic.dart';
 import '../models/scenario_topic.dart';
-import '../services/app_settings.dart';
-import '../services/chat_service.dart';
 import '../services/page_transitions.dart';
 import '../theme/engora_theme.dart';
 import '../widgets/app_svg_icon.dart';
@@ -74,7 +70,6 @@ class GuidedSettingBriefingScreen extends StatelessWidget {
     return Scaffold(
       body: Column(
         children: [
-          _OpeningVoiceWarmup(setting: setting),
           _BriefingHeader(
             title: setting.title,
             location: setting.location,
@@ -296,50 +291,4 @@ class _ModuleSourceCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _OpeningVoiceWarmup extends StatefulWidget {
-  final GuidedSetting setting;
-
-  const _OpeningVoiceWarmup({required this.setting});
-
-  @override
-  State<_OpeningVoiceWarmup> createState() => _OpeningVoiceWarmupState();
-}
-
-class _OpeningVoiceWarmupState extends State<_OpeningVoiceWarmup> {
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_prepareOpeningVoice());
-  }
-
-  Future<void> _prepareOpeningVoice() async {
-    final character = widget.setting.aiCharacter;
-    final identity =
-        '${character.displayName} ${character.role} ${character.avatarKey}'
-            .toLowerCase();
-    final gender =
-        identity.contains('michael') ||
-            identity.contains('hr_manager') ||
-            identity.contains('male') ||
-            identity.contains('mr.')
-        ? 'male'
-        : 'female';
-    try {
-      final service = ChatService(baseUrl: await AppSettings.getBaseUrl());
-      await service.prepareTts(
-        text: widget.setting.buildOpeningMessage(),
-        gender: gender,
-        aiRole: '${character.displayName} (${character.role})',
-        experienceType: 'guided_topic',
-        settingId: widget.setting.settingId,
-      );
-    } catch (_) {
-      // AR startup has neural and local TTS fallbacks.
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => const SizedBox.shrink();
 }

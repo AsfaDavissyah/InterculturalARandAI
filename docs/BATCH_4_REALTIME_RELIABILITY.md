@@ -2,9 +2,9 @@
 
 ## Scope
 
-Realtime remains limited to `ACADEMIC-LECTURER-OFFICE`. All other settings use
-the standard conversation engine. Expansion is allowed only after the pilot
-passes the physical-device checks below.
+After client acceptance, Realtime covers all active Guided Topic settings and
+Scenario Library items. The standard conversation engine remains the automatic
+fallback for every session.
 
 ## Implemented safeguards
 

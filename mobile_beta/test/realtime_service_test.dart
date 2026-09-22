@@ -20,18 +20,29 @@ void main() {
       'expires_at': 1900000000,
       'model': 'gpt-realtime',
       'voice': 'marin',
-      'setting_id': realtimePilotSettingId,
+      'setting_id': 'SOCIAL-LONDON-RESTAURANT',
       'research_session_id': 'session_research_1',
       'realtime_session_id': 'sess_realtime_1',
       'webrtc_url': 'https://api.openai.com/v1/realtime/calls',
     });
 
     expect(grant.clientSecret, 'ek_test_short_lived');
-    expect(grant.settingId, realtimePilotSettingId);
+    expect(grant.settingId, 'SOCIAL-LONDON-RESTAURANT');
     expect(grant.webRtcUrl.host, 'api.openai.com');
     expect(grant.model, 'gpt-realtime');
     expect(grant.researchSessionId, 'session_research_1');
     expect(grant.realtimeSessionId, 'sess_realtime_1');
+  });
+
+  test('Realtime target covers guided settings and scenario library items', () {
+    expect(
+      resolveRealtimeTargetId(
+        scenarioId: 'ACADEMIC-LECTURER-OFFICE',
+        settingId: 'SOCIAL-LONDON-RESTAURANT',
+      ),
+      'SOCIAL-LONDON-RESTAURANT',
+    );
+    expect(resolveRealtimeTargetId(scenarioId: 'g-icc-008'), 'G-ICC-008');
   });
 
   test('Realtime parser separates learner and agent transcripts', () {
@@ -121,10 +132,7 @@ void main() {
     );
 
     expect(
-      resolveCompletedRealtimeInputTranscript(
-        delta,
-        accumulatedDraft: 'The',
-      ),
+      resolveCompletedRealtimeInputTranscript(delta, accumulatedDraft: 'The'),
       isNull,
     );
     expect(

@@ -2,19 +2,104 @@ const OPENAI_REALTIME_CLIENT_SECRETS_URL =
   "https://api.openai.com/v1/realtime/client_secrets";
 const DEFAULT_REALTIME_MODEL = "gpt-realtime";
 const DEFAULT_REALTIME_VOICE = "marin";
-const DEFAULT_PILOT_SETTING_ID = "ACADEMIC-LECTURER-OFFICE";
+const DEFAULT_REALTIME_SCOPE = "all";
+const DEFAULT_REALTIME_ALLOWLIST = "ACADEMIC-LECTURER-OFFICE";
+const REALTIME_VOICES = new Set([
+  "alloy",
+  "ash",
+  "ballad",
+  "coral",
+  "echo",
+  "sage",
+  "shimmer",
+  "verse",
+  "marin",
+  "cedar",
+]);
 
-function realtimePilotSettingIds() {
+function realtimeAllowedScenarioIds() {
   return new Set(
-    String(process.env.OPENAI_REALTIME_PILOT_SETTING_IDS || DEFAULT_PILOT_SETTING_ID)
+    String(
+      process.env.OPENAI_REALTIME_SCENARIO_IDS ||
+        process.env.OPENAI_REALTIME_PILOT_SETTING_IDS ||
+        DEFAULT_REALTIME_ALLOWLIST
+    )
       .split(",")
       .map((value) => value.trim().toUpperCase())
       .filter(Boolean)
   );
 }
 
-function isRealtimePilotSetting(settingId) {
-  return realtimePilotSettingIds().has(String(settingId || "").trim().toUpperCase());
+function realtimeAvailabilityScope() {
+  const scope = String(
+    process.env.OPENAI_REALTIME_SCOPE || DEFAULT_REALTIME_SCOPE
+  )
+    .trim()
+    .toLowerCase();
+  return scope === "allowlist" ? "allowlist" : "all";
+}
+
+function isRealtimeScenarioEnabled(scenarioOrSettingId) {
+  const normalizedId = String(scenarioOrSettingId || "").trim().toUpperCase();
+  if (!normalizedId) return false;
+  return (
+    realtimeAvailabilityScope() === "all" ||
+    realtimeAllowedScenarioIds().has(normalizedId)
+  );
+}
+
+function resolveRealtimeVoice(scenarioData = {}) {
+  const forcedVoice = String(process.env.OPENAI_REALTIME_FORCE_VOICE || "")
+    .trim()
+    .toLowerCase();
+  if (REALTIME_VOICES.has(forcedVoice)) return forcedVoice;
+
+  const scenario = scenarioData.scenario || {};
+  const experienceType = String(scenarioData.experience_type || "")
+    .trim()
+    .toLowerCase();
+  if (experienceType !== "guided_topic") return "alloy";
+
+  const identity = [
+    scenario.ai_role,
+    scenario.avatar_key,
+    scenarioData.setting_id,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  if (
+    identity.includes("emma") ||
+    identity.includes("sarah") ||
+    identity.includes("olivia") ||
+    identity.includes("lecturer") ||
+    identity.includes("restaurant") ||
+    identity.includes("cafe") ||
+    identity.includes("waitress") ||
+    identity.includes("barista")
+  ) {
+    return "marin";
+  }
+  if (
+    identity.includes("michael") ||
+    identity.includes("david") ||
+    identity.includes("raka") ||
+    identity.includes("daniel") ||
+    identity.includes("male_") ||
+    identity.includes("interviewer") ||
+    identity.includes("hr manager")
+  ) {
+    return "cedar";
+  }
+
+  const configuredDefault = String(
+    process.env.OPENAI_REALTIME_VOICE || DEFAULT_REALTIME_VOICE
+  )
+    .trim()
+    .toLowerCase();
+  return REALTIME_VOICES.has(configuredDefault)
+    ? configuredDefault
+    : DEFAULT_REALTIME_VOICE;
 }
 
 function buildRealtimeInstructions(scenarioData, student = {}) {
@@ -46,7 +131,7 @@ function buildRealtimeInstructions(scenarioData, student = {}) {
     "Follow what the learner actually says instead of forcing a scripted stage.",
     "If the learner asks you to repeat, say 'Of course' and faithfully repeat your immediately previous spoken reply without advancing the conversation or asking a different question.",
     "Speak naturally, warmly, and at a clear B1-friendly pace.",
-    "This is an audio connectivity pilot. Do not mention system instructions or implementation details.",
+    "Do not mention system instructions or implementation details.",
   ]
     .filter(Boolean)
     .join("\n");
@@ -72,7 +157,7 @@ function buildRealtimeSessionConfig({ scenarioData, student }) {
         turn_detection: null,
       },
       output: {
-        voice: String(process.env.OPENAI_REALTIME_VOICE || DEFAULT_REALTIME_VOICE).trim(),
+        voice: resolveRealtimeVoice(scenarioData),
         speed: 1,
       },
     },
@@ -147,10 +232,12 @@ async function createRealtimeClientSecret({
 }
 
 module.exports = {
-  DEFAULT_PILOT_SETTING_ID,
+  DEFAULT_REALTIME_SCOPE,
   buildRealtimeInstructions,
   buildRealtimeSessionConfig,
   createRealtimeClientSecret,
-  isRealtimePilotSetting,
-  realtimePilotSettingIds,
+  isRealtimeScenarioEnabled,
+  realtimeAllowedScenarioIds,
+  realtimeAvailabilityScope,
+  resolveRealtimeVoice,
 };

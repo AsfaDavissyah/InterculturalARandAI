@@ -41,7 +41,8 @@ const AuditEvent = require("./models/AuditEvent");
 const AudioCache = require("./models/AudioCache");
 const {
   createRealtimeClientSecret,
-  isRealtimePilotSetting,
+  isRealtimeScenarioEnabled,
+  realtimeAvailabilityScope,
 } = require("./services/realtime_service");
 
 function requireFeature(flagName) {
@@ -3380,7 +3381,7 @@ app.post("/api/realtime/session", authenticateJWT, async (req, res) => {
   if (process.env.OPENAI_REALTIME_ENABLED !== "true") {
     return res.status(403).json({
       error: "REALTIME_DISABLED",
-      message: "The Realtime pilot is not enabled on this server.",
+      message: "Realtime conversation is not enabled on this server.",
       request_id: req.requestId,
     });
   }
@@ -3388,10 +3389,10 @@ app.post("/api/realtime/session", authenticateJWT, async (req, res) => {
   const scenarioId = String(req.body?.scenario_id || "").trim();
   const settingId = String(req.body?.setting_id || scenarioId).trim().toUpperCase();
   const researchSessionId = String(req.body?.research_session_id || "").trim();
-  if (!settingId || !isRealtimePilotSetting(settingId)) {
+  if (!settingId || !isRealtimeScenarioEnabled(settingId)) {
     return res.status(403).json({
-      error: "REALTIME_PILOT_NOT_AVAILABLE",
-      message: "Realtime is currently limited to the approved pilot setting.",
+      error: "REALTIME_SCENARIO_NOT_AVAILABLE",
+      message: "Realtime is not enabled for this scenario.",
       request_id: req.requestId,
     });
   }
@@ -3412,7 +3413,7 @@ app.post("/api/realtime/session", authenticateJWT, async (req, res) => {
     if (resolution.error || !resolution.scenarioData) {
       return res.status(404).json({
         error: "REALTIME_SCENARIO_NOT_FOUND",
-        message: resolution.error || "The pilot setting is unavailable.",
+        message: resolution.error || "The requested scenario is unavailable.",
         request_id: req.requestId,
       });
     }
@@ -3452,6 +3453,7 @@ app.post("/api/realtime/session", authenticateJWT, async (req, res) => {
         voice: grant.voice,
         research_session_id: researchSessionId,
         realtime_session_id: grant.sessionId,
+        availability_scope: realtimeAvailabilityScope(),
       },
     });
 
