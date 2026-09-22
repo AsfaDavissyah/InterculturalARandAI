@@ -8,7 +8,11 @@ import 'scenario_topic.dart';
 
 class PracticeSession {
   static const schemaVersion = 4;
-  Assessment get assessment => Assessment.calculate(transcript, evaluations);
+  Assessment get assessment => Assessment.calculate(
+    transcript,
+    evaluations,
+    objectivesRequired: settingId != 'GENERAL-FREE-CONVERSATION',
+  );
   static const scoreKeys = [
     'grammar',
     'vocabulary',

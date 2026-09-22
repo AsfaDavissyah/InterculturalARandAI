@@ -21,8 +21,9 @@ class Assessment {
   };
   static Assessment calculate(
     List<Map<String, String>> transcript,
-    List<AiResponse> evaluations,
-  ) {
+    List<AiResponse> evaluations, {
+    bool objectivesRequired = true,
+  }) {
     const keys = [
       'grammar',
       'vocabulary',
@@ -73,7 +74,8 @@ class Assessment {
     final remaining = latest?.sessionProgress['remaining_objective_ids'];
     final total = completed + (remaining is List ? remaining.length : 0);
     final objectivesComplete =
-        total > 0 && remaining is List && remaining.isEmpty;
+        !objectivesRequired ||
+        (total > 0 && remaining is List && remaining.isEmpty);
     final status = !enough
         ? 'insufficient_evidence'
         : scores.length < keys.length

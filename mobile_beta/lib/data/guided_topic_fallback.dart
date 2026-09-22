@@ -71,4 +71,27 @@ List<GuidedTopic> buildFallbackGuidedTopics() => [
       'International workplace expectations',
     ],
   ),
+  GuidedTopic(
+    topicId: 'free-conversation',
+    title: 'Free Conversation',
+    description:
+        'Choose your own topic and practice a natural English conversation that follows your interests.',
+    iconKey: 'forum',
+    displayOrder: 4,
+    isActive: true,
+    languageObjectives: const [
+      'Expressing ideas clearly',
+      'Responding naturally',
+      'Asking follow-up questions',
+      'Maintaining conversational flow',
+      'Using appropriate vocabulary',
+    ],
+    iccObjectives: const [
+      'Respectful turn-taking',
+      'Awareness of different perspectives',
+      'Appropriate conversational tone',
+      'Avoiding stereotypes',
+      'Clarifying misunderstandings respectfully',
+    ],
+  ),
 ];

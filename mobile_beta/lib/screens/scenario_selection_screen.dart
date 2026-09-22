@@ -496,7 +496,9 @@ class _TopicCard extends StatelessWidget {
                               borderRadius: BorderRadius.circular(99),
                             ),
                             child: Text(
-                              '2 Settings',
+                              topic.topicId == 'free-conversation'
+                                  ? '1 Setting'
+                                  : '2 Settings',
                               style: TextStyle(
                                 color: palette.accent,
                                 fontSize: 10.5,

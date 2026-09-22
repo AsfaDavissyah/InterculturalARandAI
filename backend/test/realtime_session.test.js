@@ -64,11 +64,37 @@ test("Realtime supports all scenarios with an optional rollback allowlist", () =
   );
   assert.equal(
     resolveRealtimeVoice({
+      experience_type: "guided_topic",
+      setting_id: "GENERAL-FREE-CONVERSATION",
+      scenario: { ai_role: "Daniel Moore, international conversation partner" },
+    }),
+    "cedar"
+  );
+  assert.equal(
+    resolveRealtimeVoice({
       experience_type: "scenario_library",
       scenario: { ai_role: "Any scenario partner" },
     }),
     "alloy"
   );
+
+  const freeConfig = buildRealtimeSessionConfig({
+    scenarioData: {
+      experience_type: "guided_topic",
+      practice_mode: "free_conversation",
+      setting_id: "GENERAL-FREE-CONVERSATION",
+      scenario: {
+        title: "Free Conversation with Daniel",
+        ai_role: "Daniel Moore, international conversation partner",
+        student_role: "Student leading an open conversation",
+      },
+      context: { setting: "Campus Conversation Space" },
+      conversation_objectives: [],
+    },
+    student: { name: "Alya" },
+  });
+  assert.equal(freeConfig.audio.output.voice, "cedar");
+  assert.match(freeConfig.instructions, /learner controls the subject/i);
 });
 
 test("authenticated student receives an ephemeral secret without exposing the API key", async () => {

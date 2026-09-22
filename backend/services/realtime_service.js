@@ -112,6 +112,7 @@ function buildRealtimeInstructions(scenarioData, student = {}) {
   const objectiveText = objectives
     .map((objective) => `- ${objective.description || objective.objective_id}`)
     .join("\n");
+  const freeConversation = scenarioData?.practice_mode === "free_conversation";
 
   return [
     `You are ${scenario.ai_role || "an English conversation partner"} in Engora.`,
@@ -128,7 +129,9 @@ function buildRealtimeInstructions(scenarioData, student = {}) {
     "Wait silently for the learner to speak first. Do not open the conversation yourself.",
     "Reply in English using one or two short sentences.",
     "Ask no more than one focused question at a time.",
-    "Follow what the learner actually says instead of forcing a scripted stage.",
+    freeConversation
+      ? "The learner controls the subject. Follow their topic, answer directly, and allow them to change direction without redirecting them to a preset task."
+      : "Follow what the learner actually says instead of forcing a scripted stage.",
     "If the learner asks you to repeat, say 'Of course' and faithfully repeat your immediately previous spoken reply without advancing the conversation or asking a different question.",
     "Speak naturally, warmly, and at a clear B1-friendly pace.",
     "Do not mention system instructions or implementation details.",

@@ -9,14 +9,15 @@ const {
 const Topic = require("../models/Topic");
 const Setting = require("../models/Setting");
 
-test("Phase 2 seed data defines three topics and six active settings", () => {
-  assert.equal(topicsData.length, 3);
-  assert.equal(settingsData.length, 6);
+test("guided seed data defines four topics and seven active settings", () => {
+  assert.equal(topicsData.length, 4);
+  assert.equal(settingsData.length, 7);
 
   const topicIds = new Set(topicsData.map((t) => t.topicId));
   assert.ok(topicIds.has("academic-communication"));
   assert.ok(topicIds.has("social-communication"));
   assert.ok(topicIds.has("professional-communication"));
+  assert.ok(topicIds.has("free-conversation"));
 
   for (const topic of topicsData) {
     assert.equal(topic.isActive, true);
@@ -57,6 +58,7 @@ test("Each setting matches expected AI characters and visual sticker keys", () =
   const melbourneCafe = settingsData.find((s) => s.settingId === "SOCIAL-MELBOURNE-CAFE");
   const interviewRoom = settingsData.find((s) => s.settingId === "PROFESSIONAL-INTERVIEW-ROOM");
   const careerFair = settingsData.find((s) => s.settingId === "PROFESSIONAL-CAREER-FAIR");
+  const freeConversation = settingsData.find((s) => s.settingId === "GENERAL-FREE-CONVERSATION");
 
   assert.equal(academicOffice.aiCharacter.display_name, "Dr Emma Collins");
   assert.equal(academicClass.aiCharacter.display_name, "Dr Emma Collins");
@@ -64,6 +66,8 @@ test("Each setting matches expected AI characters and visual sticker keys", () =
   assert.equal(melbourneCafe.aiCharacter.display_name, "Olivia Reed");
   assert.equal(interviewRoom.aiCharacter.display_name, "Michael Harris");
   assert.equal(careerFair.aiCharacter.display_name, "Michael Harris");
+  assert.equal(freeConversation.aiCharacter.display_name, "Daniel Moore");
+  assert.equal(freeConversation.practiceMode, "free_conversation");
 
   assert.equal(academicOffice.stickerAssetKey, "sticker_lecturer_office");
   assert.equal(londonRestaurant.stickerAssetKey, "sticker_london_restaurant");
@@ -102,8 +106,8 @@ test("seeding twice is idempotent and preserves dashboard CRUD changes", async (
     SettingModel: settingModel,
     logger: silentLogger,
   });
-  assert.equal(firstRun.topicsInserted, 3);
-  assert.equal(firstRun.settingsInserted, 6);
+  assert.equal(firstRun.topicsInserted, 4);
+  assert.equal(firstRun.settingsInserted, 7);
 
   topicModel.records.get("academic-communication").title =
     "Academic Communication Edited by Admin";
@@ -118,8 +122,8 @@ test("seeding twice is idempotent and preserves dashboard CRUD changes", async (
 
   assert.equal(secondRun.topicsInserted, 0);
   assert.equal(secondRun.settingsInserted, 0);
-  assert.equal(topicModel.records.size, 3);
-  assert.equal(settingModel.records.size, 6);
+  assert.equal(topicModel.records.size, 4);
+  assert.equal(settingModel.records.size, 7);
   assert.equal(
     topicModel.records.get("academic-communication").title,
     "Academic Communication Edited by Admin"

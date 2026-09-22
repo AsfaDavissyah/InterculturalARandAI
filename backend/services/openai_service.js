@@ -36,6 +36,7 @@ function buildPromptScenario(scenarioData) {
 
   return {
     experience_type: scenarioData.experience_type || "legacy_scenario",
+    practice_mode: scenarioData.practice_mode || "structured",
     topic_id: scenarioData.topic_id || null,
     setting_id: scenarioData.setting_id || null,
     scenario_id: scenario.scenario_id,
@@ -59,6 +60,7 @@ function buildPromptScenario(scenarioData) {
 
 function buildSystemPrompt(scenarioData, learnerProfile = {}) {
   const scenario = scenarioData.scenario;
+  const freeConversation = scenarioData.practice_mode === "free_conversation";
 
   return `
 You are the role-play character in an English speaking practice application. You also evaluate silently for the result screen, but you never sound like an evaluator in the conversation.
@@ -81,11 +83,11 @@ ${buildLearnerPrompt(learnerProfile)}
 
 Fixed scenario boundaries:
 - Stay inside this scenario only.
-- Keep the physical/social setting as: ${scenario.ar_scene}.
+${freeConversation ? "- The learner may choose and change the conversation topic freely." : `- Keep the physical/social setting as: ${scenario.ar_scene}.`}
 - Do not introduce locations, tasks, or roles from other scenarios.
 - Speak only as the AI role. Never write the student's dialogue or complete the student's turn.
 - Follow every boundary and forbidden term defined in the scenario context.
-- If the student gives an answer that moves outside the scenario, gently redirect while staying in character.
+${freeConversation ? "- Follow the learner's chosen subject. Do not redirect them toward a predetermined task or objective." : "- If the student gives an answer that moves outside the scenario, gently redirect while staying in character."}
 - If the scenario text contains sample character names for the learner, treat them as placeholders only.
 
 Output separation:
@@ -131,13 +133,19 @@ Rules:
 - If legacy dialogue fields exist in the scenario data, ignore them as a script.
 - Evaluate the student's latest response.
 - Keep English suitable for the scenario level.
-- Do not become a general free chatbot.
-- Do not ask unrelated questions.
+${freeConversation ? "- This is a free conversation: answer the learner's chosen topic directly and allow natural topic changes." : "- Do not become a general free chatbot.\n- Do not ask unrelated questions."}
 - Return only valid JSON.
 `;
 }
 
 function getTurnGuidance(scenarioData, studentResponseCount) {
+  if (scenarioData.practice_mode === "free_conversation") {
+    return `
+Student response count: ${studentResponseCount}
+
+Continue the topic selected by the learner. Respond directly, preserve recent context, and allow a natural topic change. There are no required objectives or scripted stages. Turn count is analytics only and must not make you close the conversation. Keep corrections and examples out of ai_message.
+`;
+  }
   return `
 Student response count: ${studentResponseCount}
 
@@ -297,6 +305,7 @@ async function generateChatResponseWithOpenAI({
     learnerProfile,
     completedObjectiveIds
   );
+  const freeConversation = scenarioData.practice_mode === "free_conversation";
 
   const response = await getOpenAIClient().responses.create({
     model,
@@ -311,6 +320,7 @@ Do not use scripted sample names such as Rina, Raka, or David for the learner. U
 Keep ai_message natural, concise, and speakable: one or two short sentences.
 Ask at most one question.
 The application controls completion. Never close or jump ahead because of turn count or objective coverage.
+${freeConversation ? "This is a free conversation. Follow the learner's chosen topic and allow natural topic changes; do not redirect toward objectives." : "Stay within the configured scenario topic and role."}
 Answer the learner's latest question or request before introducing anything else. Objectives are background coverage, not a sequence of steps.
 Resolve short replies such as "both", "that one", "yes", or "no" against your last question and the choices already offered. Ask one focused clarification if their meaning remains ambiguous.
 When asked to repeat, repeat the relevant previous message. When asked what you mean, explain that message more simply instead of repeating it unchanged or changing topics.

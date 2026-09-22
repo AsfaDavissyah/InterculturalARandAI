@@ -138,6 +138,13 @@ class TopicPalette {
 
   static TopicPalette fromTopic(String value) {
     final normalized = value.toLowerCase();
+    if (normalized.contains('free')) {
+      return const TopicPalette(
+        background: EngoraColors.social,
+        accent: EngoraColors.socialAccent,
+        icon: Icons.chat_bubble_outline_rounded,
+      );
+    }
     if (normalized.contains('social')) {
       return const TopicPalette(
         background: EngoraColors.social,

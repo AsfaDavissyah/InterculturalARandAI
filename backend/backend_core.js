@@ -806,6 +806,8 @@ function normalizeRuntimeContext(input, topicInput = null) {
 
     return {
       experience_type: "guided_topic",
+      practice_mode:
+        input.practiceMode || input.practice_mode || "structured",
       scenario_id: settingId,
       topic_id: topicId,
       setting_id: settingId,
@@ -854,6 +856,7 @@ function normalizeRuntimeContext(input, topicInput = null) {
 
   return {
     experience_type: input.experience_type || "legacy_scenario",
+    practice_mode: input.practice_mode || input.practiceMode || "structured",
     scenario_id: String(
       scenarioObj.scenario_id || input.scenarioId || ""
     ).toUpperCase(),
@@ -2895,7 +2898,7 @@ app.get("/api/admin/settings", authenticateJWT, requireRole(["admin"]), async (r
 });
 
 app.post("/api/admin/settings", authenticateJWT, requireRole(["admin"]), async (req, res) => {
-  const { settingId, topicId, title, location, briefing, stickerAssetKey, studentRole, aiCharacter, taskInstruction, conversationStages, constraints, rubric, sessionRules, displayOrder, isActive } = req.body;
+  const { settingId, topicId, title, location, briefing, stickerAssetKey, studentRole, aiCharacter, taskInstruction, conversationStages, constraints, rubric, sessionRules, practiceMode, displayOrder, isActive } = req.body;
   const validationError = validateSettingInput(req.body);
   if (validationError) return res.status(400).json({ error: validationError });
 
@@ -2934,6 +2937,7 @@ app.post("/api/admin/settings", authenticateJWT, requireRole(["admin"]), async (
       constraints: Array.isArray(constraints) ? constraints.map(String) : [],
       rubric: rubric || {},
       sessionRules: normalizeSessionRulesInput(sessionRules),
+      practiceMode: practiceMode === "free_conversation" ? "free_conversation" : "structured",
       displayOrder: Number(displayOrder || 0),
       isActive: isActive !== false,
       version: 1,
@@ -2953,7 +2957,7 @@ app.post("/api/admin/settings", authenticateJWT, requireRole(["admin"]), async (
 });
 
 app.put("/api/admin/settings/:id", authenticateJWT, requireRole(["admin"]), async (req, res) => {
-  const { topicId, title, location, briefing, stickerAssetKey, studentRole, aiCharacter, taskInstruction, conversationStages, constraints, rubric, sessionRules, displayOrder, isActive } = req.body;
+  const { topicId, title, location, briefing, stickerAssetKey, studentRole, aiCharacter, taskInstruction, conversationStages, constraints, rubric, sessionRules, practiceMode, displayOrder, isActive } = req.body;
   const validationError = validateSettingInput(req.body, { requireIdentity: false });
   if (validationError) return res.status(400).json({ error: validationError });
 
@@ -2991,6 +2995,9 @@ app.put("/api/admin/settings/:id", authenticateJWT, requireRole(["admin"]), asyn
       if (sessionRules !== undefined) {
         setting.sessionRules = normalizeSessionRulesInput(sessionRules);
       }
+      if (practiceMode !== undefined) {
+        setting.practiceMode = practiceMode === "free_conversation" ? "free_conversation" : "structured";
+      }
       if (displayOrder !== undefined) setting.displayOrder = Number(displayOrder);
       if (isActive !== undefined) setting.isActive = Boolean(isActive);
 
@@ -3018,6 +3025,7 @@ app.put("/api/admin/settings/:id", authenticateJWT, requireRole(["admin"]), asyn
       if (constraints !== undefined) s.constraints = constraints.map(String);
       if (rubric !== undefined) s.rubric = rubric;
       if (sessionRules !== undefined) s.sessionRules = normalizeSessionRulesInput(sessionRules);
+      if (practiceMode !== undefined) s.practiceMode = practiceMode === "free_conversation" ? "free_conversation" : "structured";
       if (displayOrder !== undefined) s.displayOrder = Number(displayOrder);
       if (isActive !== undefined) s.isActive = Boolean(isActive);
       s.version = Number(s.version || 1) + 1;

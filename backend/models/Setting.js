@@ -78,6 +78,11 @@ const SettingSchema = new mongoose.Schema({
     targetStudentResponsesMax: { type: Number, default: 8 },
     maximumStudentResponses: { type: Number, default: 10 },
   },
+  practiceMode: {
+    type: String,
+    enum: ["structured", "free_conversation"],
+    default: "structured",
+  },
   displayOrder: {
     type: Number,
     default: 0,

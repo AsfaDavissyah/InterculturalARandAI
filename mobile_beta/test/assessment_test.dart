@@ -84,4 +84,23 @@ void main() {
     expect(partial.scores['grammar'], 5);
     expect(partial.overall, isNull);
   });
+  test('free conversation can be assessed without objectives', () {
+    final noObjectives = evaluations(5)
+        .map(
+          (item) => AiResponse.fromJson({
+            ...item.toJson(),
+            'completed_objective_ids': const [],
+            'session_progress': {'remaining_objective_ids': const []},
+          }),
+        )
+        .toList();
+    final result = Assessment.calculate(
+      transcript(5),
+      noObjectives,
+      objectivesRequired: false,
+    );
+    expect(result.status, 'assessed');
+    expect(result.totalObjectives, 0);
+    expect(result.overall, 5);
+  });
 }

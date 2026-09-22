@@ -59,7 +59,19 @@ const SETTING_DIALOGUE = {
     closing: "It was good speaking with you. Please use the information here to follow up, and enjoy the rest of the fair.",
     example: "Hello. I am interested in learning about internship opportunities with your company.",
   },
+  "GENERAL-FREE-CONVERSATION": {
+    opening: "Hello. What would you like to talk about today?",
+    closing: "Thank you for the conversation. I enjoyed hearing your ideas.",
+    example: "I would like to talk about a topic that interests me.",
+  },
 };
+
+function isFreeConversation(item = {}) {
+  return item.practiceMode === "free_conversation" ||
+    item.practice_mode === "free_conversation" ||
+    item.settingId === "GENERAL-FREE-CONVERSATION" ||
+    item.setting_id === "GENERAL-FREE-CONVERSATION";
+}
 
 function plain(value) {
   return value && typeof value.toObject === "function" ? value.toObject() : value;
@@ -100,6 +112,7 @@ function serializeSetting(setting, topic = null) {
       avatar_key: character.avatar_key || "default_avatar",
     },
     task_instruction: item.taskInstruction || "",
+    practice_mode: isFreeConversation(item) ? "free_conversation" : "structured",
     opening_message:
       dialogue?.opening ||
       `Hello. Welcome to ${item.location || "this setting"}. How may I help you?`,
@@ -123,12 +136,13 @@ function buildGuidedScenarioData(setting, topic) {
   const parent = plain(topic) || {};
   const publicSetting = serializeSetting(item, parent);
   const character = publicSetting.ai_character;
+  const freeConversation = isFreeConversation(item);
   const dialogue = SETTING_DIALOGUE[item.settingId] || {
     opening: `Hello. Welcome to ${item.location}. How may I help you?`,
     closing: "Thank you for speaking with me. I hope our conversation was helpful.",
     example: "Hello. Could you help me, please?",
   };
-  const stages = (item.conversationStages || []).map((stage, index) => {
+  const stages = (freeConversation ? [] : item.conversationStages || []).map((stage, index) => {
     const stageId = typeof stage === "string" ? stage : stage.stage_id;
     const detail = STAGE_DETAILS[stageId] || [
       String(stageId || "conversation step").replaceAll("_", " "),
@@ -157,6 +171,7 @@ function buildGuidedScenarioData(setting, topic) {
   return {
     schema_version: "2.0",
     experience_type: "guided_topic",
+    practice_mode: freeConversation ? "free_conversation" : "structured",
     topic_id: item.topicId,
     setting_id: item.settingId,
     scenario: {
@@ -174,19 +189,29 @@ function buildGuidedScenarioData(setting, topic) {
       cultural_note: (parent.iccObjectives || []).join("; "),
       avatar_key: character.avatar_key,
       sticker_asset_key: item.stickerAssetKey || "",
-      ai_character_prompt: `You are ${character.display_name}, ${character.role} from ${character.culture}. Remain this person throughout the session. You are physically in ${item.location}. Respond as a natural conversation partner, never as a teacher or evaluator.`,
+      ai_character_prompt: freeConversation
+        ? `You are ${character.display_name}, ${character.role}. Remain this person throughout the session. Let the learner choose, lead, and change the topic. Respond as a curious natural conversation partner, never as a teacher or evaluator.`
+        : `You are ${character.display_name}, ${character.role} from ${character.culture}. Remain this person throughout the session. You are physically in ${item.location}. Respond as a natural conversation partner, never as a teacher or evaluator.`,
       good_response_examples: [dialogue.example],
     },
     context: {
       setting: item.location,
       situation: item.briefing,
-      boundaries: [
-        `The location remains ${item.location} for the entire session.`,
-        `The AI remains ${character.display_name}, ${character.role}, for the entire session.`,
-        `The learner remains ${item.studentRole}; never assign the learner a fictional name.`,
-        "Do not move to another setting, topic, or role.",
-        ...(item.constraints || []),
-      ],
+      boundaries: freeConversation
+        ? [
+            `The AI remains ${character.display_name}, ${character.role}, for the entire session.`,
+            `The learner remains ${item.studentRole}; never assign the learner a fictional name.`,
+            "The learner controls the topic and may change it naturally.",
+            "Do not force objectives, stages, role-play tasks, or a predetermined ending.",
+            ...(item.constraints || []),
+          ]
+        : [
+            `The location remains ${item.location} for the entire session.`,
+            `The AI remains ${character.display_name}, ${character.role}, for the entire session.`,
+            `The learner remains ${item.studentRole}; never assign the learner a fictional name.`,
+            "Do not move to another setting, topic, or role.",
+            ...(item.constraints || []),
+          ],
       forbidden_terms: [],
     },
     characters: [
@@ -221,6 +246,7 @@ function buildGuidedScenarioData(setting, topic) {
       ...publicSetting.session_rules,
       required_objective_ids: objectives.map((objective) => objective.objective_id),
       natural_closing_message: dialogue.closing,
+      completion_mode: freeConversation ? "manual" : "objectives",
     },
     initial_conversation_state: {
       ai_opening_message: dialogue.opening,

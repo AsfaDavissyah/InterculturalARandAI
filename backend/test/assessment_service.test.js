@@ -50,3 +50,16 @@ test('cohort mean excludes insufficient and pending sessions instead of scoring 
   assert.equal(averageAssessedScore([session(), session(1), session(5, 'openai_chat')]), 5);
   assert.equal(averageAssessedScore([session(1)]), null);
 });
+test('free conversation can be assessed without objective coverage', () => {
+  const data = session();
+  data.settingId = 'GENERAL-FREE-CONVERSATION';
+  data.evaluations.forEach((evaluation) => {
+    evaluation.completed_objective_ids = [];
+    evaluation.session_progress = { remaining_objective_ids: [] };
+  });
+  const result = assessSession(data);
+  assert.equal(result.status, 'assessed');
+  assert.equal(result.total_objectives, 0);
+  assert.equal(result.objective_coverage, 1);
+  assert.equal(result.overall_score, 5);
+});

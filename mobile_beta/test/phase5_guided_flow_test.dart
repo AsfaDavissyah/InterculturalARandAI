@@ -8,12 +8,13 @@ import 'package:mobile_beta/services/avatar_registry.dart';
 
 void main() {
   group('Phase 5 Guided Topic Mobile Flow Tests', () {
-    test('fallback topics match the three approved guided topics', () {
+    test('fallback topics match the four approved guided topics', () {
       final topics = buildFallbackGuidedTopics();
       expect(topics.map((topic) => topic.topicId), [
-        'academic-communication',
-        'social-communication',
-        'professional-communication',
+          'academic-communication',
+          'social-communication',
+          'professional-communication',
+          'free-conversation',
       ]);
       expect(topics[1].title, 'Social Communication');
       expect(
@@ -178,6 +179,8 @@ void main() {
             'Good morning. Thank you for coming in today. Could you begin by introducing yourself?',
         'PROFESSIONAL-CAREER-FAIR':
             'Hello. Welcome to our booth. What brings you to the career fair today?',
+        'GENERAL-FREE-CONVERSATION':
+            'Hello. What would you like to talk about today?',
       };
 
       final openings = expected.entries.map((entry) {

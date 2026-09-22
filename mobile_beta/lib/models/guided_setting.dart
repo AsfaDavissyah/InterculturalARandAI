@@ -84,6 +84,7 @@ class GuidedSetting {
   final String studentRole;
   final GuidedAiCharacter aiCharacter;
   final String taskInstruction;
+  final String practiceMode;
   final String openingMessage;
   final GuidedSessionRules sessionRules;
   final int displayOrder;
@@ -99,6 +100,7 @@ class GuidedSetting {
     required this.studentRole,
     required this.aiCharacter,
     required this.taskInstruction,
+    this.practiceMode = 'structured',
     this.openingMessage = '',
     required this.sessionRules,
     required this.displayOrder,
@@ -163,6 +165,8 @@ class GuidedSetting {
       }(),
       taskInstruction:
           json['taskInstruction'] ?? json['task_instruction'] ?? '',
+      practiceMode:
+          json['practiceMode'] ?? json['practice_mode'] ?? 'structured',
       openingMessage: json['openingMessage'] ?? json['opening_message'] ?? '',
       sessionRules: GuidedSessionRules.fromJson(
         Map<String, dynamic>.from(
@@ -190,6 +194,8 @@ class GuidedSetting {
           'Good morning. Thank you for coming in today. Could you begin by introducing yourself?',
       'PROFESSIONAL-CAREER-FAIR':
           'Hello. Welcome to our booth. What brings you to the career fair today?',
+      'GENERAL-FREE-CONVERSATION':
+          'Hello. What would you like to talk about today?',
     };
     final settingOpening = fallbackOpenings[settingId];
     if (settingOpening != null) return settingOpening;

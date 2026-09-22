@@ -28,13 +28,19 @@ function assessSession(session) {
   const completed = new Set(latest?.completed_objective_ids || []);
   const remaining = progress.remaining_objective_ids;
   const total = completed.size + (Array.isArray(remaining) ? remaining.length : 0);
-  const objectivesComplete = total > 0 && Array.isArray(remaining) && remaining.length === 0;
+  const freeConversation = session.practiceMode === "free_conversation" ||
+    session.practice_mode === "free_conversation" ||
+    session.settingId === "GENERAL-FREE-CONVERSATION" ||
+    session.setting_id === "GENERAL-FREE-CONVERSATION" ||
+    session.scenario?.scenario_id === "GENERAL-FREE-CONVERSATION";
+  const objectivesComplete = freeConversation ||
+    (total > 0 && Array.isArray(remaining) && remaining.length === 0);
   const status = !enough ? "insufficient_evidence" : Object.keys(scores).length < SCORE_KEYS.length ? "evaluation_pending" : !objectivesComplete ? "partial" : "assessed";
   return {
     policy_version: 1, status, minimum_turns: MIN_TURNS, minimum_words: MIN_WORDS,
     confirmed_turns: meaningful.length, confirmed_words: words,
     completed_objectives: completed.size, total_objectives: total,
-    objective_coverage: total ? completed.size / total : null,
+    objective_coverage: total ? completed.size / total : freeConversation ? 1 : null,
     scores,
     overall_score: status === "assessed" ? Object.values(scores).reduce((a, b) => a + b, 0) / SCORE_KEYS.length : null,
   };

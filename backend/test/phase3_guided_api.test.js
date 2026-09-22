@@ -30,14 +30,14 @@ async function jsonRequest(url, options) {
   return { response, body: await response.json() };
 }
 
-test("public topic API exposes three ordered guided topics", async () => {
+test("public topic API exposes four ordered guided topics", async () => {
   await withServer(async (baseUrl) => {
     const { response, body } = await jsonRequest(`${baseUrl}/api/topics`);
     assert.equal(response.status, 200);
-    assert.equal(body.length, 3);
+    assert.equal(body.length, 4);
     assert.deepEqual(
       body.map((topic) => topic.topic_id),
-      ["academic-communication", "social-communication", "professional-communication"]
+      ["academic-communication", "social-communication", "professional-communication", "free-conversation"]
     );
     assert.ok(body.every((topic) => topic.language_objectives.length > 0));
     assert.ok(body.every((topic) => topic.icc_objectives.length > 0));
@@ -85,7 +85,7 @@ test("setting detail inherits topic objectives and exposes runtime assets", asyn
   });
 });
 
-test("all six guided settings expose distinct context-specific openings", () => {
+test("all seven guided settings expose distinct context-specific openings", () => {
   const openings = settingsData.map((setting) => {
     const topic = topicsData.find((item) => item.topicId === setting.topicId);
     return buildGuidedScenarioData(setting, topic).initial_conversation_state
@@ -98,6 +98,21 @@ test("all six guided settings expose distinct context-specific openings", () => 
   assert.match(openings[3], /get started/i);
   assert.match(openings[4], /introducing yourself/i);
   assert.match(openings[5], /career fair/i);
+  assert.match(openings[6], /talk about today/i);
+});
+
+test("free conversation detail exposes manual mode and Daniel", async () => {
+  await withServer(async (baseUrl) => {
+    const { response, body } = await jsonRequest(
+      `${baseUrl}/api/settings/GENERAL-FREE-CONVERSATION`
+    );
+    assert.equal(response.status, 200);
+    assert.equal(body.topic_id, "free-conversation");
+    assert.equal(body.practice_mode, "free_conversation");
+    assert.equal(body.ai_character.display_name, "Daniel Moore");
+    assert.equal(body.ai_character.avatar_key, "hr_manager_v1");
+    assert.equal(body.session_rules.maximum_student_responses, 30);
+  });
 });
 
 test("unknown topics and settings return 404", async () => {
@@ -109,7 +124,7 @@ test("unknown topics and settings return 404", async () => {
   });
 });
 
-test("all six guided settings resolve through fast respond-turn without drift", async () => {
+test("all seven guided settings resolve through fast respond-turn without drift", async () => {
   await withServer(async (baseUrl) => {
     for (const setting of settingsData) {
       const { response, body } = await jsonRequest(
@@ -219,4 +234,22 @@ test("guided runtime and prompt lock identity, location, objectives, and rubric"
   assert.match(prompt, /icc_objectives/);
   assert.match(prompt, /polite_address/);
   assert.match(prompt, /never assign the learner a fictional name/i);
+});
+
+test("free conversation follows the learner without required objectives", () => {
+  const setting = settingsData.find(
+    (item) => item.settingId === "GENERAL-FREE-CONVERSATION"
+  );
+  const topic = topicsData.find((item) => item.topicId === setting.topicId);
+  const runtime = buildGuidedScenarioData(setting, topic);
+  const prompt = buildSystemPrompt(runtime, { displayName: "Alya" });
+
+  assert.equal(runtime.practice_mode, "free_conversation");
+  assert.deepEqual(runtime.conversation_objectives, []);
+  assert.deepEqual(runtime.session_rules.required_objective_ids, []);
+  assert.equal(runtime.session_rules.completion_mode, "manual");
+  assert.match(runtime.scenario.ai_role, /Daniel Moore/i);
+  assert.match(prompt, /free conversation/i);
+  assert.match(prompt, /allow natural topic changes/i);
+  assert.doesNotMatch(prompt, /Do not become a general free chatbot/i);
 });

@@ -1493,7 +1493,9 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
       builder: (context) => AlertDialog(
         title: const Text('End practice manually?'),
         content: Text(
-          _completionEligible
+          _isFreeConversation
+              ? 'Your free conversation will be saved and assessed using the confirmed speaking evidence.'
+              : _completionEligible
               ? 'All objectives are complete. You can also use the completion button to record this practice as completed.'
               : 'Some objectives are still incomplete. This practice will be recorded as Ended Manually.',
         ),
@@ -1711,6 +1713,10 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   }
 
   bool get _completionEligible => _lastResponse?.completionEligible == true;
+
+  bool get _isFreeConversation =>
+      widget.guidedSetting?.practiceMode == 'free_conversation' ||
+      widget.settingId == 'GENERAL-FREE-CONVERSATION';
 
   String get _realtimeTargetId => resolveRealtimeTargetId(
     scenarioId: widget.scenario.id,
