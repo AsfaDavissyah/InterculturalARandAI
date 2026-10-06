@@ -2,7 +2,7 @@ name: mobile_beta
 description: "Beta AI speaking practice system for scenario-based intercultural English learning."
 publish_to: 'none'
 
-version: 1.0.4+14
+version: 1.0.5+15
 
 environment:
   sdk: ^3.9.2

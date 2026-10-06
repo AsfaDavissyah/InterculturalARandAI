@@ -39,6 +39,11 @@ const {
 const { createDashboardRouter } = require("./routes/dashboard_router");
 const AuditEvent = require("./models/AuditEvent");
 const AudioCache = require("./models/AudioCache");
+const AIResponseReport = require("./models/AIResponseReport");
+const AccountDeletionRequest = require("./models/AccountDeletionRequest");
+const {
+  deleteStudentAccount,
+} = require("./services/account_deletion_service");
 const {
   createRealtimeClientSecret,
   isRealtimeScenarioEnabled,
@@ -269,6 +274,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const NODE_ENV = process.env.NODE_ENV || "development";
 const isProduction = NODE_ENV === "production";
+if (isProduction) app.set("trust proxy", 1);
 const allowedOrigins = (process.env.CORS_ORIGIN || "")
   .split(",")
   .map((origin) => origin.trim())
@@ -306,6 +312,12 @@ app.use(
   })
 );
 app.use(express.json());
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(self), microphone=(self)");
+  next();
+});
 app.use(express.static(path.join(__dirname, "public")));
 app.use((req, res, next) => {
   const startedAt = Date.now();
@@ -1771,12 +1783,35 @@ function authenticateJWT(req, res, next) {
   const authHeader = req.headers.authorization;
   if (authHeader) {
     const token = authHeader.split(" ")[1];
-    jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    jwt.verify(token, JWT_SECRET, async (err, decoded) => {
       if (err) {
         return res.status(403).json({ error: "Invalid or expired token" });
       }
-      req.user = decoded; // Decoded is { userId, email, role }
-      next();
+      try {
+        if (securityConfig.isProduction) {
+          const activeUser = await User.findOne({
+            _id: decoded.userId,
+            accountStatus: "active",
+          })
+            .select("email role lecturerCode")
+            .lean();
+          if (!activeUser) {
+            return res.status(403).json({ error: "Account is no longer active" });
+          }
+          req.user = {
+            ...decoded,
+            email: activeUser.email,
+            role: activeUser.role,
+            lecturerCode: activeUser.lecturerCode,
+          };
+        } else {
+          req.user = decoded;
+        }
+        next();
+      } catch (error) {
+        console.error("Authentication account check failed:", error.message);
+        return res.status(503).json({ error: "Account verification is temporarily unavailable" });
+      }
     });
   } else {
     res.status(401).json({ error: "Authorization header is missing" });
@@ -2059,6 +2094,34 @@ const realtimeLimiter = rateLimit({
 app.use("/api/auth", authLimiter);
 app.use("/api/openai", openAILimiter);
 app.use("/api/realtime", realtimeLimiter);
+app.use("/api/account-deletion-requests", authLimiter);
+
+app.post("/api/account-deletion-requests", async (req, res) => {
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const studentId = String(req.body?.student_id || "").trim();
+  const notes = String(req.body?.notes || "").trim();
+  if (!/^\S+@\S+\.\S+$/.test(email) || notes.length > 1000) {
+    return res.status(400).json({ error: "Enter a valid email address and keep notes under 1000 characters." });
+  }
+  try {
+    const request = await AccountDeletionRequest.create({ email, studentId, notes });
+    logAuditEvent({
+      event: "account_deletion_requested",
+      role: "anonymous",
+      recordId: String(request._id),
+      details: { source: "public_web_form" },
+      requestId: req.requestId,
+    });
+    return res.status(202).json({
+      success: true,
+      request_id: request._id,
+      message: "Your request was received. The publisher must verify your identity before deleting data.",
+    });
+  } catch (error) {
+    console.error("Account deletion request failed:", error);
+    return res.status(500).json({ error: "The deletion request could not be submitted." });
+  }
+});
 app.use("/api/dashboard", createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }));
 
 // ─── Analytics Endpoints ───
@@ -2281,6 +2344,108 @@ app.post("/api/auth/update", authenticateJWT, async (req, res) => {
   } catch (err) {
     console.error("Profile Update Endpoint Error:", err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete("/api/account", authenticateJWT, requireRole(["student"]), async (req, res) => {
+  const password = String(req.body?.password || "");
+  const confirmation = String(req.body?.confirmation || "").trim().toUpperCase();
+  if (confirmation !== "DELETE") {
+    return res.status(400).json({
+      error: "Type DELETE to confirm permanent account deletion.",
+      code: "DELETE_CONFIRMATION_REQUIRED",
+    });
+  }
+  try {
+    const result = await deleteStudentAccount({
+      userId: req.user.userId,
+      password,
+      User,
+      PracticeSession,
+      AIResponseReport,
+    });
+    logAuditEvent({
+      event: "student_account_deleted",
+      actorId: req.user.userId,
+      role: "student",
+      recordId: String(req.user.userId),
+      details: {
+        deleted_sessions: result.deletedSessions,
+        deleted_reports: result.deletedReports,
+      },
+      requestId: req.requestId,
+    });
+    return res.json({
+      success: true,
+      message: "Your Engora account and associated practice data were permanently deleted.",
+    });
+  } catch (error) {
+    const statusCode = Number(error.statusCode) || 500;
+    if (statusCode >= 500) console.error("Account deletion failed:", error);
+    return res.status(statusCode).json({
+      error: statusCode >= 500 ? "Account deletion could not be completed." : error.message,
+      code: error.code || "ACCOUNT_DELETE_FAILED",
+    });
+  }
+});
+
+app.post("/api/reports/ai-response", authenticateJWT, requireRole(["student"]), async (req, res) => {
+  const allowedCategories = new Set([
+    "incorrect",
+    "irrelevant",
+    "repeated",
+    "incomplete",
+    "inappropriate",
+    "other",
+  ]);
+  const sessionId = String(req.body?.session_id || "").trim();
+  const scenarioId = String(req.body?.scenario_id || "").trim();
+  const responseText = String(req.body?.response_text || "").trim();
+  const category = String(req.body?.category || "").trim().toLowerCase();
+  const notes = String(req.body?.notes || "").trim();
+  const turnNumber = Number(req.body?.turn_number);
+
+  if (!sessionId || !responseText || !allowedCategories.has(category)) {
+    return res.status(400).json({ error: "Session, response, and a valid report category are required." });
+  }
+  if (!Number.isInteger(turnNumber) || turnNumber < 1 || responseText.length > 3000 || notes.length > 1000) {
+    return res.status(400).json({ error: "Report details are invalid or too long." });
+  }
+
+  try {
+    const ownedSession = await PracticeSession.findOne({
+      sessionId,
+      userId: req.user.userId,
+    })
+      .select("sessionId")
+      .lean();
+    if (!ownedSession) {
+      return res.status(404).json({ error: "Practice session not found." });
+    }
+    const report = await AIResponseReport.create({
+      userId: req.user.userId,
+      sessionId,
+      scenarioId,
+      turnNumber,
+      responseText,
+      category,
+      notes,
+    });
+    logAuditEvent({
+      event: "ai_response_reported",
+      actorId: req.user.userId,
+      role: "student",
+      recordId: String(report._id),
+      details: { session_id: sessionId, scenario_id: scenarioId, turn_number: turnNumber, category },
+      requestId: req.requestId,
+    });
+    return res.status(201).json({ success: true, report_id: report._id, status: report.status });
+  } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(409).json({ error: "This AI response has already been reported." });
+    }
+    console.error("AI response report failed:", error);
+    return res.status(500).json({ error: "The report could not be submitted." });
   }
 });
 

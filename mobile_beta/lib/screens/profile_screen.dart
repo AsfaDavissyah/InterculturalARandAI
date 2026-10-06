@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../services/app_settings.dart';
 import '../services/auth_service.dart';
+import '../services/practice_history_store.dart';
 import '../theme/engora_theme.dart';
 import '../widgets/app_svg_icon.dart';
 import 'login_screen.dart';
+import 'legal_document_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -227,6 +229,121 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  void _openLegal(LegalDocumentType type) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => LegalDocumentScreen(type: type)),
+    );
+  }
+
+  Future<void> _deleteAccount() async {
+    final passwordController = TextEditingController();
+    final confirmationController = TextEditingController();
+    var deleting = false;
+    String? error;
+    final deleted = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Delete Engora account?'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'This permanently deletes your student profile, practice sessions, transcripts, scores, and submitted AI-response reports. This cannot be undone.',
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: passwordController,
+                  enabled: !deleting,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Password'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: confirmationController,
+                  enabled: !deleting,
+                  textCapitalization: TextCapitalization.characters,
+                  onChanged: (_) => setDialogState(() {}),
+                  decoration: const InputDecoration(labelText: 'Type DELETE'),
+                ),
+                if (error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    error!,
+                    style: const TextStyle(color: EngoraColors.danger),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: deleting
+                  ? null
+                  : () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed:
+                  deleting ||
+                      confirmationController.text.trim().toUpperCase() !=
+                          'DELETE'
+                  ? null
+                  : () async {
+                      setDialogState(() {
+                        deleting = true;
+                        error = null;
+                      });
+                      try {
+                        await AuthService.deleteAccount(
+                          password: passwordController.text,
+                        );
+                        await const PracticeHistoryStore().clear();
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext, true);
+                        }
+                      } catch (exception) {
+                        setDialogState(() {
+                          deleting = false;
+                          error = exception.toString().replaceFirst(
+                            'Exception: ',
+                            '',
+                          );
+                        });
+                      }
+                    },
+              style: FilledButton.styleFrom(
+                backgroundColor: EngoraColors.danger,
+              ),
+              child: deleting
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text('Delete permanently'),
+            ),
+          ],
+        ),
+      ),
+    );
+    passwordController.dispose();
+    confirmationController.dispose();
+    if (deleted == true && mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (_) => false,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final profile = _profile;
@@ -286,6 +403,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
             subtitle: 'Device, network, and installation details',
             onTap: _pilotSettings,
           ),
+          const SizedBox(height: 10),
+          const Text(
+            'Legal & support',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 10),
+          _ProfileTile(
+            icon: Icons.privacy_tip_outlined,
+            title: 'Privacy',
+            subtitle: 'Data use, research consent, and your choices',
+            onTap: () => _openLegal(LegalDocumentType.privacy),
+          ),
+          _ProfileTile(
+            icon: Icons.description_outlined,
+            title: 'Terms of Use',
+            subtitle: 'Conditions for using Engora',
+            onTap: () => _openLegal(LegalDocumentType.terms),
+          ),
+          _ProfileTile(
+            icon: Icons.smart_toy_outlined,
+            title: 'AI Notice',
+            subtitle: 'Limits and reporting of AI-generated content',
+            onTap: () => _openLegal(LegalDocumentType.aiNotice),
+          ),
+          _ProfileTile(
+            icon: Icons.support_agent_outlined,
+            title: 'Help & Support',
+            subtitle: 'Technical and privacy support information',
+            onTap: () => _openLegal(LegalDocumentType.support),
+          ),
           const SizedBox(height: 20),
           OutlinedButton.icon(
             onPressed: _logout,
@@ -299,6 +446,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
+          ),
+          const SizedBox(height: 10),
+          TextButton.icon(
+            onPressed: _deleteAccount,
+            icon: const Icon(Icons.delete_forever_outlined),
+            label: const Text('Delete account and data'),
+            style: TextButton.styleFrom(foregroundColor: EngoraColors.danger),
           ),
         ],
       ),

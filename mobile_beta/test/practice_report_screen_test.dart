@@ -60,6 +60,45 @@ void main() {
 
     expect(find.text('Practice Result'), findsOneWidget);
     expect(find.text('Back to Home'), findsOneWidget);
+    expect(find.byTooltip('Report AI response'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('saved sessions expose reporting on AI transcript turns', (
+    tester,
+  ) async {
+    final savedData = PracticeReportData(
+      title: reportData.title,
+      aiName: reportData.aiName,
+      overallScore: reportData.overallScore,
+      status: reportData.status,
+      responseCount: reportData.responseCount,
+      scores: reportData.scores,
+      performanceSummary: reportData.performanceSummary,
+      doneWell: reportData.doneWell,
+      suggestions: reportData.suggestions,
+      transcript: reportData.transcript,
+      sessionId: 'session_report_test',
+      scenarioId: 'ACADEMIC-LECTURER-OFFICE',
+    );
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: EngoraTheme.light(),
+        home: PracticeReportScreen(
+          data: savedData,
+          mode: PracticeReportMode.history,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final reportAction = find.byTooltip('Report AI response');
+    await tester.scrollUntilVisible(reportAction, 250);
+    expect(reportAction, findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

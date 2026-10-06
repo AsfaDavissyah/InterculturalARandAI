@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Delete Engora Account</title><link rel="stylesheet" href="/app-info.css"></head>
+<body>
+<header><nav><strong>Engora</strong><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="/ai-notice.html">AI Notice</a><a href="/support.html">Support</a><a href="/account-deletion.html">Delete account</a></nav></header>
+<main>
+<h1>Request account deletion</h1>
+<p>The fastest verified path is <strong>Engora → Profile → Delete account and data</strong>. That path requires your password and permanently deletes the student profile, practice sessions, transcripts, scores, and submitted AI-response reports.</p>
+<p>If you cannot sign in, submit this request. The publisher must verify your identity before deleting any data.</p>
+<form id="deletion-form">
+  <label>Email used in Engora<input id="email" type="email" autocomplete="email" required maxlength="254"></label>
+  <label>Student ID (optional)<input id="student-id" autocomplete="off" maxlength="100"></label>
+  <label>Additional details (optional)<textarea id="notes" rows="4" maxlength="1000"></textarea></label>
+  <button id="submit" type="submit">Submit deletion request</button>
+  <p id="status" role="status" aria-live="polite"></p>
+</form>
+<footer>Publisher verification and response contact: [CLIENT PRIVACY EMAIL]</footer>
+</main>
+<script>
+document.getElementById('deletion-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const button = document.getElementById('submit');
+  const status = document.getElementById('status');
+  button.disabled = true;
+  status.textContent = 'Submitting…';
+  try {
+    const response = await fetch('/api/account-deletion-requests', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        email: document.getElementById('email').value,
+        student_id: document.getElementById('student-id').value,
+        notes: document.getElementById('notes').value
+      })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Request failed.');
+    status.textContent = data.message;
+    event.target.reset();
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+</script>
+</body></html>

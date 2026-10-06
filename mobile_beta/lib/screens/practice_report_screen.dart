@@ -6,6 +6,7 @@ import '../models/practice_session.dart';
 import '../models/scenario_topic.dart';
 import '../theme/engora_theme.dart';
 import '../widgets/app_svg_icon.dart';
+import '../services/ai_report_service.dart';
 
 enum PracticeReportMode { result, history }
 
@@ -46,6 +47,8 @@ class PracticeReportData {
   final String doneWell;
   final String suggestions;
   final List<PracticeReportTurn> transcript;
+  final String sessionId;
+  final String scenarioId;
 
   const PracticeReportData({
     this.assessment,
@@ -59,6 +62,8 @@ class PracticeReportData {
     required this.doneWell,
     required this.suggestions,
     required this.transcript,
+    this.sessionId = '',
+    this.scenarioId = '',
   });
 
   factory PracticeReportData.fromLive({
@@ -90,6 +95,7 @@ class PracticeReportData {
         results,
         _cleanAiName(scenario.aiRole),
       ),
+      scenarioId: scenario.id,
     );
   }
 
@@ -121,6 +127,8 @@ class PracticeReportData {
         results,
         _cleanAiName(session.scenario.aiRole),
       ),
+      sessionId: session.sessionId,
+      scenarioId: session.scenario.id,
     );
   }
 
@@ -250,6 +258,128 @@ class PracticeReportScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _reportResponse(
+    BuildContext context,
+    PracticeReportTurn turn,
+    int turnNumber,
+  ) async {
+    const categories = <String, String>{
+      'incorrect': 'Incorrect information',
+      'irrelevant': 'Not relevant',
+      'repeated': 'Repeated response',
+      'incomplete': 'Incomplete or cut off',
+      'inappropriate': 'Inappropriate content',
+      'other': 'Other concern',
+    };
+    var category = 'incorrect';
+    var submitting = false;
+    final notesController = TextEditingController();
+    final submitted = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Report AI response'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  turn.message,
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: EngoraColors.muted),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  initialValue: category,
+                  decoration: const InputDecoration(labelText: 'Reason'),
+                  items: categories.entries
+                      .map(
+                        (entry) => DropdownMenuItem(
+                          value: entry.key,
+                          child: Text(entry.value),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: submitting
+                      ? null
+                      : (value) => setDialogState(
+                          () => category = value ?? 'incorrect',
+                        ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: notesController,
+                  enabled: !submitting,
+                  maxLength: 1000,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Additional details (optional)',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: submitting
+                  ? null
+                  : () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: submitting
+                  ? null
+                  : () async {
+                      setDialogState(() => submitting = true);
+                      try {
+                        await const AiReportService().reportResponse(
+                          sessionId: data.sessionId,
+                          scenarioId: data.scenarioId,
+                          turnNumber: turnNumber,
+                          responseText: turn.message,
+                          category: category,
+                          notes: notesController.text.trim(),
+                        );
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext, true);
+                        }
+                      } catch (error) {
+                        if (!dialogContext.mounted) return;
+                        setDialogState(() => submitting = false);
+                        ScaffoldMessenger.of(dialogContext).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              error.toString().replaceFirst('Exception: ', ''),
+                            ),
+                          ),
+                        );
+                      }
+                    },
+              child: submitting
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text('Submit report'),
+            ),
+          ],
+        ),
+      ),
+    );
+    notesController.dispose();
+    if (submitted == true && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('AI response reported for review.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -299,8 +429,18 @@ class PracticeReportScreen extends StatelessWidget {
                       style: TextStyle(color: EngoraColors.muted),
                     )
                   else
-                    for (final turn in data.transcript)
-                      _TranscriptBubble(turn: turn),
+                    for (final entry in data.transcript.asMap().entries)
+                      _TranscriptBubble(
+                        turn: entry.value,
+                        onReport:
+                            !entry.value.isStudent && data.sessionId.isNotEmpty
+                            ? () => _reportResponse(
+                                context,
+                                entry.value,
+                                entry.key + 1,
+                              )
+                            : null,
+                      ),
                 ],
               ),
             ),
@@ -537,8 +677,9 @@ class _TextSection extends StatelessWidget {
 
 class _TranscriptBubble extends StatelessWidget {
   final PracticeReportTurn turn;
+  final VoidCallback? onReport;
 
-  const _TranscriptBubble({required this.turn});
+  const _TranscriptBubble({required this.turn, this.onReport});
 
   @override
   Widget build(BuildContext context) {
@@ -592,6 +733,18 @@ class _TranscriptBubble extends StatelessWidget {
                   color: EngoraColors.muted,
                   fontSize: 12,
                   height: 1.3,
+                ),
+              ),
+            ],
+            if (onReport != null) ...[
+              const SizedBox(height: 4),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: IconButton(
+                  tooltip: 'Report AI response',
+                  onPressed: onReport,
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.flag_outlined, size: 18),
                 ),
               ),
             ],

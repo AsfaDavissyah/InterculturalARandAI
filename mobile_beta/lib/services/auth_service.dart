@@ -221,6 +221,40 @@ class AuthService {
     _cachedProfile = null;
   }
 
+  static Future<void> deleteAccount({required String password}) async {
+    final baseUrl = await AppSettings.getBaseUrl();
+    final token = await getToken();
+    if (token == null || token.isEmpty) {
+      throw Exception(
+        'You need to sign in again before deleting your account.',
+      );
+    }
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/api/account'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'password': password, 'confirmation': 'DELETE'}),
+      );
+      if (response.statusCode != 200) {
+        Map<String, dynamic>? data;
+        try {
+          data = jsonDecode(response.body) as Map<String, dynamic>;
+        } catch (_) {}
+        throw Exception(
+          data?['error']?.toString() ??
+              'Account deletion could not be completed.',
+        );
+      }
+      await logout();
+    } catch (error) {
+      if (error.toString().contains('Exception:')) rethrow;
+      throw Exception('Could not connect to the server. Please try again.');
+    }
+  }
+
   /// Updates user profile details both on the backend and locally.
   static Future<bool> updateProfile({
     required String name,

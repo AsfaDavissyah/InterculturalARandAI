@@ -1,0 +1,21 @@
+:root { color-scheme: light; font-family: Arial, sans-serif; color: #202926; background: #f8f7f3; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+header { border-bottom: 1px solid #d9ddd8; background: #fff; }
+nav, main { width: min(760px, calc(100% - 32px)); margin: 0 auto; }
+nav { min-height: 64px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+nav strong { color: #176a64; margin-right: auto; }
+nav a { color: #34433f; text-decoration: none; }
+main { padding: 38px 0 64px; }
+h1 { font-size: clamp(28px, 6vw, 42px); margin: 0 0 12px; }
+h2 { font-size: 20px; margin-top: 30px; }
+p, li { line-height: 1.65; }
+.notice { border-left: 4px solid #176a64; background: #fff; padding: 14px 18px; margin: 22px 0; }
+form { display: grid; gap: 14px; margin-top: 24px; }
+label { display: grid; gap: 7px; font-weight: 600; }
+input, textarea, button { font: inherit; }
+input, textarea { width: 100%; border: 1px solid #aeb8b4; padding: 12px; background: #fff; }
+button { justify-self: start; border: 0; padding: 12px 18px; color: #fff; background: #176a64; cursor: pointer; }
+button:disabled { opacity: .55; cursor: wait; }
+#status { min-height: 24px; font-weight: 600; }
+footer { margin-top: 44px; color: #66736f; font-size: 14px; }

@@ -7,6 +7,8 @@ const Scenario = require("../models/Scenario");
 const Topic = require("../models/Topic");
 const Setting = require("../models/Setting");
 const AuditEvent = require("../models/AuditEvent");
+const AIResponseReport = require("../models/AIResponseReport");
+const AccountDeletionRequest = require("../models/AccountDeletionRequest");
 const {
   APPROVED_AI_PARTNERS,
   getApprovedAiPartner,
@@ -1500,6 +1502,137 @@ function createDashboardRouter({ authenticateJWT, requireRole, logAuditEvent }) 
       return res.json({ success: true });
     } catch (err) {
       return res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get("/ai-response-reports", async (req, res) => {
+    try {
+      const filter = {};
+      if (req.query.status && req.query.status !== "all") {
+        filter.status = String(req.query.status).trim().toLowerCase();
+      }
+      if (req.user.role === "lecturer") {
+        const lecturer = mongoose.Types.ObjectId.isValid(req.user.userId)
+          ? await User.findById(req.user.userId).select("lecturerCode").lean()
+          : null;
+        const lecturerCode = lecturer?.lecturerCode || req.user.lecturerCode || "";
+        const studentIds = await User.find({
+          role: "student",
+          studentLecturerCode: lecturerCode,
+        }).distinct("_id");
+        filter.userId = { $in: studentIds };
+      }
+      const reports = await AIResponseReport.find(filter)
+        .populate("userId", "name email studentId studentLecturerCode")
+        .sort({ createdAt: -1 })
+        .limit(250)
+        .lean();
+      return res.json(
+        reports.map((report) => ({
+          id: report._id,
+          session_id: report.sessionId,
+          scenario_id: report.scenarioId,
+          turn_number: report.turnNumber,
+          response_text: report.responseText,
+          category: report.category,
+          notes: report.notes,
+          status: report.status,
+          created_at: report.createdAt,
+          student: report.userId
+            ? {
+                name: report.userId.name,
+                email: report.userId.email,
+                student_id: report.userId.studentId,
+                lecturer_code: report.userId.studentLecturerCode,
+              }
+            : null,
+        }))
+      );
+    } catch (error) {
+      return res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.patch("/ai-response-reports/:report_id", async (req, res) => {
+    const status = String(req.body?.status || "").trim().toLowerCase();
+    if (!new Set(["reviewed", "resolved"]).has(status)) {
+      return res.status(400).json({ error: "Status must be reviewed or resolved." });
+    }
+    try {
+      const report = await AIResponseReport.findById(req.params.report_id);
+      if (!report) return res.status(404).json({ error: "AI response report not found." });
+      if (req.user.role === "lecturer") {
+        const [lecturer, student] = await Promise.all([
+          User.findById(req.user.userId).select("lecturerCode").lean(),
+          User.findById(report.userId).select("studentLecturerCode").lean(),
+        ]);
+        if (!lecturer?.lecturerCode || lecturer.lecturerCode !== student?.studentLecturerCode) {
+          return res.status(403).json({ error: "You can only review reports from your own cohort." });
+        }
+      }
+      report.status = status;
+      report.reviewedBy = req.user.userId;
+      report.reviewedAt = new Date();
+      await report.save();
+      logAuditEvent({
+        event: "ai_response_report_updated",
+        actorId: req.user.userId,
+        role: req.user.role,
+        recordId: String(report._id),
+        details: { status },
+        requestId: req.requestId,
+      });
+      return res.json({ success: true, status: report.status });
+    } catch (error) {
+      return res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.get("/account-deletion-requests", requireRole(["admin"]), async (req, res) => {
+    try {
+      const requests = await AccountDeletionRequest.find()
+        .sort({ createdAt: -1 })
+        .limit(250)
+        .lean();
+      return res.json(
+        requests.map((request) => ({
+          id: request._id,
+          email: request.email,
+          student_id: request.studentId,
+          notes: request.notes,
+          status: request.status,
+          created_at: request.createdAt,
+          handled_at: request.handledAt,
+        }))
+      );
+    } catch (error) {
+      return res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.patch("/account-deletion-requests/:request_id", requireRole(["admin"]), async (req, res) => {
+    const status = String(req.body?.status || "").trim().toLowerCase();
+    if (!new Set(["verified", "completed", "rejected"]).has(status)) {
+      return res.status(400).json({ error: "Invalid deletion-request status." });
+    }
+    try {
+      const request = await AccountDeletionRequest.findById(req.params.request_id);
+      if (!request) return res.status(404).json({ error: "Deletion request not found." });
+      request.status = status;
+      request.handledBy = req.user.userId;
+      request.handledAt = new Date();
+      await request.save();
+      logAuditEvent({
+        event: "account_deletion_request_updated",
+        actorId: req.user.userId,
+        role: req.user.role,
+        recordId: String(request._id),
+        details: { status },
+        requestId: req.requestId,
+      });
+      return res.json({ success: true, status: request.status });
+    } catch (error) {
+      return res.status(500).json({ error: error.message });
     }
   });
 
