@@ -8,7 +8,7 @@ import 'auth_service.dart';
 
 const Duration _realtimeAudioDrainDelay = Duration(milliseconds: 450);
 const Duration _realtimeAudioCommitDelay = Duration(milliseconds: 150);
-const Duration realtimeResponseTimeout = Duration(seconds: 15);
+const Duration realtimeResponseTimeout = Duration(seconds: 30);
 
 Map<String, dynamic> buildRealtimeManualTurnSessionUpdate() => {
   'type': 'session.update',
@@ -171,6 +171,9 @@ class RealtimePilotEvent {
   final String? inputTranscript;
   final String? completedTranscript;
   final String? message;
+  final String? responseStatus;
+  final String? responseStatusType;
+  final String? responseIncompleteReason;
   final RealtimeUsage? usage;
 
   const RealtimePilotEvent({
@@ -181,6 +184,9 @@ class RealtimePilotEvent {
     this.inputTranscript,
     this.completedTranscript,
     this.message,
+    this.responseStatus,
+    this.responseStatusType,
+    this.responseIncompleteReason,
     this.usage,
   });
 }
@@ -198,6 +204,12 @@ RealtimePilotEvent parseRealtimeServerEvent(String message) {
   final isAgentTranscriptComplete =
       type == 'response.output_audio_transcript.done' ||
       type == 'response.audio_transcript.done';
+  final response = Map<String, dynamic>.from(
+    payload['response'] as Map? ?? const {},
+  );
+  final statusDetails = Map<String, dynamic>.from(
+    response['status_details'] as Map? ?? const {},
+  );
 
   return RealtimePilotEvent(
     type: type,
@@ -217,6 +229,15 @@ RealtimePilotEvent parseRealtimeServerEvent(String message) {
         ? payload['transcript']?.toString()
         : null,
     message: payload['error']?['message']?.toString(),
+    responseStatus: type == 'response.done'
+        ? response['status']?.toString()
+        : null,
+    responseStatusType: type == 'response.done'
+        ? statusDetails['type']?.toString()
+        : null,
+    responseIncompleteReason: type == 'response.done'
+        ? statusDetails['reason']?.toString()
+        : null,
     usage: type == 'response.done'
         ? RealtimeUsage.fromResponseDone(payload)
         : null,
@@ -250,6 +271,7 @@ class RealtimeService {
   bool _microphoneEnabled = false;
   bool _responseActive = false;
   bool _responseRequested = false;
+  bool _outputAudioPlaying = false;
   bool _turnSubmissionInProgress = false;
   Completer<void>? _manualTurnConfiguration;
   Timer? _responseTimeoutTimer;
@@ -263,6 +285,7 @@ class RealtimeService {
 
   Stream<RealtimePilotEvent> get events => _events.stream;
   bool get microphoneEnabled => _microphoneEnabled;
+  bool get outputAudioPlaying => _outputAudioPlaying;
   String? get researchSessionId => _researchSessionId;
   String? get realtimeSessionId => _realtimeSessionId;
   RealtimeUsage get usage => _usage;
@@ -453,6 +476,9 @@ class RealtimeService {
     if (!enabled && _turnSubmissionInProgress) return;
 
     if (enabled) {
+      if (_outputAudioPlaying) {
+        throw StateError('Wait for the agent to finish speaking.');
+      }
       if (_responseActive || _responseRequested) {
         await cancelActiveResponse();
       }
@@ -588,6 +614,13 @@ class RealtimeService {
         _responseRequested = false;
         _responseActive = true;
       }
+      if (event.type == 'output_audio_buffer.started') {
+        _outputAudioPlaying = true;
+      }
+      if (event.type == 'output_audio_buffer.stopped' ||
+          event.type == 'output_audio_buffer.cleared') {
+        _outputAudioPlaying = false;
+      }
       if (event.type == 'response.done') {
         _responseTimeoutTimer?.cancel();
         _responseTimeoutTimer = null;
@@ -608,6 +641,7 @@ class RealtimeService {
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
+    _outputAudioPlaying = false;
     _responseTimeoutTimer?.cancel();
     for (final track in _localStream?.getTracks() ?? <MediaStreamTrack>[]) {
       await track.stop();

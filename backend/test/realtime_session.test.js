@@ -12,6 +12,7 @@ test("Realtime supports all scenarios with an optional rollback allowlist", () =
   } = require("../services/realtime_service");
   const previousScope = process.env.OPENAI_REALTIME_SCOPE;
   const previousScenarioIds = process.env.OPENAI_REALTIME_SCENARIO_IDS;
+  const previousMaxOutputTokens = process.env.OPENAI_REALTIME_MAX_OUTPUT_TOKENS;
 
   process.env.OPENAI_REALTIME_SCOPE = "all";
   assert.equal(isRealtimeScenarioEnabled("ACADEMIC-LECTURER-OFFICE"), true);
@@ -30,6 +31,7 @@ test("Realtime supports all scenarios with an optional rollback allowlist", () =
   } else {
     process.env.OPENAI_REALTIME_SCENARIO_IDS = previousScenarioIds;
   }
+  delete process.env.OPENAI_REALTIME_MAX_OUTPUT_TOKENS;
 
   const config = buildRealtimeSessionConfig({
     scenarioData: {
@@ -50,8 +52,10 @@ test("Realtime supports all scenarios with an optional rollback allowlist", () =
   assert.deepEqual(config.output_modalities, ["audio"]);
   assert.equal(config.audio.input.turn_detection, null);
   assert.equal(config.audio.output.voice, "marin");
+  assert.equal(config.max_output_tokens, 320);
   assert.match(config.instructions, /Alya/);
   assert.match(config.instructions, /one or two short sentences/i);
+  assert.match(config.instructions, /always finish the sentence/i);
   assert.match(config.instructions, /learner to speak first/i);
   assert.match(config.instructions, /faithfully repeat your immediately previous/i);
   assert.equal(
@@ -95,6 +99,12 @@ test("Realtime supports all scenarios with an optional rollback allowlist", () =
   });
   assert.equal(freeConfig.audio.output.voice, "cedar");
   assert.match(freeConfig.instructions, /learner controls the subject/i);
+
+  if (previousMaxOutputTokens === undefined) {
+    delete process.env.OPENAI_REALTIME_MAX_OUTPUT_TOKENS;
+  } else {
+    process.env.OPENAI_REALTIME_MAX_OUTPUT_TOKENS = previousMaxOutputTokens;
+  }
 });
 
 test("authenticated student receives an ephemeral secret without exposing the API key", async () => {

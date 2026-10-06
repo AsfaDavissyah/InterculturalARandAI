@@ -23,13 +23,16 @@ OPENAI_REALTIME_SCOPE=all
 OPENAI_REALTIME_MODEL=gpt-realtime
 OPENAI_REALTIME_VOICE=marin
 OPENAI_REALTIME_TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe
-OPENAI_REALTIME_MAX_OUTPUT_TOKENS=160
+OPENAI_REALTIME_MAX_OUTPUT_TOKENS=320
 ```
 
 `OPENAI_REALTIME_VOICE` is the fallback voice. Scenario Library uses `alloy`,
 female Guided Topic partners use `marin`, and male Guided Topic partners use
 `cedar`. Set `OPENAI_REALTIME_FORCE_VOICE` only when one supported voice must
 override every character.
+
+The `320` token ceiling leaves enough room for a complete short spoken answer.
+Lower values can end an audio response in the middle of a sentence.
 
 For emergency rollback, set `OPENAI_REALTIME_SCOPE=allowlist` and provide a
 comma-separated `OPENAI_REALTIME_SCENARIO_IDS` value.

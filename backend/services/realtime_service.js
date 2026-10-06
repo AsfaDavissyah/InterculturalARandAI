@@ -2,6 +2,7 @@ const OPENAI_REALTIME_CLIENT_SECRETS_URL =
   "https://api.openai.com/v1/realtime/client_secrets";
 const DEFAULT_REALTIME_MODEL = "gpt-realtime";
 const DEFAULT_REALTIME_VOICE = "marin";
+const DEFAULT_REALTIME_MAX_OUTPUT_TOKENS = 320;
 const DEFAULT_REALTIME_SCOPE = "all";
 const DEFAULT_REALTIME_ALLOWLIST = "ACADEMIC-LECTURER-OFFICE";
 const REALTIME_VOICES = new Set([
@@ -128,6 +129,7 @@ function buildRealtimeInstructions(scenarioData, student = {}) {
     objectiveText ? `Practice objectives:\n${objectiveText}` : "",
     "Wait silently for the learner to speak first. Do not open the conversation yourself.",
     "Reply in English using one or two short sentences.",
+    "Always finish the sentence you are speaking. Prefer one complete sentence over starting a second sentence that may be cut off.",
     "Ask no more than one focused question at a time.",
     freeConversation
       ? "The learner controls the subject. Follow their topic, answer directly, and allow them to change direction without redirecting them to a preset task."
@@ -146,7 +148,9 @@ function buildRealtimeSessionConfig({ scenarioData, student }) {
     model: String(process.env.OPENAI_REALTIME_MODEL || DEFAULT_REALTIME_MODEL).trim(),
     output_modalities: ["audio"],
     instructions: buildRealtimeInstructions(scenarioData, student),
-    max_output_tokens: Number(process.env.OPENAI_REALTIME_MAX_OUTPUT_TOKENS) || 160,
+    max_output_tokens:
+      Number(process.env.OPENAI_REALTIME_MAX_OUTPUT_TOKENS) ||
+      DEFAULT_REALTIME_MAX_OUTPUT_TOKENS,
     audio: {
       input: {
         noise_reduction: { type: "near_field" },

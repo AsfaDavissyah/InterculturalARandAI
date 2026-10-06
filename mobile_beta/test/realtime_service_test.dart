@@ -97,6 +97,18 @@ void main() {
     expect(total.estimatedResponseCostUsd, closeTo(0.0139312, 0.0000001));
   });
 
+  test('Realtime parser exposes incomplete response reasons', () {
+    final event = parseRealtimeServerEvent(
+      '{"type":"response.done","response":{'
+      '"status":"incomplete","status_details":{'
+      '"type":"incomplete","reason":"max_output_tokens"}}}',
+    );
+
+    expect(event.responseStatus, 'incomplete');
+    expect(event.responseStatusType, 'incomplete');
+    expect(event.responseIncompleteReason, 'max_output_tokens');
+  });
+
   test('Realtime response guard permits only one request at a time', () {
     expect(
       shouldCreateRealtimeResponse(

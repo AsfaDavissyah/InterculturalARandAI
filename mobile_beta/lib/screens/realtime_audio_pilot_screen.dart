@@ -101,10 +101,13 @@ class _RealtimeAudioPilotScreenState extends State<RealtimeAudioPilotScreen> {
           _status = 'Preparing response';
         case 'response.output_audio.delta':
         case 'response.audio.delta':
+        case 'output_audio_buffer.started':
           _status = 'Speaking';
         case 'response.done':
-          _status = 'Ready';
           _commitAgentTranscript(_agentTranscriptDraft, _agentTranscriptItemId);
+        case 'output_audio_buffer.stopped':
+        case 'output_audio_buffer.cleared':
+          _status = 'Ready';
         case 'error':
           _error = event.message ?? 'Realtime returned an error.';
       }

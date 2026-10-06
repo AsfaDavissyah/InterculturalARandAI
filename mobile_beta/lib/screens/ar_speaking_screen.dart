@@ -409,8 +409,8 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         case 'output_audio_buffer.started':
           _activity = AvatarActivity.speaking;
           _recordRealtimeAudioStart();
-        case 'response.done':
         case 'output_audio_buffer.stopped':
+        case 'output_audio_buffer.cleared':
           if (!_captureActive) _activity = AvatarActivity.idle;
         case 'error':
         case 'response_timeout':
@@ -955,6 +955,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
   Future<void> _toggleRealtimeMicrophone() async {
     final service = _realtimeService;
     if (service == null || !_realtimeConnected) return;
+    if (!_captureActive && service.outputAudioPlaying) return;
     try {
       if (!_captureActive) {
         await _tts.stop();
@@ -2156,12 +2157,7 @@ class _ArSpeakingScreenState extends State<ArSpeakingScreen>
         _activity != AvatarActivity.thinking &&
         _activity != AvatarActivity.speaking &&
         _activity != AvatarActivity.loading;
-    final canUseMicrophone =
-        canInteract ||
-        (_usesLiveRealtime &&
-            !_navigatingToResult &&
-            !_sessionLoading &&
-            _sessionError == null);
+    final canUseMicrophone = canInteract;
 
     return PopScope(
       canPop:
