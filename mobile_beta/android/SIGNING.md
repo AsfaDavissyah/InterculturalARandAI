@@ -1,6 +1,6 @@
 # Android Release Signing
 
-Engora uses the permanent Android application ID `com.asfadavissyah.engora`.
+Engora uses the permanent Android application ID `com.mala.engora`.
 Release signing is loaded from `android/key.properties`; the keystore and
 properties file are intentionally ignored by Git.
 

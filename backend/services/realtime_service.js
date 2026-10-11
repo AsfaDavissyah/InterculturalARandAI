@@ -3,6 +3,7 @@ const OPENAI_REALTIME_CLIENT_SECRETS_URL =
 const DEFAULT_REALTIME_MODEL = "gpt-realtime";
 const DEFAULT_REALTIME_VOICE = "marin";
 const DEFAULT_REALTIME_MAX_OUTPUT_TOKENS = 320;
+const MAX_REALTIME_OUTPUT_TOKENS = 4096;
 const DEFAULT_REALTIME_SCOPE = "all";
 const DEFAULT_REALTIME_ALLOWLIST = "ACADEMIC-LECTURER-OFFICE";
 const REALTIME_VOICES = new Set([
@@ -103,6 +104,15 @@ function resolveRealtimeVoice(scenarioData = {}) {
     : DEFAULT_REALTIME_VOICE;
 }
 
+function resolveRealtimeMaxOutputTokens() {
+  const configured = Number(process.env.OPENAI_REALTIME_MAX_OUTPUT_TOKENS);
+  if (!Number.isFinite(configured)) return DEFAULT_REALTIME_MAX_OUTPUT_TOKENS;
+  return Math.min(
+    MAX_REALTIME_OUTPUT_TOKENS,
+    Math.max(DEFAULT_REALTIME_MAX_OUTPUT_TOKENS, Math.trunc(configured))
+  );
+}
+
 function buildRealtimeInstructions(scenarioData, student = {}) {
   const scenario = scenarioData?.scenario || {};
   const context = scenarioData?.context || {};
@@ -148,9 +158,7 @@ function buildRealtimeSessionConfig({ scenarioData, student }) {
     model: String(process.env.OPENAI_REALTIME_MODEL || DEFAULT_REALTIME_MODEL).trim(),
     output_modalities: ["audio"],
     instructions: buildRealtimeInstructions(scenarioData, student),
-    max_output_tokens:
-      Number(process.env.OPENAI_REALTIME_MAX_OUTPUT_TOKENS) ||
-      DEFAULT_REALTIME_MAX_OUTPUT_TOKENS,
+    max_output_tokens: resolveRealtimeMaxOutputTokens(),
     audio: {
       input: {
         noise_reduction: { type: "near_field" },
@@ -246,5 +254,6 @@ module.exports = {
   isRealtimeScenarioEnabled,
   realtimeAllowedScenarioIds,
   realtimeAvailabilityScope,
+  resolveRealtimeMaxOutputTokens,
   resolveRealtimeVoice,
 };

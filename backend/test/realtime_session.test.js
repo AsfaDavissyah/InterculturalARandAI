@@ -8,6 +8,7 @@ test("Realtime supports all scenarios with an optional rollback allowlist", () =
   const {
     buildRealtimeSessionConfig,
     isRealtimeScenarioEnabled,
+    resolveRealtimeMaxOutputTokens,
     resolveRealtimeVoice,
   } = require("../services/realtime_service");
   const previousScope = process.env.OPENAI_REALTIME_SCOPE;
@@ -53,6 +54,12 @@ test("Realtime supports all scenarios with an optional rollback allowlist", () =
   assert.equal(config.audio.input.turn_detection, null);
   assert.equal(config.audio.output.voice, "marin");
   assert.equal(config.max_output_tokens, 320);
+  process.env.OPENAI_REALTIME_MAX_OUTPUT_TOKENS = "160";
+  assert.equal(resolveRealtimeMaxOutputTokens(), 320);
+  process.env.OPENAI_REALTIME_MAX_OUTPUT_TOKENS = "640";
+  assert.equal(resolveRealtimeMaxOutputTokens(), 640);
+  process.env.OPENAI_REALTIME_MAX_OUTPUT_TOKENS = "5000";
+  assert.equal(resolveRealtimeMaxOutputTokens(), 4096);
   assert.match(config.instructions, /Alya/);
   assert.match(config.instructions, /one or two short sentences/i);
   assert.match(config.instructions, /always finish the sentence/i);
